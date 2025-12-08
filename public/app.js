@@ -45,7 +45,8 @@ async function loadUser() {
     document.getElementById('userName').textContent = state.user.name || state.user.email;
   } catch (error) {
     console.error('Failed to load user:', error);
-    showNotification('Please sign in with Cloudflare Access', 'error');
+    document.getElementById('userName').textContent = 'Error';
+    showNotification('Failed to load user. Please refresh the page.', 'error');
   }
 }
 

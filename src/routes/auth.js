@@ -41,14 +41,24 @@ auth.get('/user', async (c) => {
   }
 
   const payload = parseJWT(jwtToken);
+  
+  if (!payload || !payload.email) {
+    return c.json({ error: 'Invalid JWT token' }, 401);
+  }
+
   const db = c.env.DB;
   
-  const user = await db.prepare(
+  let user = await db.prepare(
     'SELECT * FROM users WHERE email = ?'
   ).bind(payload.email).first();
 
   if (!user) {
-    return c.json({ error: 'User not found' }, 404);
+    // Auto-create user on first access
+    const result = await db.prepare(
+      'INSERT INTO users (email, name) VALUES (?, ?) RETURNING *'
+    ).bind(payload.email, payload.name || payload.email).first();
+    
+    user = result;
   }
 
   return c.json({ user });
