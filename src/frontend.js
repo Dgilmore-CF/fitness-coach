@@ -1,8 +1,7 @@
-/**
+// Auto-generated - do not edit manually
+export default `/**
  * AI Fitness Coach - Frontend Application
  */
-
-export default `
 
 // Global state
 const state = {
@@ -23,7 +22,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // API helper
 async function api(endpoint, options = {}) {
-  const response = await fetch(`/api${endpoint}`, {
+  const response = await fetch(\`/api\${endpoint}\`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -93,25 +92,25 @@ async function loadDashboard() {
       api('/workouts?limit=5')
     ]);
 
-    container.innerHTML = `
+    container.innerHTML = \`
       <div class="card">
         <h2><i class="fas fa-chart-line"></i> 30-Day Progress</h2>
         <div class="stats-grid">
           <div class="stat-card">
             <div class="stat-label">Workouts</div>
-            <div class="stat-value">${progress.overview.total_workouts}</div>
+            <div class="stat-value">\${progress.overview.total_workouts}</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">Total Weight Lifted</div>
-            <div class="stat-value">${Math.round(progress.overview.total_volume_kg)} kg</div>
+            <div class="stat-value">\${Math.round(progress.overview.total_volume_kg)} kg</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">Total Time</div>
-            <div class="stat-value">${formatDuration(progress.overview.total_time_seconds)}</div>
+            <div class="stat-value">\${formatDuration(progress.overview.total_time_seconds)}</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">Avg Workout</div>
-            <div class="stat-value">${formatDuration(progress.overview.average_workout_time)}</div>
+            <div class="stat-value">\${formatDuration(progress.overview.average_workout_time)}</div>
           </div>
         </div>
       </div>
@@ -133,31 +132,31 @@ async function loadDashboard() {
 
       <div class="card">
         <h2><i class="fas fa-history"></i> Recent Workouts</h2>
-        ${recentWorkouts.workouts.length > 0 ? `
+        \${recentWorkouts.workouts.length > 0 ? \`
           <div class="exercise-list">
-            ${recentWorkouts.workouts.map(w => `
-              <div class="exercise-item" onclick="viewWorkout(${w.id})">
+            \${recentWorkouts.workouts.map(w => \`
+              <div class="exercise-item" onclick="viewWorkout(\${w.id})">
                 <div style="display: flex; justify-content: space-between;">
                   <div>
-                    <strong>${w.day_name || 'Custom Workout'}</strong>
+                    <strong>\${w.day_name || 'Custom Workout'}</strong>
                     <div style="color: var(--gray); font-size: 14px;">
-                      ${new Date(w.start_time).toLocaleDateString()} - 
-                      ${w.total_weight_kg ? Math.round(w.total_weight_kg) + ' kg' : 'N/A'}
+                      \${new Date(w.start_time).toLocaleDateString()} - 
+                      \${w.total_weight_kg ? Math.round(w.total_weight_kg) + ' kg' : 'N/A'}
                     </div>
                   </div>
                   <div style="text-align: right;">
-                    <div>${formatDuration(w.total_duration_seconds)}</div>
-                    ${w.completed ? '<span style="color: var(--secondary);">✓ Completed</span>' : '<span style="color: var(--warning);">In Progress</span>'}
+                    <div>\${formatDuration(w.total_duration_seconds)}</div>
+                    \${w.completed ? '<span style="color: var(--secondary);">✓ Completed</span>' : '<span style="color: var(--warning);">In Progress</span>'}
                   </div>
                 </div>
               </div>
-            `).join('')}
+            \`).join('')}
           </div>
-        ` : '<p>No workouts yet. Start your first workout!</p>'}
+        \` : '<p>No workouts yet. Start your first workout!</p>'}
       </div>
-    `;
+    \`;
   } catch (error) {
-    container.innerHTML = `<div class="card"><p>Error loading dashboard: ${error.message}</p></div>`;
+    container.innerHTML = \`<div class="card"><p>Error loading dashboard: \${error.message}</p></div>\`;
   }
 }
 
@@ -169,7 +168,7 @@ async function loadPrograms() {
     const data = await api('/programs');
     const activeProgram = data.programs.find(p => p.active);
     
-    container.innerHTML = `
+    container.innerHTML = \`
       <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <h2><i class="fas fa-list-alt"></i> My Programs</h2>
@@ -179,102 +178,102 @@ async function loadPrograms() {
         </div>
       </div>
 
-      ${activeProgram ? `
+      \${activeProgram ? \`
         <div class="card" style="border: 2px solid var(--secondary);">
           <h2><i class="fas fa-check-circle"></i> Active Program</h2>
-          <div onclick="viewProgram(${activeProgram.id})" style="cursor: pointer;">
-            <h3>${activeProgram.name}</h3>
-            <p>${activeProgram.days_per_week} days per week | ${activeProgram.goal}</p>
+          <div onclick="viewProgram(\${activeProgram.id})" style="cursor: pointer;">
+            <h3>\${activeProgram.name}</h3>
+            <p>\${activeProgram.days_per_week} days per week | \${activeProgram.goal}</p>
           </div>
-          <button class="btn btn-secondary" onclick="viewProgram(${activeProgram.id})">
+          <button class="btn btn-secondary" onclick="viewProgram(\${activeProgram.id})">
             View Details
           </button>
         </div>
-      ` : ''}
+      \` : ''}
 
       <div class="card">
         <h2><i class="fas fa-folder"></i> All Programs</h2>
-        ${data.programs.length > 0 ? `
+        \${data.programs.length > 0 ? \`
           <div class="exercise-list">
-            ${data.programs.map(p => `
-              <div class="exercise-item ${p.active ? 'active' : ''}" onclick="viewProgram(${p.id})">
+            \${data.programs.map(p => \`
+              <div class="exercise-item \${p.active ? 'active' : ''}" onclick="viewProgram(\${p.id})">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                   <div>
-                    <strong>${p.name}</strong>
+                    <strong>\${p.name}</strong>
                     <div style="color: var(--gray); font-size: 14px;">
-                      ${p.days_per_week} days/week | ${p.goal} | ${p.ai_generated ? '🤖 AI Generated' : 'Custom'}
+                      \${p.days_per_week} days/week | \${p.goal} | \${p.ai_generated ? '🤖 AI Generated' : 'Custom'}
                     </div>
                   </div>
                   <div>
-                    ${p.active ? '<span style="color: var(--secondary); font-weight: bold;">ACTIVE</span>' : `
-                      <button class="btn btn-outline" onclick="event.stopPropagation(); activateProgram(${p.id})">
+                    \${p.active ? '<span style="color: var(--secondary); font-weight: bold;">ACTIVE</span>' : \`
+                      <button class="btn btn-outline" onclick="event.stopPropagation(); activateProgram(\${p.id})">
                         Activate
                       </button>
-                    `}
+                    \`}
                   </div>
                 </div>
               </div>
-            `).join('')}
+            \`).join('')}
           </div>
-        ` : '<p>No programs yet. Generate your first program!</p>'}
+        \` : '<p>No programs yet. Generate your first program!</p>'}
       </div>
-    `;
+    \`;
   } catch (error) {
-    container.innerHTML = `<div class="card"><p>Error loading programs: ${error.message}</p></div>`;
+    container.innerHTML = \`<div class="card"><p>Error loading programs: \${error.message}</p></div>\`;
   }
 }
 
 // View program details
 async function viewProgram(programId) {
   try {
-    const data = await api(`/programs/${programId}`);
+    const data = await api(\`/programs/\${programId}\`);
     const program = data.program;
     
     const modalBody = document.getElementById('modalBody');
-    modalBody.innerHTML = `
-      <h3>${program.name}</h3>
-      <p>${program.days_per_week} days per week | ${program.goal}</p>
-      <p><em>${program.equipment}</em></p>
+    modalBody.innerHTML = \`
+      <h3>\${program.name}</h3>
+      <p>\${program.days_per_week} days per week | \${program.goal}</p>
+      <p><em>\${program.equipment}</em></p>
 
-      ${program.days.map(day => `
+      \${program.days.map(day => \`
         <div style="margin: 20px 0; padding: 16px; background: var(--light); border-radius: 8px;">
-          <h4>Day ${day.day_number}: ${day.name}</h4>
-          <p style="color: var(--gray); margin-bottom: 10px;">${day.focus}</p>
+          <h4>Day \${day.day_number}: \${day.name}</h4>
+          <p style="color: var(--gray); margin-bottom: 10px;">\${day.focus}</p>
           
           <strong>Warm-up Stretches:</strong>
           <ul style="margin: 10px 0;">
-            ${day.stretches.map(s => `
-              <li>${s.name} - ${s.duration_seconds}s (${s.muscle_group})</li>
-            `).join('')}
+            \${day.stretches.map(s => \`
+              <li>\${s.name} - \${s.duration_seconds}s (\${s.muscle_group})</li>
+            \`).join('')}
           </ul>
 
           <strong>Exercises:</strong>
           <ol style="margin: 10px 0;">
-            ${day.exercises.map(ex => `
+            \${day.exercises.map(ex => \`
               <li>
-                <strong>${ex.name}</strong> - ${ex.target_sets} sets x ${ex.target_reps} reps
+                <strong>\${ex.name}</strong> - \${ex.target_sets} sets x \${ex.target_reps} reps
                 <div style="font-size: 12px; color: var(--gray);">
-                  Rest: ${ex.rest_seconds}s | ${ex.muscle_group} | ${ex.equipment}
+                  Rest: \${ex.rest_seconds}s | \${ex.muscle_group} | \${ex.equipment}
                 </div>
-                ${ex.tips ? `<div style="font-size: 12px; font-style: italic; margin-top: 4px;">${ex.tips}</div>` : ''}
+                \${ex.tips ? \`<div style="font-size: 12px; font-style: italic; margin-top: 4px;">\${ex.tips}</div>\` : ''}
               </li>
-            `).join('')}
+            \`).join('')}
           </ol>
         </div>
-      `).join('')}
+      \`).join('')}
 
-      <button class="btn btn-primary" onclick="startWorkoutFromProgram(${program.id})">
+      <button class="btn btn-primary" onclick="startWorkoutFromProgram(\${program.id})">
         <i class="fas fa-play"></i> Start Workout
       </button>
-      ${!program.active ? `
-        <button class="btn btn-secondary" onclick="activateProgram(${program.id})">
+      \${!program.active ? \`
+        <button class="btn btn-secondary" onclick="activateProgram(\${program.id})">
           Set as Active
         </button>
-      ` : ''}
-      <button class="btn btn-danger" onclick="deleteProgram(${program.id})">
+      \` : ''}
+      <button class="btn btn-danger" onclick="deleteProgram(\${program.id})">
         <i class="fas fa-trash"></i> Delete
       </button>
-    `;
+    \`;
 
     document.getElementById('modalTitle').textContent = 'Program Details';
     openModal();
@@ -286,7 +285,7 @@ async function viewProgram(programId) {
 // Generate program modal
 function showGenerateProgram() {
   const modalBody = document.getElementById('modalBody');
-  modalBody.innerHTML = `
+  modalBody.innerHTML = \`
     <div class="form-group">
       <label>Days per week:</label>
       <select id="daysPerWeek" class="form-control">
@@ -313,7 +312,7 @@ function showGenerateProgram() {
     <button class="btn btn-primary" onclick="generateProgram()">
       <i class="fas fa-magic"></i> Generate Program
     </button>
-  `;
+  \`;
 
   document.getElementById('modalTitle').textContent = 'Generate AI Program';
   openModal();
@@ -346,7 +345,7 @@ async function generateProgram() {
 // Activate program
 async function activateProgram(programId) {
   try {
-    await api(`/programs/${programId}/activate`, { method: 'POST' });
+    await api(\`/programs/\${programId}/activate\`, { method: 'POST' });
     showNotification('Program activated!', 'success');
     loadPrograms();
   } catch (error) {
@@ -359,7 +358,7 @@ async function deleteProgram(programId) {
   if (!confirm('Are you sure you want to delete this program?')) return;
 
   try {
-    await api(`/programs/${programId}`, { method: 'DELETE' });
+    await api(\`/programs/\${programId}\`, { method: 'DELETE' });
     showNotification('Program deleted', 'success');
     closeModal();
     loadPrograms();
@@ -382,23 +381,23 @@ async function startWorkout() {
     }
 
     // Get program details
-    const programData = await api(`/programs/${activeProgram.id}`);
+    const programData = await api(\`/programs/\${activeProgram.id}\`);
     const program = programData.program;
 
     // Show day selection
     const modalBody = document.getElementById('modalBody');
-    modalBody.innerHTML = `
+    modalBody.innerHTML = \`
       <h3>Select Workout Day</h3>
       <div class="exercise-list">
-        ${program.days.map(day => `
-          <div class="exercise-item" onclick="startWorkoutDay(${program.id}, ${day.id})">
-            <strong>Day ${day.day_number}: ${day.name}</strong>
-            <div style="color: var(--gray); font-size: 14px;">${day.focus}</div>
-            <div style="font-size: 12px; margin-top: 4px;">${day.exercises.length} exercises</div>
+        \${program.days.map(day => \`
+          <div class="exercise-item" onclick="startWorkoutDay(\${program.id}, \${day.id})">
+            <strong>Day \${day.day_number}: \${day.name}</strong>
+            <div style="color: var(--gray); font-size: 14px;">\${day.focus}</div>
+            <div style="font-size: 12px; margin-top: 4px;">\${day.exercises.length} exercises</div>
           </div>
-        `).join('')}
+        \`).join('')}
       </div>
-    `;
+    \`;
 
     document.getElementById('modalTitle').textContent = 'Start Workout';
     openModal();
@@ -445,7 +444,7 @@ async function loadWorkout() {
   if (state.currentWorkout) {
     loadWorkoutInterface();
   } else {
-    container.innerHTML = `
+    container.innerHTML = \`
       <div class="card">
         <h2><i class="fas fa-dumbbell"></i> No Active Workout</h2>
         <p>Start a workout to begin tracking your session.</p>
@@ -453,7 +452,7 @@ async function loadWorkout() {
           <i class="fas fa-play"></i> Start Workout
         </button>
       </div>
-    `;
+    \`;
   }
 }
 
@@ -462,7 +461,7 @@ async function loadWorkoutInterface() {
   const container = document.getElementById('workout');
   
   try {
-    const data = await api(`/workouts/${state.currentWorkout.id}`);
+    const data = await api(\`/workouts/\${state.currentWorkout.id}\`);
     const workout = data.workout;
 
     // Start workout timer if not already started
@@ -470,10 +469,10 @@ async function loadWorkoutInterface() {
       startWorkoutTimer();
     }
 
-    container.innerHTML = `
+    container.innerHTML = \`
       <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-          <h2><i class="fas fa-stopwatch"></i> ${workout.day_name || 'Workout Session'}</h2>
+          <h2><i class="fas fa-stopwatch"></i> \${workout.day_name || 'Workout Session'}</h2>
           <div id="workoutTimer" class="timer-display" style="font-size: 24px;">00:00:00</div>
         </div>
       </div>
@@ -492,7 +491,7 @@ async function loadWorkoutInterface() {
       <div class="card">
         <h3><i class="fas fa-list"></i> Exercises</h3>
         <div id="exerciseList">
-          ${workout.exercises.map((ex, idx) => renderExercise(ex, idx)).join('')}
+          \${workout.exercises.map((ex, idx) => renderExercise(ex, idx)).join('')}
         </div>
         <button class="btn btn-outline" onclick="addExerciseToWorkout()">
           <i class="fas fa-plus"></i> Add Exercise
@@ -501,7 +500,7 @@ async function loadWorkoutInterface() {
 
       <div class="card">
         <h3><i class="fas fa-notes-medical"></i> Workout Notes</h3>
-        <textarea id="workoutNotes" class="form-control" rows="3" placeholder="Add notes about your workout...">${workout.notes || ''}</textarea>
+        <textarea id="workoutNotes" class="form-control" rows="3" placeholder="Add notes about your workout...">\${workout.notes || ''}</textarea>
         <button class="btn btn-outline" onclick="saveWorkoutNotes()" style="margin-top: 10px;">Save Notes</button>
       </div>
 
@@ -510,62 +509,62 @@ async function loadWorkoutInterface() {
           <i class="fas fa-check"></i> Complete Workout
         </button>
       </div>
-    `;
+    \`;
 
     updateWorkoutTimerDisplay();
   } catch (error) {
-    container.innerHTML = `<div class="card"><p>Error loading workout: ${error.message}</p></div>`;
+    container.innerHTML = \`<div class="card"><p>Error loading workout: \${error.message}</p></div>\`;
   }
 }
 
 // Render exercise
 function renderExercise(exercise, index) {
-  return `
-    <div class="exercise-item" id="exercise-${exercise.id}">
+  return \`
+    <div class="exercise-item" id="exercise-\${exercise.id}">
       <div style="margin-bottom: 10px;">
-        <strong>${index + 1}. ${exercise.name}</strong>
+        <strong>\${index + 1}. \${exercise.name}</strong>
         <div style="font-size: 12px; color: var(--gray);">
-          ${exercise.muscle_group} | ${exercise.equipment}
-          ${exercise.is_unilateral ? ' | <strong>UNILATERAL (weight doubles)</strong>' : ''}
+          \${exercise.muscle_group} | \${exercise.equipment}
+          \${exercise.is_unilateral ? ' | <strong>UNILATERAL (weight doubles)</strong>' : ''}
         </div>
-        ${exercise.tips ? `
+        \${exercise.tips ? \`
           <details style="margin-top: 8px;">
             <summary style="cursor: pointer; color: var(--primary);"><i class="fas fa-info-circle"></i> Exercise Tips</summary>
-            <p style="font-size: 13px; margin-top: 8px;">${exercise.tips}</p>
+            <p style="font-size: 13px; margin-top: 8px;">\${exercise.tips}</p>
           </details>
-        ` : ''}
+        \` : ''}
       </div>
 
       <div class="set-tracker">
-        ${(exercise.sets || []).map((set, setIdx) => `
+        \${(exercise.sets || []).map((set, setIdx) => \`
           <div class="set-item completed">
-            <div>Set ${set.set_number}</div>
-            <div>${set.weight_kg}kg x ${set.reps}</div>
-            <div style="font-size: 10px;">1RM: ${Math.round(set.one_rep_max_kg)}kg</div>
+            <div>Set \${set.set_number}</div>
+            <div>\${set.weight_kg}kg x \${set.reps}</div>
+            <div style="font-size: 10px;">1RM: \${Math.round(set.one_rep_max_kg)}kg</div>
           </div>
-        `).join('')}
+        \`).join('')}
       </div>
 
       <div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
-        <input type="number" id="weight-${exercise.id}" placeholder="Weight (kg)" step="2.5" 
+        <input type="number" id="weight-\${exercise.id}" placeholder="Weight (kg)" step="2.5" 
                style="width: 100px; padding: 8px; border: 2px solid var(--light); border-radius: 6px;">
-        <input type="number" id="reps-${exercise.id}" placeholder="Reps" min="1"
+        <input type="number" id="reps-\${exercise.id}" placeholder="Reps" min="1"
                style="width: 80px; padding: 8px; border: 2px solid var(--light); border-radius: 6px;">
-        <button class="btn btn-secondary" onclick="recordSet(${exercise.id})">
+        <button class="btn btn-secondary" onclick="recordSet(\${exercise.id})">
           <i class="fas fa-plus"></i> Add Set
         </button>
-        <button class="btn btn-outline" onclick="showExerciseNotes(${exercise.id})">
+        <button class="btn btn-outline" onclick="showExerciseNotes(\${exercise.id})">
           <i class="fas fa-sticky-note"></i> Notes
         </button>
       </div>
     </div>
-  `;
+  \`;
 }
 
 // Record set
 async function recordSet(exerciseId) {
-  const weight = parseFloat(document.getElementById(`weight-${exerciseId}`).value);
-  const reps = parseInt(document.getElementById(`reps-${exerciseId}`).value);
+  const weight = parseFloat(document.getElementById(\`weight-\${exerciseId}\`).value);
+  const reps = parseInt(document.getElementById(\`reps-\${exerciseId}\`).value);
 
   if (!weight || !reps) {
     showNotification('Please enter weight and reps', 'warning');
@@ -573,7 +572,7 @@ async function recordSet(exerciseId) {
   }
 
   try {
-    await api(`/workouts/${state.currentWorkout.id}/exercises/${exerciseId}/sets`, {
+    await api(\`/workouts/\${state.currentWorkout.id}/exercises/\${exerciseId}/sets\`, {
       method: 'POST',
       body: JSON.stringify({ weight_kg: weight, reps, rest_seconds: 90 })
     });
@@ -621,7 +620,7 @@ function updateRestTimerDisplay() {
   if (display) {
     const mins = Math.floor(remaining / 60);
     const secs = remaining % 60;
-    display.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    display.textContent = \`\${String(mins).padStart(2, '0')}:\${String(secs).padStart(2, '0')}\`;
     
     if (remaining === 0) {
       playAlarm();
@@ -668,7 +667,7 @@ async function completeWorkout() {
   if (!confirm('Are you sure you want to complete this workout?')) return;
 
   try {
-    await api(`/workouts/${state.currentWorkout.id}/complete`, { method: 'POST' });
+    await api(\`/workouts/\${state.currentWorkout.id}/complete\`, { method: 'POST' });
     
     if (state.workoutTimer) {
       clearInterval(state.workoutTimer);
@@ -697,83 +696,83 @@ async function loadAnalytics() {
       api('/analytics/bodymap?days=7')
     ]);
 
-    container.innerHTML = `
+    container.innerHTML = \`
       <div class="card">
         <h2><i class="fas fa-chart-line"></i> 90-Day Progress</h2>
         <div class="stats-grid">
           <div class="stat-card">
             <div class="stat-label">Total Workouts</div>
-            <div class="stat-value">${progress.overview.total_workouts}</div>
+            <div class="stat-value">\${progress.overview.total_workouts}</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">Total Volume</div>
-            <div class="stat-value">${Math.round(progress.overview.total_volume_kg)} kg</div>
+            <div class="stat-value">\${Math.round(progress.overview.total_volume_kg)} kg</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">Total Time</div>
-            <div class="stat-value">${formatDuration(progress.overview.total_time_seconds)}</div>
+            <div class="stat-value">\${formatDuration(progress.overview.total_time_seconds)}</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">Avg Workout</div>
-            <div class="stat-value">${formatDuration(progress.overview.average_workout_time)}</div>
+            <div class="stat-value">\${formatDuration(progress.overview.average_workout_time)}</div>
           </div>
         </div>
       </div>
 
       <div class="card">
         <h2><i class="fas fa-weight"></i> Volume by Muscle Group (90 days)</h2>
-        ${volumeData.volume_by_muscle.length > 0 ? `
+        \${volumeData.volume_by_muscle.length > 0 ? \`
           <div style="display: grid; gap: 8px;">
-            ${volumeData.volume_by_muscle.map(m => `
+            \${volumeData.volume_by_muscle.map(m => \`
               <div style="display: flex; justify-content: space-between; padding: 8px; background: var(--light); border-radius: 6px;">
-                <strong>${m.muscle_group}</strong>
-                <span>${Math.round(m.volume)} kg</span>
+                <strong>\${m.muscle_group}</strong>
+                <span>\${Math.round(m.volume)} kg</span>
               </div>
-            `).join('')}
+            \`).join('')}
           </div>
-        ` : '<p>No volume data yet.</p>'}
+        \` : '<p>No volume data yet.</p>'}
       </div>
 
       <div class="card">
         <h2><i class="fas fa-body"></i> Body Map (Last 7 Days)</h2>
-        ${bodyMap.body_map.length > 0 ? `
+        \${bodyMap.body_map.length > 0 ? \`
           <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px;">
-            ${bodyMap.body_map.map(m => `
-              <div style="padding: 16px; background: linear-gradient(135deg, rgba(79, 70, 229, ${m.intensity/100}) 0%, rgba(118, 75, 162, ${m.intensity/100}) 100%); 
+            \${bodyMap.body_map.map(m => \`
+              <div style="padding: 16px; background: linear-gradient(135deg, rgba(79, 70, 229, \${m.intensity/100}) 0%, rgba(118, 75, 162, \${m.intensity/100}) 100%); 
                           border-radius: 8px; color: white; text-align: center;">
-                <div style="font-weight: bold;">${m.muscle_group}</div>
-                <div style="font-size: 12px; margin-top: 4px;">${m.set_count} sets</div>
-                <div style="font-size: 12px;">${Math.round(m.volume)} kg</div>
+                <div style="font-weight: bold;">\${m.muscle_group}</div>
+                <div style="font-size: 12px; margin-top: 4px;">\${m.set_count} sets</div>
+                <div style="font-size: 12px;">\${Math.round(m.volume)} kg</div>
               </div>
-            `).join('')}
+            \`).join('')}
           </div>
-        ` : '<p>No workout data in the last 7 days.</p>'}
+        \` : '<p>No workout data in the last 7 days.</p>'}
       </div>
 
       <div class="card">
         <h2><i class="fas fa-trophy"></i> Top Exercises</h2>
-        ${progress.top_exercises.length > 0 ? `
+        \${progress.top_exercises.length > 0 ? \`
           <div class="exercise-list">
-            ${progress.top_exercises.map((ex, idx) => `
+            \${progress.top_exercises.map((ex, idx) => \`
               <div class="exercise-item">
                 <div style="display: flex; justify-content: space-between;">
                   <div>
-                    <strong>${idx + 1}. ${ex.name}</strong>
-                    <div style="font-size: 12px; color: var(--gray);">${ex.muscle_group}</div>
+                    <strong>\${idx + 1}. \${ex.name}</strong>
+                    <div style="font-size: 12px; color: var(--gray);">\${ex.muscle_group}</div>
                   </div>
                   <div style="text-align: right;">
-                    <div>${Math.round(ex.volume)} kg total</div>
-                    <div style="font-size: 12px; color: var(--gray);">${ex.workout_count} workouts</div>
+                    <div>\${Math.round(ex.volume)} kg total</div>
+                    <div style="font-size: 12px; color: var(--gray);">\${ex.workout_count} workouts</div>
                   </div>
                 </div>
               </div>
-            `).join('')}
+            \`).join('')}
           </div>
-        ` : '<p>No exercise data yet.</p>'}
+        \` : '<p>No exercise data yet.</p>'}
       </div>
-    `;
+    \`;
   } catch (error) {
-    container.innerHTML = `<div class="card"><p>Error loading analytics: ${error.message}</p></div>`;
+    container.innerHTML = \`<div class="card"><p>Error loading analytics: \${error.message}</p></div>\`;
   }
 }
 
@@ -785,19 +784,19 @@ async function loadNutrition() {
     const daily = await api('/nutrition/daily');
     const today = new Date().toISOString().split('T')[0];
 
-    container.innerHTML = `
+    container.innerHTML = \`
       <div class="card">
         <h2><i class="fas fa-apple-alt"></i> Today's Nutrition</h2>
         <div class="stats-grid">
           <div class="stat-card" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
             <div class="stat-label">Protein</div>
-            <div class="stat-value">${Math.round(daily.protein_grams)}g</div>
-            <div class="stat-label">Goal: ${Math.round(daily.protein_goal)}g (${Math.round(daily.protein_percentage)}%)</div>
+            <div class="stat-value">\${Math.round(daily.protein_grams)}g</div>
+            <div class="stat-label">Goal: \${Math.round(daily.protein_goal)}g (\${Math.round(daily.protein_percentage)}%)</div>
           </div>
           <div class="stat-card" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);">
             <div class="stat-label">Water</div>
-            <div class="stat-value">${Math.round(daily.water_ml)}ml</div>
-            <div class="stat-label">Goal: ${Math.round(daily.water_goal)}ml (${Math.round(daily.water_percentage)}%)</div>
+            <div class="stat-value">\${Math.round(daily.water_ml)}ml</div>
+            <div class="stat-label">Goal: \${Math.round(daily.water_goal)}ml (\${Math.round(daily.water_percentage)}%)</div>
           </div>
         </div>
       </div>
@@ -831,9 +830,9 @@ async function loadNutrition() {
           </div>
         </div>
       </div>
-    `;
+    \`;
   } catch (error) {
-    container.innerHTML = `<div class="card"><p>Error loading nutrition: ${error.message}</p></div>`;
+    container.innerHTML = \`<div class="card"><p>Error loading nutrition: \${error.message}</p></div>\`;
   }
 }
 
@@ -882,31 +881,31 @@ async function logWater(amount) {
 // Profile modal
 function showProfile() {
   const modalBody = document.getElementById('modalBody');
-  modalBody.innerHTML = `
+  modalBody.innerHTML = \`
     <div class="form-group">
       <label>Name:</label>
-      <input type="text" id="profileName" value="${state.user.name || ''}" class="form-control">
+      <input type="text" id="profileName" value="\${state.user.name || ''}" class="form-control">
     </div>
 
     <div class="form-group">
       <label>Age:</label>
-      <input type="number" id="profileAge" value="${state.user.age || ''}" class="form-control">
+      <input type="number" id="profileAge" value="\${state.user.age || ''}" class="form-control">
     </div>
 
     <div class="form-group">
       <label>Height (cm):</label>
-      <input type="number" id="profileHeight" value="${state.user.height_cm || ''}" class="form-control" step="0.1">
+      <input type="number" id="profileHeight" value="\${state.user.height_cm || ''}" class="form-control" step="0.1">
     </div>
 
     <div class="form-group">
       <label>Weight (kg):</label>
-      <input type="number" id="profileWeight" value="${state.user.weight_kg || ''}" class="form-control" step="0.1">
+      <input type="number" id="profileWeight" value="\${state.user.weight_kg || ''}" class="form-control" step="0.1">
     </div>
 
     <button class="btn btn-primary" onclick="saveProfile()">
       <i class="fas fa-save"></i> Save Profile
     </button>
-  `;
+  \`;
 
   document.getElementById('modalTitle').textContent = 'User Profile';
   openModal();
@@ -942,10 +941,10 @@ function formatDuration(seconds) {
   const secs = seconds % 60;
   
   if (hrs > 0) {
-    return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    return \`\${String(hrs).padStart(2, '0')}:\${String(mins).padStart(2, '0')}:\${String(secs).padStart(2, '0')}\`;
   }
   
-  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  return \`\${String(mins).padStart(2, '0')}:\${String(secs).padStart(2, '0')}\`;
 }
 
 function openModal() {
@@ -973,7 +972,7 @@ async function saveWorkoutNotes() {
   const notes = document.getElementById('workoutNotes').value;
   
   try {
-    await api(`/workouts/${state.currentWorkout.id}`, {
+    await api(\`/workouts/\${state.currentWorkout.id}\`, {
       method: 'PUT',
       body: JSON.stringify({ notes })
     });
@@ -987,16 +986,16 @@ async function saveWorkoutNotes() {
 // Show exercise notes
 function showExerciseNotes(exerciseId) {
   const modalBody = document.getElementById('modalBody');
-  modalBody.innerHTML = `
+  modalBody.innerHTML = \`
     <div class="form-group">
       <label>Exercise Notes:</label>
       <textarea id="exerciseNotes" class="form-control" rows="4" placeholder="Add notes about this exercise..."></textarea>
     </div>
 
-    <button class="btn btn-primary" onclick="saveExerciseNotes(${exerciseId})">
+    <button class="btn btn-primary" onclick="saveExerciseNotes(\${exerciseId})">
       <i class="fas fa-save"></i> Save Notes
     </button>
-  `;
+  \`;
 
   document.getElementById('modalTitle').textContent = 'Exercise Notes';
   openModal();
@@ -1006,7 +1005,7 @@ async function saveExerciseNotes(exerciseId) {
   const notes = document.getElementById('exerciseNotes').value;
   
   try {
-    await api(`/workouts/${state.currentWorkout.id}/exercises/${exerciseId}/notes`, {
+    await api(\`/workouts/\${state.currentWorkout.id}/exercises/\${exerciseId}/notes\`, {
       method: 'PUT',
       body: JSON.stringify({ notes })
     });
