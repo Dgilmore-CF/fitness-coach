@@ -1,20 +1,22 @@
 /**
- * Serve static HTML frontend
+ * Serve static HTML frontend and JavaScript
  */
+
+import frontendJS from '../frontend.js';
 
 export async function serveStatic(c) {
   const path = new URL(c.req.url).pathname;
   
   // Serve index.html for root and all non-API routes
   if (path === '/' || !path.startsWith('/api')) {
-    const html = await getIndexHTML();
+    const html = getIndexHTML();
     return c.html(html);
   }
   
   return c.notFound();
 }
 
-async function getIndexHTML() {
+function getIndexHTML() {
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -472,7 +474,9 @@ async function getIndexHTML() {
         <span id="notificationText"></span>
     </div>
 
-    <script src="/app.js"></script>
+    <script>
+      ${frontendJS}
+    </script>
 </body>
 </html>
 `;
