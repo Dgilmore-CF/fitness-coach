@@ -83,7 +83,7 @@ Get your AI Fitness Coach up and running in **10 minutes**!
 ### Prerequisites
 
 - **Cloudflare account** (free tier works!)
-- **Node.js 18+** installed
+- **Node.js 20+** installed (required for wrangler 4.x)
 - **GitHub account** (if using CI/CD)
 - **10 minutes** of your time
 
@@ -323,7 +323,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: '20'
       - run: npm ci
       - run: npx wrangler d1 migrations apply fitness-coach-db
         env:
