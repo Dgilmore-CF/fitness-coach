@@ -29,20 +29,24 @@ function getIndexHTML() {
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
         :root {
-            --primary: #4f46e5;
-            --primary-dark: #4338ca;
-            --secondary: #10b981;
-            --danger: #ef4444;
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --primary-light: #dbeafe;
+            --secondary: #059669;
+            --secondary-light: #d1fae5;
+            --danger: #dc2626;
             --warning: #f59e0b;
-            --dark: #1f2937;
+            --dark: #111827;
             --gray: #6b7280;
-            --light: #f3f4f6;
+            --gray-light: #9ca3af;
+            --light: #f9fafb;
+            --border: #e5e7eb;
             --white: #ffffff;
         }
         
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: var(--light);
             min-height: 100vh;
             color: var(--dark);
         }
@@ -55,20 +59,28 @@ function getIndexHTML() {
         
         .header {
             background: var(--white);
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
+            padding: 24px 32px;
+            border-radius: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            border: 1px solid var(--border);
+            margin-bottom: 24px;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
         
         .header h1 {
-            color: var(--primary);
+            color: var(--dark);
+            font-size: 24px;
+            font-weight: 700;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
+            letter-spacing: -0.025em;
+        }
+        
+        .header h1 i {
+            color: var(--primary);
         }
         
         .user-info {
@@ -80,14 +92,15 @@ function getIndexHTML() {
         .btn {
             padding: 10px 20px;
             border: none;
-            border-radius: 8px;
+            border-radius: 10px;
             cursor: pointer;
             font-size: 14px;
             font-weight: 600;
-            transition: all 0.3s;
+            transition: all 0.2s;
             display: inline-flex;
             align-items: center;
             gap: 8px;
+            font-family: inherit;
         }
         
         .btn-primary {
@@ -97,7 +110,8 @@ function getIndexHTML() {
         
         .btn-primary:hover {
             background: var(--primary-dark);
-            transform: translateY(-2px);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
         }
         
         .btn-secondary {
@@ -111,44 +125,67 @@ function getIndexHTML() {
         }
         
         .btn-outline {
-            background: transparent;
-            border: 2px solid var(--primary);
+            background: var(--white);
+            border: 1.5px solid var(--border);
+            color: var(--dark);
+        }
+        
+        .btn-outline:hover {
+            border-color: var(--primary);
             color: var(--primary);
+            background: var(--primary-light);
         }
         
         .card {
             background: var(--white);
-            padding: 24px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
+            padding: 28px;
+            border-radius: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            border: 1px solid var(--border);
+            margin-bottom: 24px;
         }
         
         .card h2 {
-            margin-bottom: 16px;
-            color: var(--primary);
+            margin-bottom: 20px;
+            color: var(--dark);
+            font-size: 18px;
+            font-weight: 700;
             display: flex;
             align-items: center;
             gap: 10px;
+            letter-spacing: -0.025em;
+        }
+        
+        .card h2 i {
+            color: var(--primary);
         }
         
         .tabs {
             display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            border-bottom: 2px solid var(--light);
+            gap: 8px;
+            margin-bottom: 24px;
+            border-bottom: 1px solid var(--border);
+            background: var(--white);
+            border-radius: 16px 16px 0 0;
+            padding: 0 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
         }
         
         .tab {
-            padding: 12px 24px;
+            padding: 14px 24px;
             cursor: pointer;
             border: none;
             background: none;
-            font-size: 16px;
+            font-size: 15px;
             font-weight: 600;
+            color: var(--gray-light);
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        
+        .tab:hover {
             color: var(--gray);
-            border-bottom: 3px solid transparent;
-            transition: all 0.3s;
         }
         
         .tab.active {
@@ -179,11 +216,13 @@ function getIndexHTML() {
         .form-group select,
         .form-group textarea {
             width: 100%;
-            padding: 10px;
-            border: 2px solid var(--light);
-            border-radius: 8px;
+            padding: 12px;
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
             font-size: 14px;
-            transition: border-color 0.3s;
+            transition: all 0.2s;
+            font-family: inherit;
+            background: var(--white);
         }
         
         .form-group input:focus,
@@ -191,6 +230,7 @@ function getIndexHTML() {
         .form-group textarea:focus {
             outline: none;
             border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-light);
         }
         
         .timer-display {
@@ -215,21 +255,24 @@ function getIndexHTML() {
         }
         
         .exercise-item {
-            padding: 16px;
-            border: 2px solid var(--light);
-            border-radius: 8px;
+            padding: 20px;
+            border: 1.5px solid var(--border);
+            border-radius: 12px;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.2s;
+            background: var(--white);
         }
         
         .exercise-item:hover {
             border-color: var(--primary);
-            background: var(--light);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            transform: translateY(-1px);
         }
         
         .exercise-item.active {
             border-color: var(--primary);
-            background: linear-gradient(135deg, rgba(79, 70, 229, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+            background: var(--primary-light);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
         }
         
         .set-tracker {
@@ -240,18 +283,21 @@ function getIndexHTML() {
         }
         
         .set-item {
-            padding: 8px;
-            border: 2px solid var(--light);
-            border-radius: 6px;
+            padding: 10px;
+            border: 1.5px solid var(--border);
+            border-radius: 8px;
             text-align: center;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.2s;
+            background: var(--white);
+            font-size: 13px;
         }
         
         .set-item.completed {
             background: var(--secondary);
             color: var(--white);
             border-color: var(--secondary);
+            box-shadow: 0 2px 8px rgba(5, 150, 105, 0.25);
         }
         
         .stats-grid {
@@ -262,22 +308,27 @@ function getIndexHTML() {
         }
         
         .stat-card {
-            padding: 20px;
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            padding: 24px;
+            background: var(--primary);
             color: var(--white);
             border-radius: 12px;
             text-align: center;
+            box-shadow: 0 2px 12px rgba(37, 99, 235, 0.15);
         }
         
         .stat-value {
-            font-size: 32px;
-            font-weight: bold;
-            margin: 10px 0;
+            font-size: 36px;
+            font-weight: 700;
+            margin: 12px 0;
+            letter-spacing: -0.025em;
         }
         
         .stat-label {
-            font-size: 14px;
-            opacity: 0.9;
+            font-size: 13px;
+            font-weight: 500;
+            opacity: 0.95;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         
         .chart-container {
@@ -331,7 +382,8 @@ function getIndexHTML() {
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.5);
+            background: rgba(17, 24, 39, 0.7);
+            backdrop-filter: blur(4px);
             z-index: 1000;
             align-items: center;
             justify-content: center;
@@ -343,12 +395,14 @@ function getIndexHTML() {
         
         .modal-content {
             background: var(--white);
-            padding: 30px;
-            border-radius: 12px;
+            padding: 32px;
+            border-radius: 20px;
             max-width: 500px;
             width: 90%;
-            max-height: 80vh;
+            max-height: 85vh;
             overflow-y: auto;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+            border: 1px solid var(--border);
         }
         
         .modal-header {
@@ -366,17 +420,20 @@ function getIndexHTML() {
         
         .notification {
             position: fixed;
-            top: 20px;
-            right: 20px;
+            top: 24px;
+            right: 24px;
             padding: 16px 24px;
             background: var(--white);
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            border: 1px solid var(--border);
             z-index: 2000;
             display: none;
             align-items: center;
             gap: 12px;
             animation: slideIn 0.3s ease-out;
+            font-size: 14px;
+            font-weight: 500;
         }
         
         .notification.active {
@@ -384,8 +441,14 @@ function getIndexHTML() {
         }
         
         @keyframes slideIn {
-            from { transform: translateX(400px); }
-            to { transform: translateX(0); }
+            from { 
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to { 
+                transform: translateX(0);
+                opacity: 1;
+            }
         }
         
         .hidden {
