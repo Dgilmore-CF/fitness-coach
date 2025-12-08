@@ -30,9 +30,15 @@ Available Equipment: ${equipmentList}
 Create a ${days_per_week}-day hypertrophy-focused workout program. For each day, include:
 1. Day name (e.g., "Upper Body Push")
 2. Muscle groups targeted
-3. 4-6 exercises from the available equipment
-4. Sets and reps (focus on hypertrophy range: 3-4 sets of 8-12 reps)
-5. Rest periods (60-120 seconds for hypertrophy)
+3. EXACTLY 5 UNIQUE exercises from the available equipment - NO DUPLICATES ALLOWED
+4. Each exercise should be DIFFERENT - do NOT use the same exercise twice in one day
+5. Sets and reps (focus on hypertrophy range: 3-4 sets of 8-12 reps)
+6. Rest periods (60-120 seconds for hypertrophy)
+
+IMPORTANT RULES:
+- Each day must have 5 different exercises
+- Never repeat the same exercise within a single day
+- Use variety in movement patterns (push/pull, compound/isolation)
 
 Respond in valid JSON format only:
 {
@@ -82,16 +88,48 @@ Respond in valid JSON format only:
       exerciseMap[ex.name.toLowerCase()] = ex;
     });
 
-    // Match exercises to database
+    // Match exercises to database and remove duplicates
     for (const day of programData.days) {
-      day.exercises = day.exercises.map(ex => {
+      const seenExerciseIds = new Set();
+      const uniqueExercises = [];
+      
+      for (const ex of day.exercises) {
         const matchedExercise = findExerciseByName(ex.name, exercises);
-        return {
+        
+        // Skip if we've already added this exercise to this day
+        if (seenExerciseIds.has(matchedExercise.id)) {
+          console.log(`Skipping duplicate exercise: ${matchedExercise.name}`);
+          continue;
+        }
+        
+        seenExerciseIds.add(matchedExercise.id);
+        uniqueExercises.push({
           ...ex,
           exercise_id: matchedExercise.id,
           rest_seconds: ex.rest_seconds || 90
-        };
-      });
+        });
+      }
+      
+      // If we have fewer than 4 exercises after deduplication, add more
+      if (uniqueExercises.length < 4) {
+        const muscleGroups = day.muscle_groups || [];
+        const additionalExercises = exercises.filter(e => 
+          !seenExerciseIds.has(e.id) && 
+          muscleGroups.some(mg => e.muscle_group.toLowerCase().includes(mg.toLowerCase()))
+        ).slice(0, 5 - uniqueExercises.length);
+        
+        for (const addEx of additionalExercises) {
+          uniqueExercises.push({
+            name: addEx.name,
+            sets: 3,
+            reps: '10-12',
+            exercise_id: addEx.id,
+            rest_seconds: 90
+          });
+        }
+      }
+      
+      day.exercises = uniqueExercises;
     }
 
     return programData;
