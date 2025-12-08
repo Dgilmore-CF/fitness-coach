@@ -1,0 +1,23 @@
+{
+  "name": "ai-fitness-coach",
+  "version": "1.0.0",
+  "description": "AI-driven fitness coaching application built on Cloudflare Workers",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:create": "wrangler d1 create fitness-coach-db",
+    "db:migrate": "wrangler d1 migrations apply fitness-coach-db",
+    "db:migrate:local": "wrangler d1 migrations apply fitness-coach-db --local"
+  },
+  "keywords": ["fitness", "ai", "cloudflare", "workers"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "wrangler": "^3.20.0"
+  },
+  "dependencies": {
+    "hono": "^3.11.7",
+    "jsonwebtoken": "^9.0.2"
+  }
+}
