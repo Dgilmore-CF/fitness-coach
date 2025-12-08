@@ -75,14 +75,14 @@ auth.put('/user', async (c) => {
   const db = c.env.DB;
   const body = await c.req.json();
 
-  const { age, height_cm, weight_kg, name } = body;
+  const { age, height_cm, weight_kg, name, measurement_system } = body;
 
   const user = await db.prepare(
     `UPDATE users 
-     SET age = ?, height_cm = ?, weight_kg = ?, name = ?, updated_at = CURRENT_TIMESTAMP 
+     SET age = ?, height_cm = ?, weight_kg = ?, name = ?, measurement_system = ?, updated_at = CURRENT_TIMESTAMP 
      WHERE email = ? 
      RETURNING *`
-  ).bind(age, height_cm, weight_kg, name, payload.email).first();
+  ).bind(age, height_cm, weight_kg, name, measurement_system || 'metric', payload.email).first();
 
   if (!user) {
     return c.json({ error: 'User not found' }, 404);

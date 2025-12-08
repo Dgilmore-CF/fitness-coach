@@ -14,6 +14,53 @@ const state = {
   audioContext: null
 };
 
+// Measurement conversion utilities
+function kgToLbs(kg) {
+  return kg * 2.20462;
+}
+
+function lbsToKg(lbs) {
+  return lbs / 2.20462;
+}
+
+function cmToInches(cm) {
+  return cm / 2.54;
+}
+
+function inchesToCm(inches) {
+  return inches * 2.54;
+}
+
+function cmToFeetInches(cm) {
+  const totalInches = cmToInches(cm);
+  const feet = Math.floor(totalInches / 12);
+  const inches = Math.round(totalInches % 12);
+  return { feet, inches };
+}
+
+function feetInchesToCm(feet, inches) {
+  return inchesToCm(feet * 12 + inches);
+}
+
+function formatWeight(kg, system) {
+  if (!kg) return 'N/A';
+  system = system || (state.user && state.user.measurement_system) || 'metric';
+  if (system === 'imperial') {
+    return \`\${Math.round(kgToLbs(kg))} lbs\`;
+  }
+  return \`\${Math.round(kg)} kg\`;
+}
+
+function formatHeight(cm, system) {
+  if (!cm) return 'N/A';
+  system = system || (state.user && state.user.measurement_system) || 'metric';
+  if (system === 'imperial') {
+    const { feet, inches } = cmToFeetInches(cm);
+    return \`\${feet}'\${inches}"\`;
+  }
+  return \`\${Math.round(cm)} cm\`;
+}
+
 // Initialize app
 document.addEventListener('DOMContentLoaded', async () => {
   await loadUser();
@@ -102,7 +149,7 @@ async function loadDashboard() {
           </div>
           <div class="stat-card">
             <div class="stat-label">Total Weight Lifted</div>
-            <div class="stat-value">\${Math.round(progress.overview.total_volume_kg)} kg</div>
+            <div class="stat-value">\${formatWeight(progress.overview.total_volume_kg)}</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">Total Time</div>
@@ -141,7 +188,7 @@ async function loadDashboard() {
                     <strong>\${w.day_name || 'Custom Workout'}</strong>
                     <div style="color: var(--gray); font-size: 14px;">
                       \${new Date(w.start_time).toLocaleDateString()} - 
-                      \${w.total_weight_kg ? Math.round(w.total_weight_kg) + ' kg' : 'N/A'}
+                      \${w.total_weight_kg ? formatWeight(w.total_weight_kg) : 'N/A'}
                     </div>
                   </div>
                   <div style="text-align: right;">
@@ -519,6 +566,11 @@ async function loadWorkoutInterface() {
 
 // Render exercise
 function renderExercise(exercise, index) {
+  const system = (state.user && state.user.measurement_system) || 'metric';
+  const isImperial = system === 'imperial';
+  const weightUnit = isImperial ? 'lbs' : 'kg';
+  const weightStep = isImperial ? '5' : '2.5';
+  
   return \`
     <div class="exercise-item" id="exercise-\${exercise.id}">
       <div style="margin-bottom: 10px;">
@@ -539,15 +591,15 @@ function renderExercise(exercise, index) {
         \${(exercise.sets || []).map((set, setIdx) => \`
           <div class="set-item completed">
             <div>Set \${set.set_number}</div>
-            <div>\${set.weight_kg}kg x \${set.reps}</div>
-            <div style="font-size: 10px;">1RM: \${Math.round(set.one_rep_max_kg)}kg</div>
+            <div>\${formatWeight(set.weight_kg, system)} x \${set.reps}</div>
+            <div style="font-size: 10px;">1RM: \${formatWeight(set.one_rep_max_kg, system)}</div>
           </div>
         \`).join('')}
       </div>
 
       <div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
-        <input type="number" id="weight-\${exercise.id}" placeholder="Weight (kg)" step="2.5" 
-               style="width: 100px; padding: 8px; border: 2px solid var(--light); border-radius: 6px;">
+        <input type="number" id="weight-\${exercise.id}" placeholder="Weight (\${weightUnit})" step="\${weightStep}" 
+               style="width: 110px; padding: 8px; border: 2px solid var(--light); border-radius: 6px;">
         <input type="number" id="reps-\${exercise.id}" placeholder="Reps" min="1"
                style="width: 80px; padding: 8px; border: 2px solid var(--light); border-radius: 6px;">
         <button class="btn btn-secondary" onclick="recordSet(\${exercise.id})">
@@ -563,12 +615,18 @@ function renderExercise(exercise, index) {
 
 // Record set
 async function recordSet(exerciseId) {
-  const weight = parseFloat(document.getElementById(\`weight-\${exerciseId}\`).value);
+  let weight = parseFloat(document.getElementById(\`weight-\${exerciseId}\`).value);
   const reps = parseInt(document.getElementById(\`reps-\${exerciseId}\`).value);
 
   if (!weight || !reps) {
     showNotification('Please enter weight and reps', 'warning');
     return;
+  }
+
+  // Convert to kg if user is using imperial
+  const system = (state.user && state.user.measurement_system) || 'metric';
+  if (system === 'imperial') {
+    weight = lbsToKg(weight);
   }
 
   try {
@@ -706,7 +764,7 @@ async function loadAnalytics() {
           </div>
           <div class="stat-card">
             <div class="stat-label">Total Volume</div>
-            <div class="stat-value">\${Math.round(progress.overview.total_volume_kg)} kg</div>
+            <div class="stat-value">\${formatWeight(progress.overview.total_volume_kg)}</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">Total Time</div>
@@ -726,7 +784,7 @@ async function loadAnalytics() {
             \${volumeData.volume_by_muscle.map(m => \`
               <div style="display: flex; justify-content: space-between; padding: 8px; background: var(--light); border-radius: 6px;">
                 <strong>\${m.muscle_group}</strong>
-                <span>\${Math.round(m.volume)} kg</span>
+                <span>\${formatWeight(m.volume)}</span>
               </div>
             \`).join('')}
           </div>
@@ -742,7 +800,7 @@ async function loadAnalytics() {
                           border-radius: 8px; color: white; text-align: center;">
                 <div style="font-weight: bold;">\${m.muscle_group}</div>
                 <div style="font-size: 12px; margin-top: 4px;">\${m.set_count} sets</div>
-                <div style="font-size: 12px;">\${Math.round(m.volume)} kg</div>
+                <div style="font-size: 12px;">\${formatWeight(m.volume)}</div>
               </div>
             \`).join('')}
           </div>
@@ -761,7 +819,7 @@ async function loadAnalytics() {
                     <div style="font-size: 12px; color: var(--gray);">\${ex.muscle_group}</div>
                   </div>
                   <div style="text-align: right;">
-                    <div>\${Math.round(ex.volume)} kg total</div>
+                    <div>\${formatWeight(ex.volume)} total</div>
                     <div style="font-size: 12px; color: var(--gray);">\${ex.workout_count} workouts</div>
                   </div>
                 </div>
@@ -881,6 +939,22 @@ async function logWater(amount) {
 // Profile modal
 function showProfile() {
   const modalBody = document.getElementById('modalBody');
+  const system = state.user.measurement_system || 'metric';
+  const isImperial = system === 'imperial';
+  
+  let heightValue = state.user.height_cm || '';
+  let heightFeet = '';
+  let heightInches = '';
+  if (isImperial && heightValue) {
+    const feetInches = cmToFeetInches(heightValue);
+    heightFeet = feetInches.feet;
+    heightInches = feetInches.inches;
+  }
+  
+  const weightValue = isImperial && state.user.weight_kg 
+    ? Math.round(kgToLbs(state.user.weight_kg)) 
+    : (state.user.weight_kg || '');
+  
   modalBody.innerHTML = \`
     <div class="form-group">
       <label>Name:</label>
@@ -893,13 +967,36 @@ function showProfile() {
     </div>
 
     <div class="form-group">
-      <label>Height (cm):</label>
-      <input type="number" id="profileHeight" value="\${state.user.height_cm || ''}" class="form-control" step="0.1">
+      <label>Measurement System:</label>
+      <select id="profileSystem" class="form-control" onchange="toggleMeasurementInputs()">
+        <option value="metric" \${!isImperial ? 'selected' : ''}>Metric (kg, cm)</option>
+        <option value="imperial" \${isImperial ? 'selected' : ''}>Imperial (lbs, feet/inches)</option>
+      </select>
     </div>
 
-    <div class="form-group">
-      <label>Weight (kg):</label>
-      <input type="number" id="profileWeight" value="\${state.user.weight_kg || ''}" class="form-control" step="0.1">
+    <div id="metricInputs" style="display: \${isImperial ? 'none' : 'block'}">
+      <div class="form-group">
+        <label>Height (cm):</label>
+        <input type="number" id="profileHeightCm" value="\${heightValue}" class="form-control" step="0.1">
+      </div>
+      <div class="form-group">
+        <label>Weight (kg):</label>
+        <input type="number" id="profileWeightKg" value="\${state.user.weight_kg || ''}" class="form-control" step="0.1">
+      </div>
+    </div>
+
+    <div id="imperialInputs" style="display: \${isImperial ? 'block' : 'none'}">
+      <div class="form-group">
+        <label>Height:</label>
+        <div style="display: flex; gap: 10px;">
+          <input type="number" id="profileHeightFeet" value="\${heightFeet}" placeholder="Feet" class="form-control" style="flex: 1;">
+          <input type="number" id="profileHeightInches" value="\${heightInches}" placeholder="Inches" class="form-control" style="flex: 1;">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Weight (lbs):</label>
+        <input type="number" id="profileWeightLbs" value="\${weightValue}" class="form-control" step="0.1">
+      </div>
     </div>
 
     <button class="btn btn-primary" onclick="saveProfile()">
@@ -911,16 +1008,43 @@ function showProfile() {
   openModal();
 }
 
+function toggleMeasurementInputs() {
+  const system = document.getElementById('profileSystem').value;
+  const metricInputs = document.getElementById('metricInputs');
+  const imperialInputs = document.getElementById('imperialInputs');
+  
+  if (system === 'metric') {
+    metricInputs.style.display = 'block';
+    imperialInputs.style.display = 'none';
+  } else {
+    metricInputs.style.display = 'none';
+    imperialInputs.style.display = 'block';
+  }
+}
+
 async function saveProfile() {
   const name = document.getElementById('profileName').value;
   const age = parseInt(document.getElementById('profileAge').value);
-  const height_cm = parseFloat(document.getElementById('profileHeight').value);
-  const weight_kg = parseFloat(document.getElementById('profileWeight').value);
+  const measurement_system = document.getElementById('profileSystem').value;
+  
+  let height_cm, weight_kg;
+  
+  if (measurement_system === 'imperial') {
+    const feet = parseFloat(document.getElementById('profileHeightFeet').value) || 0;
+    const inches = parseFloat(document.getElementById('profileHeightInches').value) || 0;
+    const lbs = parseFloat(document.getElementById('profileWeightLbs').value) || 0;
+    
+    height_cm = feetInchesToCm(feet, inches);
+    weight_kg = lbsToKg(lbs);
+  } else {
+    height_cm = parseFloat(document.getElementById('profileHeightCm').value);
+    weight_kg = parseFloat(document.getElementById('profileWeightKg').value);
+  }
 
   try {
     const data = await api('/auth/user', {
       method: 'PUT',
-      body: JSON.stringify({ name, age, height_cm, weight_kg })
+      body: JSON.stringify({ name, age, height_cm, weight_kg, measurement_system })
     });
 
     state.user = data.user;
