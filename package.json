@@ -10,11 +10,16 @@
     "db:migrate": "wrangler d1 migrations apply fitness-coach-db",
     "db:migrate:local": "wrangler d1 migrations apply fitness-coach-db --local"
   },
-  "keywords": ["fitness", "ai", "cloudflare", "workers"],
+  "keywords": [
+    "fitness",
+    "ai",
+    "cloudflare",
+    "workers"
+  ],
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "wrangler": "^3.20.0"
+    "wrangler": "^4.53.0"
   },
   "dependencies": {
     "hono": "^3.11.7",

@@ -84,9 +84,128 @@ Get your AI Fitness Coach up and running in **10 minutes**!
 
 - **Cloudflare account** (free tier works!)
 - **Node.js 18+** installed
+- **GitHub account** (if using CI/CD)
 - **10 minutes** of your time
 
-### Installation Steps
+### Choose Your Deployment Method
+
+**Option A: GitHub Actions (Recommended)** - Automatic deployments on every push
+**Option B: Manual Deployment** - Deploy directly from your local machine
+
+---
+
+### Option A: GitHub Actions Deployment (Recommended)
+
+**Step 1: Set Up Cloudflare Resources**
+
+```bash
+# 1. Navigate to project directory
+cd fitness-builder
+
+# 2. Install dependencies
+npm install
+
+# 3. Login to Cloudflare
+npx wrangler login
+
+# 4. Create D1 database
+npx wrangler d1 create fitness-coach-db
+# Copy the database_id from output
+
+# 5. Update wrangler.toml with your database_id
+# Edit: [[d1_databases]] database_id = "YOUR_ID_HERE"
+
+# 6. Create R2 storage bucket
+npx wrangler r2 bucket create fitness-coach-storage
+```
+
+> ⚠️ **Note**: Don't set JWT_SECRET yet - the Worker doesn't exist until first deployment!
+
+**Step 2: Set Up GitHub Repository**
+
+```bash
+# Initialize Git repository
+git init
+
+# Add all files
+git add .
+
+# Initial commit
+git commit -m "Initial commit: AI Fitness Coach"
+
+# Create GitHub repository (via GitHub CLI or web)
+gh repo create fitness-coach --public --source=. --remote=origin
+
+# Push to GitHub
+git push -u origin main
+```
+
+**Step 3: Add GitHub Secrets**
+
+1. Go to your GitHub repository
+2. Navigate to **Settings** → **Secrets and variables** → **Actions**
+3. Click **New repository secret**
+4. Add these two secrets:
+
+   **CLOUDFLARE_API_TOKEN**
+   - Go to https://dash.cloudflare.com/profile/api-tokens
+   - Click "Create Token"
+   - Select **"Create Custom Token"**
+   - Configure the following permissions:
+     
+     **Account Permissions:**
+     - `Workers Scripts` → **Edit**
+     - `D1` → **Edit**
+     - `Workers R2 Storage` → **Edit**
+     
+     **Account Resources:**
+     - Include → **All accounts** (or select your specific account)
+     
+     **TTL (Time to Live):**
+     - Leave as default or set expiration as needed
+   
+   - Click "Continue to summary" → "Create Token"
+   - Copy the token immediately (shown only once!)
+   - Paste as secret value in GitHub
+
+   **CLOUDFLARE_ACCOUNT_ID**
+   - Go to https://dash.cloudflare.com/
+   - Copy "Account ID" from right sidebar
+   - Paste as secret value
+
+**Step 4: Trigger Initial Deployment**
+
+```bash
+# Push to trigger first deployment (creates the Worker)
+git commit --allow-empty -m "Initial deployment"
+git push
+```
+
+Watch the deployment in GitHub **Actions** tab. Wait for it to complete successfully.
+
+**Step 5: Set JWT Secret (After Worker Exists)**
+
+Now that the Worker has been created by GitHub Actions:
+
+```bash
+# Generate secure secret
+openssl rand -base64 32
+
+# Set the secret (Worker now exists!)
+npx wrangler secret put JWT_SECRET
+# Paste the generated secret when prompted
+```
+
+🎉 **Your app is now fully deployed!** 
+
+- Visit: `https://ai-fitness-coach.YOUR-SUBDOMAIN.workers.dev`
+- Future pushes will automatically deploy updates
+
+---
+
+### Option B: Manual Deployment
+
+**Complete Setup:**
 
 ```bash
 # 1. Navigate to project directory
@@ -111,14 +230,27 @@ npx wrangler d1 migrations apply fitness-coach-db
 # 7. Create R2 storage bucket
 npx wrangler r2 bucket create fitness-coach-storage
 
-# 8. Set JWT secret
-openssl rand -base64 32 | npx wrangler secret put JWT_SECRET
-
-# 9. Deploy!
+# 8. Deploy (creates the Worker)
 npm run deploy
 ```
 
-🎉 **Your app is now live!** Visit `https://ai-fitness-coach.YOUR-SUBDOMAIN.workers.dev`
+🎉 **Worker created!** Now set the JWT secret:
+
+```bash
+# Generate secure secret
+openssl rand -base64 32
+
+# Set the secret (Worker now exists!)
+npx wrangler secret put JWT_SECRET
+# Paste the generated secret when prompted
+```
+
+� **Your app is now live!** Visit `https://ai-fitness-coach.YOUR-SUBDOMAIN.workers.dev`
+
+**Future deployments:**
+```bash
+npm run deploy
+```
 
 ### First-Time Setup
 
@@ -150,92 +282,66 @@ npm run deploy
 
 ## GitHub Integration & CI/CD
 
-### Setting Up Your Repository
+> 💡 **See [Quick Start - Option A](#option-a-github-actions-deployment-recommended)** for complete setup instructions.
 
-```bash
-# Initialize Git repository
-git init
+### How It Works
 
-# Add all files
-git add .
+The `.github/workflows/deploy.yml` workflow automatically:
 
-# Initial commit
-git commit -m "Initial commit: AI Fitness Coach"
+1. **Triggers on**:
+   - Every push to `main` branch
+   - Pull requests to `main` branch
 
-# Create GitHub repository (via GitHub CLI or web)
-gh repo create fitness-coach --public --source=. --remote=origin
+2. **Deployment steps**:
+   - ✅ Checks out your code
+   - ✅ Sets up Node.js environment
+   - ✅ Installs dependencies (`npm ci`)
+   - ✅ Runs database migrations
+   - ✅ Deploys Worker to Cloudflare
 
-# Push to GitHub
-git push -u origin main
-```
+3. **Authentication**:
+   - Uses GitHub Secrets (CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID)
+   - Secrets are encrypted and never exposed in logs
 
-### GitHub Actions CI/CD Pipeline
+### The Workflow File
 
-Create `.github/workflows/deploy.yml`:
+Already included at `.github/workflows/deploy.yml`:
 
 ```yaml
 name: Deploy to Cloudflare Workers
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    name: Deploy
     steps:
       - uses: actions/checkout@v3
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
+      - uses: actions/setup-node@v3
         with:
           node-version: '18'
-          cache: 'npm'
-      
-      - name: Install dependencies
-        run: npm ci
-      
-      - name: Run database migrations
-        run: npx wrangler d1 migrations apply fitness-coach-db
+      - run: npm ci
+      - run: npx wrangler d1 migrations apply fitness-coach-db
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      
-      - name: Deploy to Cloudflare Workers
-        run: npm run deploy
+      - run: npm run deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 ```
 
-### Required GitHub Secrets
+### Key Benefits
 
-Add these secrets to your GitHub repository (Settings > Secrets > Actions):
-
-1. **CLOUDFLARE_API_TOKEN**
-   ```bash
-   # Create API token at: https://dash.cloudflare.com/profile/api-tokens
-   # Template: "Edit Cloudflare Workers"
-   # Permissions: Account.Workers Scripts.Edit, Account.D1.Edit
-   ```
-
-2. **CLOUDFLARE_ACCOUNT_ID**
-   ```bash
-   # Find at: https://dash.cloudflare.com/ (right sidebar)
-   ```
-
-### Automatic Deployments
-
-Now every push to `main` will automatically:
-- ✅ Install dependencies
-- ✅ Run database migrations
-- ✅ Deploy to Cloudflare Workers
-- ✅ No manual intervention required!
+- 🚀 **Automatic deployments** - Push to main = instant deployment
+- 🔄 **Database migrations** - Automatically applied on each deploy
+- ✅ **No manual steps** - Set up once, deploy forever
+- 🔒 **Secure** - Secrets never exposed in code or logs
+- 📊 **Visibility** - Watch deployments in GitHub Actions tab
 
 ### Branch Protection (Recommended)
 
@@ -269,118 +375,38 @@ git push origin feature/new-feature
 
 ---
 
-## Deployment Guide
+## Deployment Details
 
-### Prerequisites
+> 💡 **For step-by-step setup**, see [Quick Start](#quick-start) above.
 
-1. **Cloudflare account** with Workers enabled
-2. **Node.js 18+** installed
-3. **Wrangler CLI** installed: `npm install -g wrangler`
+This section covers deployment specifics, configuration details, and advanced topics.
 
-### Step-by-Step Deployment
+### Understanding the Deployment Process
 
-#### 1. Install Dependencies
+**What happens when you deploy:**
 
-```bash
-npm install
-```
+1. **Code bundling** - Hono app bundled with all routes
+2. **Worker upload** - JavaScript uploaded to Cloudflare edge
+3. **Binding configuration** - D1, R2, AI bindings connected
+4. **Global distribution** - Deployed to 200+ data centers worldwide
 
-> **Note**: You may see deprecated package warnings - these are safe to ignore.
+### Cloudflare Resources Required
 
-#### 2. Authenticate with Cloudflare
+**D1 Database:**
+- Stores all user data, workouts, programs
+- SQLite-compatible, serverless
+- Migrations auto-applied on deploy (with GitHub Actions)
 
-```bash
-wrangler login
-```
+**R2 Storage:**
+- Currently unused (reserved for future media uploads)
+- Object storage compatible with S3 API
 
-This opens your browser to authenticate.
+**Workers AI:**
+- Used for program generation (Llama 3 model)
+- Falls back to templates if unavailable
 
-#### 3. Create D1 Database
-
-```bash
-wrangler d1 create fitness-coach-db
-```
-
-Copy the `database_id` from output and update `wrangler.toml`:
-
-```toml
-[[d1_databases]]
-binding = "DB"
-database_name = "fitness-coach-db"
-database_id = "YOUR_DATABASE_ID_HERE"  # Replace this
-```
-
-#### 4. Run Database Migrations
-
-```bash
-wrangler d1 migrations apply fitness-coach-db
-```
-
-This creates all tables and seeds 40+ exercises.
-
-#### 5. Create R2 Bucket
-
-```bash
-wrangler r2 bucket create fitness-coach-storage
-```
-
-#### 6. Set JWT Secret
-
-**Generate secure secret:**
-
-```bash
-# Option 1: OpenSSL (Recommended)
-openssl rand -base64 32
-
-# Option 2: Node.js
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-
-# Option 3: Python
-python3 -c "import secrets; print(secrets.token_urlsafe(32))"
-```
-
-**Set the secret:**
-
-```bash
-wrangler secret put JWT_SECRET
-# Paste the generated secret when prompted
-```
-
-**What is JWT_SECRET?**
-- Used for future custom JWT creation
-- Optional extra validation layer
-- Best practice for security
-- Cloudflare Access handles primary auth
-
-#### 7. Configure Cloudflare Access
-
-1. Go to [Cloudflare Zero Trust](https://one.dash.cloudflare.com/)
-2. Navigate to **Access > Applications**
-3. Click **Add an Application**
-4. Select **Self-hosted**
-5. Enter your Worker URL
-6. Choose authentication method:
-   - Google
-   - GitHub
-   - Email OTP
-   - Other identity providers
-7. Create Access Policy (e.g., allow specific emails)
-8. **Ensure JWT is passed** to application
-
-#### 8. Deploy
-
-```bash
-npm run deploy
-```
-
-#### 9. Verify Deployment
-
-Visit your Worker URL:
-```
-https://ai-fitness-coach.your-subdomain.workers.dev
-```
-
-You should be redirected to Cloudflare Access for authentication.
+**Secrets:**
+- `JWT_SECRET` - For custom JWT validation (optional)
 
 ### Local Development
 
