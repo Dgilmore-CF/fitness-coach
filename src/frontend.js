@@ -1389,7 +1389,13 @@ async function loadNutrition() {
   const container = document.getElementById('nutrition');
   
   try {
-    const daily = await api('/nutrition/daily');
+    const [daily, analytics, streaks] = await Promise.all([
+      api('/nutrition/daily'),
+      api('/nutrition/analytics?days=30'),
+      api('/nutrition/streaks')
+    ]);
+    
+    const { summary, weekly_trends, daily_data } = analytics;
     const today = new Date().toISOString().split('T')[0];
 
     container.innerHTML = \`
@@ -1458,6 +1464,144 @@ async function loadNutrition() {
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- Nutrition Analytics & Trends -->
+      <div class="card">
+        <h2><i class="fas fa-chart-line"></i> Nutrition Analytics (30 Days)</h2>
+        
+        <!-- Streak Cards -->
+        <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 24px;">
+          <div class="stat-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+            <div class="stat-icon" style="font-size: 24px;">🔥</div>
+            <div class="stat-value" style="font-size: 28px;">\${streaks.streaks.all.current}</div>
+            <div class="stat-label">Current Streak</div>
+            <div style="font-size: 12px; opacity: 0.9;">Best: \${streaks.streaks.all.longest} days</div>
+          </div>
+          
+          <div class="stat-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
+            <div class="stat-icon" style="font-size: 24px;">🥩</div>
+            <div class="stat-value" style="font-size: 28px;">\${streaks.streaks.protein.current}</div>
+            <div class="stat-label">Protein Streak</div>
+            <div style="font-size: 12px; opacity: 0.9;">Best: \${streaks.streaks.protein.longest} days</div>
+          </div>
+          
+          <div class="stat-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white;">
+            <div class="stat-icon" style="font-size: 24px;">💧</div>
+            <div class="stat-value" style="font-size: 28px;">\${streaks.streaks.water.current}</div>
+            <div class="stat-label">Water Streak</div>
+            <div style="font-size: 12px; opacity: 0.9;">Best: \${streaks.streaks.water.longest} days</div>
+          </div>
+          
+          <div class="stat-card" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white;">
+            <div class="stat-icon" style="font-size: 24px;">⚡</div>
+            <div class="stat-value" style="font-size: 28px;">\${streaks.streaks.creatine.current}</div>
+            <div class="stat-label">Creatine Streak</div>
+            <div style="font-size: 12px; opacity: 0.9;">Best: \${streaks.streaks.creatine.longest} days</div>
+          </div>
+        </div>
+
+        <!-- Summary Stats -->
+        <div style="background: var(--light); padding: 20px; border-radius: 12px; margin-bottom: 24px;">
+          <h3 style="margin-bottom: 16px;"><i class="fas fa-chart-bar"></i> 30-Day Summary</h3>
+          <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
+            <div>
+              <div style="font-size: 12px; color: var(--gray); margin-bottom: 4px;">Days Logged</div>
+              <div style="font-size: 24px; font-weight: bold; color: var(--primary);">\${summary.total_days_logged}</div>
+            </div>
+            <div>
+              <div style="font-size: 12px; color: var(--gray); margin-bottom: 4px;">Avg Protein</div>
+              <div style="font-size: 24px; font-weight: bold; color: var(--secondary);">\${summary.avg_protein_daily}g</div>
+            </div>
+            <div>
+              <div style="font-size: 12px; color: var(--gray); margin-bottom: 4px;">Avg Water</div>
+              <div style="font-size: 24px; font-weight: bold; color: var(--primary);">\${summary.avg_water_daily}ml</div>
+            </div>
+            <div>
+              <div style="font-size: 12px; color: var(--gray); margin-bottom: 4px;">Avg Creatine</div>
+              <div style="font-size: 24px; font-weight: bold; color: #8b5cf6;">\${summary.avg_creatine_daily}g</div>
+            </div>
+            <div>
+              <div style="font-size: 12px; color: var(--gray); margin-bottom: 4px;">Adherence Rate</div>
+              <div style="font-size: 24px; font-weight: bold; color: \${summary.adherence_rate >= 80 ? '#4CAF50' : summary.adherence_rate >= 60 ? '#FFA500' : '#f44336'};">\${summary.adherence_rate}%</div>
+            </div>
+            <div>
+              <div style="font-size: 12px; color: var(--gray); margin-bottom: 4px;">All Goals Hit</div>
+              <div style="font-size: 24px; font-weight: bold; color: var(--success);">\${summary.all_goals_days} days</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Weekly Trends -->
+        \${weekly_trends.length > 0 ? \`
+        <div style="margin-bottom: 24px;">
+          <h3><i class="fas fa-calendar-week"></i> Weekly Trends</h3>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Week</th>
+                  <th>Avg Protein</th>
+                  <th>Avg Water</th>
+                  <th>Avg Creatine</th>
+                  <th>Days Logged</th>
+                  <th>Goals Hit</th>
+                </tr>
+              </thead>
+              <tbody>
+                \${weekly_trends.map(week => \`
+                  <tr>
+                    <td><small>\${new Date(week.week_start).toLocaleDateString()} - \${new Date(week.week_end).toLocaleDateString()}</small></td>
+                    <td><strong>\${Math.round(week.avg_protein)}g</strong></td>
+                    <td><strong>\${Math.round(week.avg_water)}ml</strong></td>
+                    <td><strong>\${week.avg_creatine.toFixed(1)}g</strong></td>
+                    <td>\${week.days_logged}</td>
+                    <td><span style="color: \${week.days_hit_goals >= 5 ? 'var(--success)' : 'var(--warning)'};">\${week.days_hit_goals} days</span></td>
+                  </tr>
+                \`).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        \` : ''}
+
+        <!-- Daily Trend Chart (last 14 days) -->
+        \${daily_data.length > 0 ? \`
+        <div>
+          <h3><i class="fas fa-chart-area"></i> Recent Trends (Last 14 Days)</h3>
+          <div style="background: var(--light); padding: 16px; border-radius: 12px; overflow-x: auto;">
+            <div style="display: flex; gap: 12px; min-width: 800px;">
+              \${daily_data.slice(-14).map(day => \`
+                <div style="flex: 1; text-align: center;">
+                  <div style="font-size: 11px; color: var(--gray); margin-bottom: 8px;">
+                    \${new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </div>
+                  
+                  <!-- Protein Bar -->
+                  <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 8px;">
+                    <div style="width: 24px; height: \${Math.min((day.protein / day.protein_goal) * 100, 100)}px; background: \${day.hit_protein ? 'var(--secondary)' : '#ccc'}; border-radius: 4px 4px 0 0;"></div>
+                    <div style="font-size: 10px; margin-top: 4px;">💪</div>
+                  </div>
+                  
+                  <!-- Water Bar -->
+                  <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 8px;">
+                    <div style="width: 24px; height: \${Math.min((day.water / day.water_goal) * 100, 100)}px; background: \${day.hit_water ? 'var(--primary)' : '#ccc'}; border-radius: 4px 4px 0 0;"></div>
+                    <div style="font-size: 10px; margin-top: 4px;">💧</div>
+                  </div>
+                  
+                  <!-- Creatine Bar -->
+                  <div style="display: flex; flex-direction: column; align-items: center;">
+                    <div style="width: 24px; height: \${Math.min((day.creatine / day.creatine_goal) * 100, 100)}px; background: \${day.hit_creatine ? '#8b5cf6' : '#ccc'}; border-radius: 4px 4px 0 0;"></div>
+                    <div style="font-size: 10px; margin-top: 4px;">⚡</div>
+                  </div>
+                  
+                  \${day.hit_all ? '<div style="font-size: 16px; margin-top: 8px;">✅</div>' : ''}
+                </div>
+              \`).join('')}
+            </div>
+          </div>
+        </div>
+        \` : '<p>No data yet. Start logging your nutrition to see trends!</p>'}
       </div>
     \`;
   } catch (error) {

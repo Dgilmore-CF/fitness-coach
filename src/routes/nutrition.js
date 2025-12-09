@@ -136,6 +136,206 @@ nutrition.get('/history', async (c) => {
   return c.json({ history: enriched });
 });
 
+// Get nutrition analytics and trends
+nutrition.get('/analytics', async (c) => {
+  const user = requireAuth(c);
+  const db = c.env.DB;
+  const days = parseInt(c.req.query('days') || '90');
+
+  // Get historical data
+  const history = await db.prepare(
+    `SELECT * FROM nutrition_log 
+     WHERE user_id = ? AND date >= date('now', '-' || ? || ' days')
+     ORDER BY date ASC`
+  ).bind(user.id, days).all();
+
+  const logs = history.results || [];
+  
+  // Calculate goals
+  const proteinGoal = user.weight_kg ? user.weight_kg * 2 : 150;
+  const waterGoal = user.weight_kg ? user.weight_kg * 35 : 2500;
+  const creatineGoal = 5;
+
+  // Calculate averages
+  const avgProtein = logs.length > 0 
+    ? logs.reduce((sum, log) => sum + (log.protein_grams || 0), 0) / logs.length 
+    : 0;
+  const avgWater = logs.length > 0 
+    ? logs.reduce((sum, log) => sum + (log.water_ml || 0), 0) / logs.length 
+    : 0;
+  const avgCreatine = logs.length > 0 
+    ? logs.reduce((sum, log) => sum + (log.creatine_grams || 0), 0) / logs.length 
+    : 0;
+
+  // Count days hitting goals
+  const proteinGoalDays = logs.filter(log => log.protein_grams >= proteinGoal).length;
+  const waterGoalDays = logs.filter(log => log.water_ml >= waterGoal).length;
+  const creatineGoalDays = logs.filter(log => log.creatine_grams >= creatineGoal).length;
+  const allGoalsDays = logs.filter(log => 
+    log.protein_grams >= proteinGoal && 
+    log.water_ml >= waterGoal && 
+    log.creatine_grams >= creatineGoal
+  ).length;
+
+  // Calculate current streak
+  let currentStreak = 0;
+  let longestStreak = 0;
+  let tempStreak = 0;
+  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  for (let i = 0; i < days; i++) {
+    const checkDate = new Date(today);
+    checkDate.setDate(checkDate.getDate() - i);
+    const dateStr = checkDate.toISOString().split('T')[0];
+    
+    const log = logs.find(l => l.date === dateStr);
+    const hitGoals = log && 
+      log.protein_grams >= proteinGoal && 
+      log.water_ml >= waterGoal &&
+      log.creatine_grams >= creatineGoal;
+    
+    if (hitGoals) {
+      tempStreak++;
+      if (i === 0 || currentStreak > 0) {
+        currentStreak++;
+      }
+      if (tempStreak > longestStreak) {
+        longestStreak = tempStreak;
+      }
+    } else {
+      if (i === 0) {
+        currentStreak = 0;
+      }
+      tempStreak = 0;
+    }
+  }
+
+  // Weekly aggregation
+  const weeklyData = [];
+  const weeksCount = Math.ceil(logs.length / 7);
+  
+  for (let week = 0; week < weeksCount; week++) {
+    const weekLogs = logs.slice(week * 7, (week + 1) * 7);
+    if (weekLogs.length === 0) continue;
+    
+    const weekStart = weekLogs[0].date;
+    const weekEnd = weekLogs[weekLogs.length - 1].date;
+    
+    weeklyData.push({
+      week_start: weekStart,
+      week_end: weekEnd,
+      avg_protein: weekLogs.reduce((sum, l) => sum + (l.protein_grams || 0), 0) / weekLogs.length,
+      avg_water: weekLogs.reduce((sum, l) => sum + (l.water_ml || 0), 0) / weekLogs.length,
+      avg_creatine: weekLogs.reduce((sum, l) => sum + (l.creatine_grams || 0), 0) / weekLogs.length,
+      days_logged: weekLogs.length,
+      days_hit_goals: weekLogs.filter(l => 
+        l.protein_grams >= proteinGoal && 
+        l.water_ml >= waterGoal &&
+        l.creatine_grams >= creatineGoal
+      ).length
+    });
+  }
+
+  return c.json({
+    summary: {
+      total_days_logged: logs.length,
+      avg_protein_daily: Math.round(avgProtein),
+      avg_water_daily: Math.round(avgWater),
+      avg_creatine_daily: avgCreatine.toFixed(1),
+      protein_goal_days: proteinGoalDays,
+      water_goal_days: waterGoalDays,
+      creatine_goal_days: creatineGoalDays,
+      all_goals_days: allGoalsDays,
+      current_streak: currentStreak,
+      longest_streak: longestStreak,
+      protein_goal: proteinGoal,
+      water_goal: waterGoal,
+      creatine_goal: creatineGoal,
+      adherence_rate: logs.length > 0 ? Math.round((allGoalsDays / logs.length) * 100) : 0
+    },
+    weekly_trends: weeklyData.reverse(),
+    daily_data: logs.map(log => ({
+      date: log.date,
+      protein: log.protein_grams || 0,
+      water: log.water_ml || 0,
+      creatine: log.creatine_grams || 0,
+      protein_goal: proteinGoal,
+      water_goal: waterGoal,
+      creatine_goal: creatineGoal,
+      hit_protein: log.protein_grams >= proteinGoal,
+      hit_water: log.water_ml >= waterGoal,
+      hit_creatine: log.creatine_grams >= creatineGoal,
+      hit_all: log.protein_grams >= proteinGoal && log.water_ml >= waterGoal && log.creatine_grams >= creatineGoal
+    }))
+  });
+});
+
+// Get nutrition streaks
+nutrition.get('/streaks', async (c) => {
+  const user = requireAuth(c);
+  const db = c.env.DB;
+
+  // Get last 90 days
+  const history = await db.prepare(
+    `SELECT * FROM nutrition_log 
+     WHERE user_id = ? AND date >= date('now', '-90 days')
+     ORDER BY date DESC`
+  ).bind(user.id).all();
+
+  const logs = history.results || [];
+  const proteinGoal = user.weight_kg ? user.weight_kg * 2 : 150;
+  const waterGoal = user.weight_kg ? user.weight_kg * 35 : 2500;
+  const creatineGoal = 5;
+
+  // Calculate different streak types
+  const streaks = {
+    protein: { current: 0, longest: 0 },
+    water: { current: 0, longest: 0 },
+    creatine: { current: 0, longest: 0 },
+    all: { current: 0, longest: 0 }
+  };
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Check each type of streak
+  ['protein', 'water', 'creatine', 'all'].forEach(type => {
+    let current = 0;
+    let longest = 0;
+    let temp = 0;
+
+    for (let i = 0; i < 90; i++) {
+      const checkDate = new Date(today);
+      checkDate.setDate(checkDate.getDate() - i);
+      const dateStr = checkDate.toISOString().split('T')[0];
+      
+      const log = logs.find(l => l.date === dateStr);
+      let hit = false;
+
+      if (type === 'protein') hit = log && log.protein_grams >= proteinGoal;
+      else if (type === 'water') hit = log && log.water_ml >= waterGoal;
+      else if (type === 'creatine') hit = log && log.creatine_grams >= creatineGoal;
+      else if (type === 'all') hit = log && log.protein_grams >= proteinGoal && log.water_ml >= waterGoal && log.creatine_grams >= creatineGoal;
+
+      if (hit) {
+        temp++;
+        if (i === 0 || current > 0) current++;
+        if (temp > longest) longest = temp;
+      } else {
+        if (i === 0) current = 0;
+        temp = 0;
+      }
+    }
+
+    streaks[type].current = current;
+    streaks[type].longest = longest;
+  });
+
+  return c.json({ streaks });
+});
+
 // Update nutrition log
 nutrition.put('/daily', async (c) => {
   const user = requireAuth(c);
