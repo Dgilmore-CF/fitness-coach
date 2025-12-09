@@ -89,6 +89,69 @@ programs.post('/generate', async (c) => {
   return c.json({ program, message: 'Program generated successfully' });
 });
 
+// Create manual program
+programs.post('/manual', async (c) => {
+  const user = requireAuth(c);
+  const body = await c.req.json();
+  const { name, days_per_week, goal, days } = body;
+
+  if (!name || !days_per_week || !days || days.length === 0) {
+    return c.json({ error: 'Missing required fields' }, 400);
+  }
+
+  const db = c.env.DB;
+
+  // Create program in database
+  const program = await db.prepare(
+    `INSERT INTO programs (user_id, name, days_per_week, goal, equipment, ai_generated, active)
+     VALUES (?, ?, ?, ?, ?, 0, 0)
+     RETURNING *`
+  ).bind(
+    user.id,
+    name,
+    days_per_week,
+    goal || 'hypertrophy',
+    'Custom Selection'
+  ).first();
+
+  // Create program days and exercises
+  for (const day of days) {
+    const programDay = await db.prepare(
+      `INSERT INTO program_days (program_id, day_number, name, focus)
+       VALUES (?, ?, ?, ?)
+       RETURNING *`
+    ).bind(program.id, day.day_number, day.name, day.focus || 'Custom workout').first();
+
+    // Add exercises to program day
+    for (let i = 0; i < day.exercises.length; i++) {
+      const exercise = day.exercises[i];
+      await db.prepare(
+        `INSERT INTO program_exercises (program_day_id, exercise_id, order_index, target_sets, target_reps, rest_seconds)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      ).bind(
+        programDay.id,
+        exercise.exercise_id,
+        i,
+        exercise.sets || 3,
+        exercise.reps || '8-12',
+        exercise.rest_seconds || 90
+      ).run();
+    }
+
+    // Add stretches if provided
+    if (day.stretch_ids && day.stretch_ids.length > 0) {
+      for (let i = 0; i < day.stretch_ids.length; i++) {
+        await db.prepare(
+          `INSERT INTO program_day_stretches (program_day_id, stretch_id, order_index)
+           VALUES (?, ?, ?)`
+        ).bind(programDay.id, day.stretch_ids[i], i).run();
+      }
+    }
+  }
+
+  return c.json({ program, message: 'Custom program created successfully' });
+});
+
 // Get user programs
 programs.get('/', async (c) => {
   const user = requireAuth(c);

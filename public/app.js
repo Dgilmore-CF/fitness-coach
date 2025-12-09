@@ -216,11 +216,16 @@ async function loadPrograms() {
     
     container.innerHTML = `
       <div class="card">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
           <h2><i class="fas fa-list-alt"></i> My Programs</h2>
-          <button class="btn btn-primary" onclick="showGenerateProgram()">
-            <i class="fas fa-magic"></i> Generate New Program
-          </button>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <button class="btn btn-primary" onclick="showGenerateProgram()">
+              <i class="fas fa-magic"></i> AI Generate
+            </button>
+            <button class="btn btn-secondary" onclick="showCreateManualProgram()">
+              <i class="fas fa-plus"></i> Create Custom
+            </button>
+          </div>
         </div>
       </div>
 
@@ -347,6 +352,267 @@ async function viewProgram(programId) {
     openModal(true); // Pass true for wide modal
   } catch (error) {
     showNotification('Error loading program: ' + error.message, 'error');
+  }
+}
+
+// Manual program creation state
+const manualProgramState = {
+  name: '',
+  days_per_week: 3,
+  goal: 'hypertrophy',
+  days: [],
+  currentDayIndex: 0,
+  availableExercises: []
+};
+
+// Show create manual program
+async function showCreateManualProgram() {
+  // Reset state
+  manualProgramState.days = [];
+  manualProgramState.currentDayIndex = 0;
+  
+  // Load available exercises
+  try {
+    const data = await api('/exercises');
+    manualProgramState.availableExercises = data.exercises;
+  } catch (error) {
+    showNotification('Error loading exercises', 'error');
+    return;
+  }
+  
+  showManualProgramStep1();
+}
+
+// Step 1: Program details
+function showManualProgramStep1() {
+  const modalBody = document.getElementById('modalBody');
+  modalBody.innerHTML = `
+    <h3>Create Custom Program - Step 1</h3>
+    <p style="color: var(--gray); margin-bottom: 20px;">Enter your program details</p>
+    
+    <div class="form-group">
+      <label>Program Name:</label>
+      <input type="text" id="programName" class="form-control" placeholder="e.g., My Push/Pull/Legs" value="${manualProgramState.name}">
+    </div>
+    
+    <div class="form-group">
+      <label>Days per week:</label>
+      <select id="daysPerWeek" class="form-control">
+        <option value="3" ${manualProgramState.days_per_week === 3 ? 'selected' : ''}>3 days</option>
+        <option value="4" ${manualProgramState.days_per_week === 4 ? 'selected' : ''}>4 days</option>
+        <option value="5" ${manualProgramState.days_per_week === 5 ? 'selected' : ''}>5 days</option>
+        <option value="6" ${manualProgramState.days_per_week === 6 ? 'selected' : ''}>6 days</option>
+      </select>
+    </div>
+    
+    <div class="form-group">
+      <label>Goal:</label>
+      <select id="programGoal" class="form-control">
+        <option value="hypertrophy" ${manualProgramState.goal === 'hypertrophy' ? 'selected' : ''}>Hypertrophy (Muscle Growth)</option>
+        <option value="strength" ${manualProgramState.goal === 'strength' ? 'selected' : ''}>Strength</option>
+        <option value="endurance" ${manualProgramState.goal === 'endurance' ? 'selected' : ''}>Endurance</option>
+      </select>
+    </div>
+    
+    <div style="display: flex; gap: 12px; margin-top: 24px;">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveManualProgramStep1()">
+        Next: Configure Days <i class="fas fa-arrow-right"></i>
+      </button>
+    </div>
+  `;
+  
+  document.getElementById('modalTitle').textContent = 'Create Custom Program';
+  openModal(true);
+}
+
+function saveManualProgramStep1() {
+  manualProgramState.name = document.getElementById('programName').value.trim();
+  manualProgramState.days_per_week = parseInt(document.getElementById('daysPerWeek').value);
+  manualProgramState.goal = document.getElementById('programGoal').value;
+  
+  if (!manualProgramState.name) {
+    showNotification('Please enter a program name', 'warning');
+    return;
+  }
+  
+  // Initialize days array
+  manualProgramState.days = [];
+  for (let i = 0; i < manualProgramState.days_per_week; i++) {
+    manualProgramState.days.push({
+      day_number: i + 1,
+      name: `Day ${i + 1}`,
+      focus: '',
+      exercises: []
+    });
+  }
+  
+  manualProgramState.currentDayIndex = 0;
+  showManualProgramDayBuilder();
+}
+
+// Step 2: Build each day
+function showManualProgramDayBuilder() {
+  const day = manualProgramState.days[manualProgramState.currentDayIndex];
+  const exercisesByMuscle = {};
+  
+  // Group exercises by muscle group
+  manualProgramState.availableExercises.forEach(ex => {
+    if (!exercisesByMuscle[ex.muscle_group]) {
+      exercisesByMuscle[ex.muscle_group] = [];
+    }
+    exercisesByMuscle[ex.muscle_group].push(ex);
+  });
+  
+  const modalBody = document.getElementById('modalBody');
+  modalBody.innerHTML = `
+    <h3>Day ${day.day_number} of ${manualProgramState.days_per_week}</h3>
+    <p style="color: var(--gray); margin-bottom: 20px;">Configure this workout day</p>
+    
+    <div class="form-group">
+      <label>Day Name:</label>
+      <input type="text" id="dayName" class="form-control" placeholder="e.g., Upper Body Push" value="${day.name}">
+    </div>
+    
+    <div class="form-group">
+      <label>Focus/Description:</label>
+      <input type="text" id="dayFocus" class="form-control" placeholder="e.g., Chest, Shoulders, Triceps" value="${day.focus}">
+    </div>
+    
+    <div class="form-group">
+      <label>Select Exercises (${day.exercises.length} selected):</label>
+      <div style="max-height: 400px; overflow-y: auto; border: 1.5px solid var(--border); border-radius: 10px; padding: 16px;">
+        ${Object.keys(exercisesByMuscle).sort().map(muscleGroup => `
+          <div style="margin-bottom: 20px;">
+            <h4 style="color: var(--primary); font-size: 14px; margin-bottom: 8px;">${muscleGroup}</h4>
+            ${exercisesByMuscle[muscleGroup].map(ex => {
+              const isSelected = day.exercises.some(e => e.exercise_id === ex.id);
+              const selectedEx = day.exercises.find(e => e.exercise_id === ex.id);
+              return `
+                <div style="padding: 12px; margin-bottom: 8px; background: ${isSelected ? 'var(--primary-light)' : 'var(--white)'}; border: 1.5px solid ${isSelected ? 'var(--primary)' : 'var(--border)'}; border-radius: 8px;">
+                  <label style="display: flex; align-items: start; cursor: pointer; margin: 0;">
+                    <input type="checkbox" 
+                           ${isSelected ? 'checked' : ''}
+                           onchange="toggleExerciseSelection(${ex.id}, '${ex.name.replace(/'/g, "\\'")}')"
+                           style="margin-right: 12px; margin-top: 4px;">
+                    <div style="flex: 1;">
+                      <div style="font-weight: 600; margin-bottom: 4px;">${ex.name}</div>
+                      <div style="font-size: 12px; color: var(--gray);">${ex.equipment}</div>
+                      ${isSelected ? `
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 8px;">
+                          <input type="number" 
+                                 value="${selectedEx.sets || 3}"
+                                 onchange="updateExerciseConfig(${ex.id}, 'sets', this.value)"
+                                 placeholder="Sets"
+                                 min="1"
+                                 style="padding: 6px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px;">
+                          <input type="text" 
+                                 value="${selectedEx.reps || '8-12'}"
+                                 onchange="updateExerciseConfig(${ex.id}, 'reps', this.value)"
+                                 placeholder="Reps"
+                                 style="padding: 6px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px;">
+                          <input type="number" 
+                                 value="${selectedEx.rest_seconds || 90}"
+                                 onchange="updateExerciseConfig(${ex.id}, 'rest_seconds', this.value)"
+                                 placeholder="Rest (s)"
+                                 min="30"
+                                 step="15"
+                                 style="padding: 6px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px;">
+                        </div>
+                      ` : ''}
+                    </div>
+                  </label>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    
+    <div style="display: flex; gap: 12px; margin-top: 24px; flex-wrap: wrap;">
+      ${manualProgramState.currentDayIndex > 0 ? `
+        <button class="btn btn-outline" onclick="manualProgramState.currentDayIndex--; showManualProgramDayBuilder()">
+          <i class="fas fa-arrow-left"></i> Previous Day
+        </button>
+      ` : ''}
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveManualProgramDay()" style="margin-left: auto;">
+        ${manualProgramState.currentDayIndex < manualProgramState.days_per_week - 1 ? 'Next Day' : 'Finish & Save'} 
+        <i class="fas fa-${manualProgramState.currentDayIndex < manualProgramState.days_per_week - 1 ? 'arrow-right' : 'check'}"></i>
+      </button>
+    </div>
+  `;
+}
+
+function toggleExerciseSelection(exerciseId, exerciseName) {
+  const day = manualProgramState.days[manualProgramState.currentDayIndex];
+  const index = day.exercises.findIndex(e => e.exercise_id === exerciseId);
+  
+  if (index >= 0) {
+    // Remove exercise
+    day.exercises.splice(index, 1);
+  } else {
+    // Add exercise with defaults
+    day.exercises.push({
+      exercise_id: exerciseId,
+      name: exerciseName,
+      sets: 3,
+      reps: '8-12',
+      rest_seconds: 90
+    });
+  }
+  
+  showManualProgramDayBuilder();
+}
+
+function updateExerciseConfig(exerciseId, field, value) {
+  const day = manualProgramState.days[manualProgramState.currentDayIndex];
+  const exercise = day.exercises.find(e => e.exercise_id === exerciseId);
+  
+  if (exercise) {
+    exercise[field] = field === 'reps' ? value : parseInt(value);
+  }
+}
+
+function saveManualProgramDay() {
+  const day = manualProgramState.days[manualProgramState.currentDayIndex];
+  day.name = document.getElementById('dayName').value.trim() || `Day ${day.day_number}`;
+  day.focus = document.getElementById('dayFocus').value.trim();
+  
+  if (day.exercises.length === 0) {
+    showNotification('Please select at least one exercise for this day', 'warning');
+    return;
+  }
+  
+  // Move to next day or finish
+  if (manualProgramState.currentDayIndex < manualProgramState.days_per_week - 1) {
+    manualProgramState.currentDayIndex++;
+    showManualProgramDayBuilder();
+  } else {
+    saveManualProgram();
+  }
+}
+
+async function saveManualProgram() {
+  try {
+    const programData = {
+      name: manualProgramState.name,
+      days_per_week: manualProgramState.days_per_week,
+      goal: manualProgramState.goal,
+      days: manualProgramState.days
+    };
+    
+    await api('/programs/manual', {
+      method: 'POST',
+      body: JSON.stringify(programData)
+    });
+    
+    showNotification('Custom program created successfully!', 'success');
+    closeModal();
+    loadPrograms();
+  } catch (error) {
+    showNotification('Error creating program: ' + error.message, 'error');
   }
 }
 
