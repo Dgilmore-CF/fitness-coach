@@ -455,6 +455,32 @@ function getIndexHTML() {
             }
         }
         
+        @keyframes loading {
+            0% {
+                width: 0%;
+                transform: translateX(0);
+            }
+            50% {
+                width: 100%;
+                transform: translateX(0);
+            }
+            100% {
+                width: 100%;
+                transform: translateX(100%);
+            }
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.6;
+                transform: scale(1.1);
+            }
+        }
+        
         .hidden {
             display: none !important;
         }

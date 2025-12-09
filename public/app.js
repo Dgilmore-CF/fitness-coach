@@ -657,10 +657,34 @@ async function generateProgram() {
   const days = document.getElementById('daysPerWeek').value;
   const goal = document.getElementById('programGoal').value;
 
-  try {
-    showNotification('Generating program... This may take a moment.', 'info');
-    closeModal();
+  // Show loading state in modal
+  const modalBody = document.getElementById('modalBody');
+  modalBody.innerHTML = `
+    <div style="text-align: center; padding: 40px 20px;">
+      <div style="margin-bottom: 24px;">
+        <i class="fas fa-magic" style="font-size: 48px; color: var(--primary); animation: pulse 2s infinite;"></i>
+      </div>
+      
+      <h3 style="margin-bottom: 16px; color: var(--dark);">Generating Your Program</h3>
+      
+      <div style="max-width: 400px; margin: 0 auto 24px;">
+        <div class="loading-bar" style="height: 8px; background: var(--light); border-radius: 4px; overflow: hidden;">
+          <div class="loading-bar-fill" style="height: 100%; background: linear-gradient(90deg, var(--primary), var(--secondary)); border-radius: 4px; animation: loading 2s ease-in-out infinite;"></div>
+        </div>
+      </div>
+      
+      <div style="color: var(--gray); line-height: 1.8;">
+        <p style="margin: 8px 0;"><i class="fas fa-check" style="color: var(--secondary);"></i> Analyzing your profile...</p>
+        <p style="margin: 8px 0;"><i class="fas fa-check" style="color: var(--secondary);"></i> Consulting AI for optimal exercises...</p>
+        <p style="margin: 8px 0;"><i class="fas fa-spinner fa-spin" style="color: var(--primary);"></i> Building ${days}-day program...</p>
+        <p style="margin: 8px 0; color: var(--gray-light);"><i class="fas fa-clock"></i> Optimizing sets and rest periods...</p>
+      </div>
+      
+      <p style="margin-top: 24px; font-size: 13px; color: var(--gray);">This usually takes 10-30 seconds</p>
+    </div>
+  `;
 
+  try {
     await api('/programs/generate', {
       method: 'POST',
       body: JSON.stringify({
@@ -669,10 +693,40 @@ async function generateProgram() {
       })
     });
 
-    showNotification('Program generated successfully!', 'success');
-    loadPrograms();
+    // Show success state
+    modalBody.innerHTML = `
+      <div style="text-align: center; padding: 40px 20px;">
+        <div style="margin-bottom: 24px;">
+          <i class="fas fa-check-circle" style="font-size: 64px; color: var(--secondary);"></i>
+        </div>
+        <h3 style="color: var(--dark); margin-bottom: 12px;">Program Generated Successfully!</h3>
+        <p style="color: var(--gray); margin-bottom: 24px;">Your new ${days}-day ${goal} program is ready</p>
+        <button class="btn btn-primary" onclick="closeModal(); loadPrograms();">
+          <i class="fas fa-list"></i> View My Programs
+        </button>
+      </div>
+    `;
+    
+    // Auto-close and refresh after 2 seconds
+    setTimeout(() => {
+      closeModal();
+      loadPrograms();
+    }, 2000);
   } catch (error) {
-    showNotification('Error generating program: ' + error.message, 'error');
+    // Show error state
+    modalBody.innerHTML = `
+      <div style="text-align: center; padding: 40px 20px;">
+        <div style="margin-bottom: 24px;">
+          <i class="fas fa-exclamation-circle" style="font-size: 64px; color: var(--danger);"></i>
+        </div>
+        <h3 style="color: var(--dark); margin-bottom: 12px;">Generation Failed</h3>
+        <p style="color: var(--gray); margin-bottom: 24px;">${error.message}</p>
+        <div style="display: flex; gap: 12px; justify-content: center;">
+          <button class="btn btn-outline" onclick="closeModal();">Close</button>
+          <button class="btn btn-primary" onclick="showGenerateProgram();">Try Again</button>
+        </div>
+      </div>
+    `;
   }
 }
 
