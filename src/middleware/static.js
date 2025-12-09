@@ -515,6 +515,89 @@ function getIndexHTML() {
             display: none !important;
         }
         
+        /* Table Styles */
+        .table-container {
+            overflow-x: auto;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: var(--white);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        
+        .data-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 14px;
+        }
+        
+        .data-table thead {
+            background: var(--light);
+            border-bottom: 2px solid var(--border);
+        }
+        
+        .data-table th {
+            padding: 16px 20px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--dark);
+            border-bottom: 2px solid var(--border);
+            white-space: nowrap;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .data-table th:first-child {
+            padding-left: 24px;
+        }
+        
+        .data-table th:last-child {
+            padding-right: 24px;
+        }
+        
+        .data-table tbody tr {
+            border-bottom: 1px solid var(--border);
+            transition: background-color 0.2s;
+        }
+        
+        .data-table tbody tr:hover {
+            background-color: var(--light);
+        }
+        
+        .data-table tbody tr:last-child {
+            border-bottom: none;
+        }
+        
+        .data-table td {
+            padding: 16px 20px;
+            color: var(--dark);
+            vertical-align: middle;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .data-table td:first-child {
+            padding-left: 24px;
+            font-weight: 500;
+        }
+        
+        .data-table td:last-child {
+            padding-right: 24px;
+        }
+        
+        .data-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+        
+        /* Alternating row colors for better readability */
+        .data-table tbody tr:nth-child(even) {
+            background-color: rgba(249, 250, 251, 0.5);
+        }
+        
+        .data-table tbody tr:nth-child(even):hover {
+            background-color: var(--light);
+        }
+        
         @media (max-width: 768px) {
             .container {
                 padding: 10px;
@@ -527,6 +610,21 @@ function getIndexHTML() {
             
             .stats-grid {
                 grid-template-columns: 1fr;
+            }
+            
+            .data-table th,
+            .data-table td {
+                padding: 12px 16px;
+            }
+            
+            .data-table th:first-child,
+            .data-table td:first-child {
+                padding-left: 16px;
+            }
+            
+            .data-table th:last-child,
+            .data-table td:last-child {
+                padding-right: 16px;
             }
         }
     </style>
