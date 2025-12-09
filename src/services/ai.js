@@ -11,10 +11,192 @@ export function calculateOneRepMax(weight, reps) {
 }
 
 /**
- * Generate workout program using AI
+ * Perfect example programs for few-shot learning
+ */
+const EXAMPLE_PROGRAMS = {
+  3: {
+    name: "3-Day Full Body Split",
+    days: [
+      {
+        day_number: 1,
+        name: "Full Body A",
+        focus: "Compound Movements - Chest, Back, Legs",
+        muscle_groups: ["Chest", "Back", "Legs"],
+        exercises: [
+          { name: "Barbell Squat", sets: 4, reps: "8-10", rest_seconds: 120 },
+          { name: "Barbell Bench Press", sets: 4, reps: "8-10", rest_seconds: 120 },
+          { name: "Barbell Deadlift", sets: 3, reps: "6-8", rest_seconds: 180 },
+          { name: "Cable Lat Pulldown", sets: 3, reps: "10-12", rest_seconds: 90 },
+          { name: "Cable Lateral Raise", sets: 3, reps: "12-15", rest_seconds: 60 }
+        ]
+      },
+      {
+        day_number: 2,
+        name: "Full Body B",
+        focus: "Upper Focus - Push & Pull",
+        muscle_groups: ["Shoulders", "Back", "Arms"],
+        exercises: [
+          { name: "Smith Machine Overhead Press", sets: 4, reps: "8-10", rest_seconds: 120 },
+          { name: "Cable Seated Row", sets: 4, reps: "10-12", rest_seconds: 90 },
+          { name: "Cable Tricep Pushdown", sets: 3, reps: "10-12", rest_seconds: 60 },
+          { name: "Cable Bicep Curl", sets: 3, reps: "10-12", rest_seconds: 60 },
+          { name: "Cable Face Pull", sets: 3, reps: "12-15", rest_seconds: 60 }
+        ]
+      },
+      {
+        day_number: 3,
+        name: "Full Body C",
+        focus: "Lower Focus - Legs & Glutes",
+        muscle_groups: ["Legs", "Glutes", "Hamstrings"],
+        exercises: [
+          { name: "Barbell Squat", sets: 4, reps: "8-12", rest_seconds: 120 },
+          { name: "Smith Machine Romanian Deadlift", sets: 4, reps: "8-10", rest_seconds: 120 },
+          { name: "Leg Extension", sets: 3, reps: "12-15", rest_seconds: 60 },
+          { name: "Leg Curl", sets: 3, reps: "12-15", rest_seconds: 60 },
+          { name: "Smith Machine Calf Raise", sets: 3, reps: "15-20", rest_seconds: 60 }
+        ]
+      }
+    ]
+  },
+  4: {
+    name: "4-Day Upper/Lower Split",
+    days: [
+      {
+        day_number: 1,
+        name: "Upper Body Push",
+        focus: "Chest, Shoulders, Triceps",
+        muscle_groups: ["Chest", "Shoulders", "Triceps"],
+        exercises: [
+          { name: "Barbell Bench Press", sets: 4, reps: "8-10", rest_seconds: 120 },
+          { name: "Smith Machine Incline Press", sets: 4, reps: "8-10", rest_seconds: 120 },
+          { name: "Smith Machine Overhead Press", sets: 3, reps: "8-12", rest_seconds: 90 },
+          { name: "Cable Lateral Raise", sets: 3, reps: "12-15", rest_seconds: 60 },
+          { name: "Cable Tricep Pushdown", sets: 3, reps: "10-12", rest_seconds: 60 }
+        ]
+      },
+      {
+        day_number: 2,
+        name: "Lower Body",
+        focus: "Quads, Hamstrings, Glutes, Calves",
+        muscle_groups: ["Legs", "Quads", "Hamstrings", "Glutes"],
+        exercises: [
+          { name: "Barbell Squat", sets: 4, reps: "8-10", rest_seconds: 120 },
+          { name: "Smith Machine Romanian Deadlift", sets: 4, reps: "8-10", rest_seconds: 120 },
+          { name: "Leg Extension", sets: 3, reps: "12-15", rest_seconds: 60 },
+          { name: "Leg Curl", sets: 3, reps: "12-15", rest_seconds: 60 },
+          { name: "Smith Machine Calf Raise", sets: 3, reps: "15-20", rest_seconds: 60 }
+        ]
+      },
+      {
+        day_number: 3,
+        name: "Upper Body Pull",
+        focus: "Back, Biceps, Rear Delts",
+        muscle_groups: ["Back", "Biceps"],
+        exercises: [
+          { name: "Barbell Deadlift", sets: 4, reps: "6-8", rest_seconds: 180 },
+          { name: "Cable Lat Pulldown", sets: 4, reps: "10-12", rest_seconds: 90 },
+          { name: "Cable Seated Row", sets: 3, reps: "10-12", rest_seconds: 90 },
+          { name: "Cable Face Pull", sets: 3, reps: "12-15", rest_seconds: 60 },
+          { name: "Cable Bicep Curl", sets: 3, reps: "10-12", rest_seconds: 60 }
+        ]
+      },
+      {
+        day_number: 4,
+        name: "Lower Body",
+        focus: "Hamstrings, Glutes, Quads",
+        muscle_groups: ["Hamstrings", "Glutes", "Legs"],
+        exercises: [
+          { name: "Smith Machine Squat", sets: 4, reps: "8-12", rest_seconds: 120 },
+          { name: "Barbell Hip Thrust", sets: 4, reps: "10-12", rest_seconds: 90 },
+          { name: "Leg Curl", sets: 3, reps: "12-15", rest_seconds: 60 },
+          { name: "Single Leg Extension", sets: 3, reps: "12-15", rest_seconds: 60 },
+          { name: "Smith Machine Calf Raise", sets: 3, reps: "15-20", rest_seconds: 60 }
+        ]
+      }
+    ]
+  },
+  5: {
+    name: "5-Day Push/Pull/Legs Split",
+    days: [
+      {
+        day_number: 1,
+        name: "Push (Chest, Shoulders, Triceps)",
+        focus: "Chest, Shoulders, Triceps",
+        muscle_groups: ["Chest", "Shoulders", "Triceps"],
+        exercises: [
+          { name: "Barbell Bench Press", sets: 4, reps: "8-10", rest_seconds: 120 },
+          { name: "Smith Machine Incline Press", sets: 4, reps: "8-10", rest_seconds: 120 },
+          { name: "Smith Machine Overhead Press", sets: 3, reps: "8-12", rest_seconds: 90 },
+          { name: "Cable Lateral Raise", sets: 3, reps: "12-15", rest_seconds: 60 },
+          { name: "Cable Tricep Pushdown", sets: 3, reps: "10-12", rest_seconds: 60 }
+        ]
+      },
+      {
+        day_number: 2,
+        name: "Pull (Back, Biceps)",
+        focus: "Back, Biceps, Rear Delts",
+        muscle_groups: ["Back", "Biceps"],
+        exercises: [
+          { name: "Barbell Deadlift", sets: 4, reps: "6-8", rest_seconds: 180 },
+          { name: "Cable Lat Pulldown", sets: 4, reps: "10-12", rest_seconds: 90 },
+          { name: "Cable Seated Row", sets: 3, reps: "10-12", rest_seconds: 90 },
+          { name: "Cable Face Pull", sets: 3, reps: "12-15", rest_seconds: 60 },
+          { name: "Cable Bicep Curl", sets: 3, reps: "10-12", rest_seconds: 60 }
+        ]
+      },
+      {
+        day_number: 3,
+        name: "Legs (Quads, Hamstrings, Glutes)",
+        focus: "Quads, Hamstrings, Glutes, Calves",
+        muscle_groups: ["Legs", "Quads", "Hamstrings", "Glutes"],
+        exercises: [
+          { name: "Barbell Squat", sets: 4, reps: "8-10", rest_seconds: 120 },
+          { name: "Smith Machine Romanian Deadlift", sets: 4, reps: "8-10", rest_seconds: 120 },
+          { name: "Leg Extension", sets: 3, reps: "12-15", rest_seconds: 60 },
+          { name: "Leg Curl", sets: 3, reps: "12-15", rest_seconds: 60 },
+          { name: "Smith Machine Calf Raise", sets: 3, reps: "15-20", rest_seconds: 60 }
+        ]
+      },
+      {
+        day_number: 4,
+        name: "Upper Body (Volume)",
+        focus: "Chest, Back, Shoulders",
+        muscle_groups: ["Chest", "Back", "Shoulders"],
+        exercises: [
+          { name: "Smith Machine Bench Press", sets: 3, reps: "10-12", rest_seconds: 90 },
+          { name: "Cable Seated Row", sets: 3, reps: "10-12", rest_seconds: 90 },
+          { name: "Cable Chest Fly", sets: 3, reps: "12-15", rest_seconds: 60 },
+          { name: "Cable Lat Pulldown", sets: 3, reps: "10-12", rest_seconds: 90 },
+          { name: "Cable Lateral Raise", sets: 3, reps: "12-15", rest_seconds: 60 }
+        ]
+      },
+      {
+        day_number: 5,
+        name: "Lower Body (Volume)",
+        focus: "Legs, Glutes",
+        muscle_groups: ["Legs", "Glutes", "Hamstrings"],
+        exercises: [
+          { name: "Smith Machine Squat", sets: 3, reps: "10-12", rest_seconds: 90 },
+          { name: "Barbell Hip Thrust", sets: 4, reps: "10-12", rest_seconds: 90 },
+          { name: "Single Leg Extension", sets: 3, reps: "12-15", rest_seconds: 60 },
+          { name: "Single Leg Curl", sets: 3, reps: "12-15", rest_seconds: 60 },
+          { name: "Smith Machine Calf Raise", sets: 3, reps: "15-20", rest_seconds: 60 }
+        ]
+      }
+    ]
+  }
+};
+
+/**
+ * Generate workout program using hybrid AI approach:
+ * 1. Few-shot learning with perfect examples
+ * 2. Prompt chaining (structure first, then exercises)
+ * 3. Validation at each step
  */
 export async function generateProgram(ai, { user, days_per_week, goal, exercises }) {
-  // Categorize exercises by muscle group for better AI selection
+  console.log(`\n🔧 Starting hybrid AI program generation (${days_per_week} days, ${goal})...`);
+  
+  // Categorize exercises by muscle group for validation
   const upperBodyMuscles = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps'];
   const lowerBodyMuscles = ['Legs', 'Quads', 'Hamstrings', 'Glutes', 'Calves'];
   
@@ -37,171 +219,252 @@ export async function generateProgram(ai, { user, days_per_week, goal, exercises
     ).join('\n');
   };
   
-  const prompt = `You are a professional strength and conditioning coach specializing in hypertrophy training.
+  try {
+    // STEP 1: Generate program structure with few-shot learning
+    console.log('📋 Step 1: Generating program structure with few-shot learning...');
+    const programData = await generateProgramStructureWithFewShot(
+      ai, days_per_week, goal, user
+    );
+    
+    if (!programData || !programData.days) {
+      throw new Error('Failed to generate program structure');
+    }
+    
+    console.log(`✅ Structure generated: ${programData.days.length} days`);
+    
+    // STEP 2: For each day, generate exercises with prompt chaining
+    for (let i = 0; i < programData.days.length; i++) {
+      const day = programData.days[i];
+      console.log(`\n💪 Step 2.${i+1}: Generating exercises for ${day.name}...`);
+      
+      // Determine day type and filter exercises
+      const dayType = determineDayType(day);
+      const validExercises = filterExercisesByDayType(
+        dayType, exercises, upperBodyMuscles, lowerBodyMuscles
+      );
+      
+      console.log(`   Day type: ${dayType}, Available exercises: ${validExercises.length}`);
+      
+      // Generate exercises for this specific day
+      const dayExercises = await generateExercisesForDay(
+        ai, day, validExercises, formatExerciseList
+      );
+      
+      // STEP 3: Validate and map exercises
+      const validatedExercises = validateAndMapExercises(
+        dayExercises, validExercises, day.name, dayType
+      );
+      
+      // Ensure we have 4-5 exercises
+      if (validatedExercises.length < 4) {
+        console.log(`   ⚠️  Only ${validatedExercises.length} exercises, adding fallbacks...`);
+        addFallbackExercises(validatedExercises, validExercises, day.muscle_groups);
+      }
+      
+      day.exercises = validatedExercises;
+      console.log(`   ✅ ${day.name}: ${validatedExercises.length} exercises finalized`);
+    }
+    
+    console.log('\n🎉 Program generation complete!\n');
+    return programData;
+    
+  } catch (error) {
+    console.error('❌ AI program generation failed:', error);
+    console.log('   Falling back to template program...');
+    return generateTemplateProgram(days_per_week);
+  }
+}
 
-User Profile:
+/**
+ * Step 1: Generate program structure using few-shot learning
+ */
+async function generateProgramStructureWithFewShot(ai, days_per_week, goal, user) {
+  // Get example program for few-shot learning
+  const exampleProgram = EXAMPLE_PROGRAMS[days_per_week] || EXAMPLE_PROGRAMS[4];
+  
+  const structurePrompt = `You are an expert strength and conditioning coach. Study this perfect example of a ${days_per_week}-day program:
+
+PERFECT EXAMPLE:
+${JSON.stringify(exampleProgram, null, 2)}
+
+Now create a similar ${days_per_week}-day ${goal} program structure for this user:
 - Age: ${user.age || 'Not specified'}
-- Height: ${user.height_cm ? user.height_cm + ' cm' : 'Not specified'}
 - Weight: ${user.weight_kg ? user.weight_kg + ' kg' : 'Not specified'}
-- Days per week: ${days_per_week}
 - Goal: ${goal}
 
-AVAILABLE EXERCISES BY MUSCLE GROUP:
-
-UPPER BODY:
-${formatExerciseList(upperBodyExercises)}
-
-LOWER BODY:
-${formatExerciseList(lowerBodyExercises)}
-
-CRITICAL RULES FOR PROGRAM DESIGN:
-1. UPPER BODY DAYS: Only use exercises from the UPPER BODY list above
-2. LOWER BODY DAYS: Only use exercises from the LOWER BODY list above
-3. Each day must have EXACTLY 5 UNIQUE exercises - NO DUPLICATES
-4. Exercise names must EXACTLY match the names in the lists above
-5. Follow proper split structure:
-   - 3-day: Full Body, Upper, Lower
-   - 4-day: Upper Push, Lower, Upper Pull, Lower
-   - 5-day: Push, Pull, Legs, Upper, Lower
-   - 6-day: Push, Pull, Legs, Push, Pull, Legs
-
-HYPERTROPHY GUIDELINES:
-- Compound exercises: 3-4 sets of 6-10 reps, 120s rest
-- Isolation exercises: 3-4 sets of 10-15 reps, 60-90s rest
-- Progressive overload principle
-
-Respond in valid JSON format only:
+IMPORTANT: Return ONLY the structure (name and days array WITHOUT exercises). Follow this exact format:
 {
   "name": "Program name",
   "days": [
     {
       "day_number": 1,
-      "name": "Day name",
-      "focus": "Primary muscle groups",
-      "muscle_groups": ["Chest", "Shoulders"],
-      "exercises": [
-        {
-          "name": "Exercise name (must match available exercises)",
-          "sets": 4,
-          "reps": "8-12",
-          "rest_seconds": 90
-        }
-      ]
+      "name": "Day name (e.g., Upper Push, Lower Body, Full Body A)",
+      "focus": "Primary muscle groups targeted",
+      "muscle_groups": ["Muscle1", "Muscle2"]
     }
   ]
-}`;
+}
 
-  try {
-    const response = await ai.run('@cf/meta/llama-3-8b-instruct', {
-      prompt,
-      max_tokens: 2048
-    });
+For ${days_per_week} days, use this split:
+- 3 days: Full Body A, Full Body B, Full Body C
+- 4 days: Upper Push, Lower, Upper Pull, Lower
+- 5 days: Push, Pull, Legs, Upper, Lower
+- 6 days: Push, Pull, Legs, Push, Pull, Legs
 
-    let programData;
+Return valid JSON only:`;
+  
+  const response = await ai.run('@cf/meta/llama-3-8b-instruct', {
+    prompt: structurePrompt,
+    max_tokens: 1024,
+    temperature: 0.3  // Lower temperature for consistency
+  });
+  
+  // Parse JSON from response
+  const jsonMatch = response.response.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    return JSON.parse(jsonMatch[0]);
+  }
+  
+  return null;
+}
+
+/**
+ * Step 2: Generate exercises for a specific day
+ */
+async function generateExercisesForDay(ai, day, validExercises, formatExerciseList) {
+  const exercisePrompt = `You are selecting exercises for: ${day.name}
+Focus: ${day.focus}
+Muscle Groups: ${day.muscle_groups.join(', ')}
+
+AVAILABLE EXERCISES (you MUST choose from this list):
+${formatExerciseList(validExercises)}
+
+Select EXACTLY 5 exercises that:
+1. Match the day's focus and muscle groups
+2. Include 2-3 compound exercises (lower reps, longer rest)
+3. Include 2-3 isolation exercises (higher reps, shorter rest)
+4. Provide variety in movement patterns
+5. Use exercise names EXACTLY as listed above
+
+Return valid JSON array only:
+[
+  {"name": "Exercise name", "sets": 4, "reps": "8-10", "rest_seconds": 120},
+  {"name": "Exercise name", "sets": 3, "reps": "10-12", "rest_seconds": 90}
+]
+
+Guidelines:
+- Compound: 3-4 sets, 6-10 reps, 120-180s rest
+- Isolation: 3 sets, 10-15 reps, 60-90s rest
+
+Your selection:`;
+  
+  const response = await ai.run('@cf/meta/llama-3-8b-instruct', {
+    prompt: exercisePrompt,
+    max_tokens: 512,
+    temperature: 0.4
+  });
+  
+  // Parse JSON array from response
+  const jsonMatch = response.response.match(/\[[\s\S]*\]/);
+  if (jsonMatch) {
+    return JSON.parse(jsonMatch[0]);
+  }
+  
+  return [];
+}
+
+/**
+ * Determine if day is upper, lower, or full body
+ */
+function determineDayType(day) {
+  const dayName = day.name.toLowerCase();
+  const dayFocus = day.focus.toLowerCase();
+  
+  const upperKeywords = ['upper', 'push', 'pull', 'chest', 'back', 'shoulder', 'arm', 'bicep', 'tricep'];
+  const lowerKeywords = ['lower', 'leg', 'quad', 'hamstring', 'glute', 'calf'];
+  
+  const hasUpper = upperKeywords.some(kw => dayName.includes(kw) || dayFocus.includes(kw));
+  const hasLower = lowerKeywords.some(kw => dayName.includes(kw) || dayFocus.includes(kw));
+  
+  if (hasUpper && !hasLower) return 'UPPER';
+  if (hasLower && !hasUpper) return 'LOWER';
+  return 'FULL';
+}
+
+/**
+ * Filter exercises based on day type
+ */
+function filterExercisesByDayType(dayType, exercises, upperBodyMuscles, lowerBodyMuscles) {
+  if (dayType === 'UPPER') {
+    return exercises.filter(ex => upperBodyMuscles.includes(ex.muscle_group));
+  } else if (dayType === 'LOWER') {
+    return exercises.filter(ex => lowerBodyMuscles.includes(ex.muscle_group));
+  }
+  return exercises; // Full body - all exercises allowed
+}
+
+/**
+ * Validate and map AI-generated exercises to database
+ */
+function validateAndMapExercises(aiExercises, validExercises, dayName, dayType) {
+  const validated = [];
+  const seenIds = new Set();
+  
+  for (const ex of aiExercises) {
+    const matched = findExerciseByName(ex.name, validExercises);
     
-    // Parse AI response
-    if (response.response) {
-      const jsonMatch = response.response.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        programData = JSON.parse(jsonMatch[0]);
-      }
+    if (!matched) {
+      console.log(`   ⚠️  Could not find: ${ex.name}`);
+      continue;
     }
-
-    // Fallback to template if AI fails
-    if (!programData) {
-      programData = generateTemplateProgram(days_per_week);
+    
+    if (seenIds.has(matched.id)) {
+      console.log(`   ⚠️  Skipping duplicate: ${matched.name}`);
+      continue;
     }
-
-    // Map exercise names to IDs
-    const exerciseMap = {};
-    exercises.forEach(ex => {
-      exerciseMap[ex.name.toLowerCase()] = ex;
+    
+    seenIds.add(matched.id);
+    validated.push({
+      name: matched.name,
+      exercise_id: matched.id,
+      sets: ex.sets || 3,
+      reps: ex.reps || '10-12',
+      rest_seconds: ex.rest_seconds || 90
     });
+    
+    console.log(`   ✅ Validated: ${matched.name} (${matched.muscle_group})`);
+  }
+  
+  return validated;
+}
 
-    // Match exercises to database with strict validation
-    for (const day of programData.days) {
-      const seenExerciseIds = new Set();
-      const validatedExercises = [];
-      
-      // Determine if this is an upper or lower body day
-      const dayName = day.name.toLowerCase();
-      const dayFocus = day.focus.toLowerCase();
-      const isUpperDay = dayName.includes('upper') || dayName.includes('push') || 
-                         dayName.includes('pull') || dayName.includes('chest') ||
-                         dayName.includes('back') || dayName.includes('shoulder') ||
-                         dayName.includes('arm');
-      const isLowerDay = dayName.includes('lower') || dayName.includes('leg') ||
-                         dayName.includes('quad') || dayName.includes('hamstring') ||
-                         dayName.includes('glute');
-      
-      // Get appropriate exercise pool
-      const validMuscles = isUpperDay ? ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps'] :
-                           isLowerDay ? ['Legs', 'Quads', 'Hamstrings', 'Glutes', 'Calves'] :
-                           null; // Full body day
-      
-      for (const ex of day.exercises) {
-        const matchedExercise = findExerciseByName(ex.name, exercises);
-        
-        // Validate: No duplicates
-        if (seenExerciseIds.has(matchedExercise.id)) {
-          console.log(`⚠️  Skipping duplicate: ${matchedExercise.name}`);
-          continue;
-        }
-        
-        // Validate: Muscle group matches day type
-        if (validMuscles && !validMuscles.includes(matchedExercise.muscle_group)) {
-          console.log(`⚠️  Skipping ${matchedExercise.name} (${matchedExercise.muscle_group}) - doesn't match ${isUpperDay ? 'UPPER' : 'LOWER'} body day`);
-          continue;
-        }
-        
-        seenExerciseIds.add(matchedExercise.id);
-        validatedExercises.push({
-          ...ex,
-          exercise_id: matchedExercise.id,
-          rest_seconds: ex.rest_seconds || 90
-        });
-      }
-      
-      // If we have fewer than 4 exercises after validation, add appropriate ones
-      if (validatedExercises.length < 4) {
-        console.log(`⚠️  Only ${validatedExercises.length} valid exercises for ${day.name}. Adding more...`);
-        
-        const muscleGroups = day.muscle_groups || [];
-        let candidateExercises = exercises.filter(e => !seenExerciseIds.has(e.id));
-        
-        // Filter by upper/lower body if specified
-        if (validMuscles) {
-          candidateExercises = candidateExercises.filter(e => validMuscles.includes(e.muscle_group));
-        }
-        
-        // Prefer exercises matching the day's muscle groups
-        const preferredExercises = candidateExercises.filter(e =>
-          muscleGroups.some(mg => e.muscle_group.toLowerCase().includes(mg.toLowerCase()))
-        );
-        
-        const exercisesToAdd = (preferredExercises.length > 0 ? preferredExercises : candidateExercises)
-          .slice(0, 5 - validatedExercises.length);
-        
-        for (const addEx of exercisesToAdd) {
-          validatedExercises.push({
-            name: addEx.name,
-            sets: 3,
-            reps: '10-12',
-            exercise_id: addEx.id,
-            rest_seconds: 90
-          });
-          console.log(`✅ Added ${addEx.name} (${addEx.muscle_group})`);
-        }
-      }
-      
-      day.exercises = validatedExercises;
-      console.log(`✅ ${day.name}: ${validatedExercises.length} exercises validated`);
-    }
-
-    return programData;
-  } catch (error) {
-    console.error('AI program generation failed:', error);
-    return generateTemplateProgram(days_per_week);
+/**
+ * Add fallback exercises if needed
+ */
+function addFallbackExercises(currentExercises, validExercises, muscleGroups) {
+  const seenIds = new Set(currentExercises.map(ex => ex.exercise_id));
+  
+  // Prefer exercises matching muscle groups
+  const preferred = validExercises.filter(ex => 
+    !seenIds.has(ex.id) &&
+    muscleGroups.some(mg => ex.muscle_group.toLowerCase().includes(mg.toLowerCase()))
+  );
+  
+  const candidates = preferred.length > 0 ? preferred : 
+    validExercises.filter(ex => !seenIds.has(ex.id));
+  
+  const needed = Math.min(5 - currentExercises.length, candidates.length);
+  
+  for (let i = 0; i < needed; i++) {
+    const ex = candidates[i];
+    currentExercises.push({
+      name: ex.name,
+      exercise_id: ex.id,
+      sets: 3,
+      reps: '10-12',
+      rest_seconds: 90
+    });
+    console.log(`   ✅ Added fallback: ${ex.name} (${ex.muscle_group})`);
   }
 }
 
