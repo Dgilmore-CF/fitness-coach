@@ -14,7 +14,28 @@ export function calculateOneRepMax(weight, reps) {
  * Generate workout program using AI
  */
 export async function generateProgram(ai, { user, days_per_week, goal, exercises }) {
-  const equipmentList = 'Smith Machine, Olympic Bar and Plates, Functional Cable Trainer, Leg Extension/Curl Machine, Rower';
+  // Categorize exercises by muscle group for better AI selection
+  const upperBodyMuscles = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps'];
+  const lowerBodyMuscles = ['Legs', 'Quads', 'Hamstrings', 'Glutes', 'Calves'];
+  
+  const upperBodyExercises = exercises.filter(ex => 
+    upperBodyMuscles.includes(ex.muscle_group)
+  );
+  const lowerBodyExercises = exercises.filter(ex => 
+    lowerBodyMuscles.includes(ex.muscle_group)
+  );
+  
+  // Format exercise list for AI
+  const formatExerciseList = (exList) => {
+    const grouped = {};
+    exList.forEach(ex => {
+      if (!grouped[ex.muscle_group]) grouped[ex.muscle_group] = [];
+      grouped[ex.muscle_group].push(ex.name);
+    });
+    return Object.entries(grouped).map(([muscle, exs]) => 
+      `${muscle}: ${exs.join(', ')}`
+    ).join('\n');
+  };
   
   const prompt = `You are a professional strength and conditioning coach specializing in hypertrophy training.
 
@@ -25,20 +46,29 @@ User Profile:
 - Days per week: ${days_per_week}
 - Goal: ${goal}
 
-Available Equipment: ${equipmentList}
+AVAILABLE EXERCISES BY MUSCLE GROUP:
 
-Create a ${days_per_week}-day hypertrophy-focused workout program. For each day, include:
-1. Day name (e.g., "Upper Body Push")
-2. Muscle groups targeted
-3. EXACTLY 5 UNIQUE exercises from the available equipment - NO DUPLICATES ALLOWED
-4. Each exercise should be DIFFERENT - do NOT use the same exercise twice in one day
-5. Sets and reps (focus on hypertrophy range: 3-4 sets of 8-12 reps)
-6. Rest periods (60-120 seconds for hypertrophy)
+UPPER BODY:
+${formatExerciseList(upperBodyExercises)}
 
-IMPORTANT RULES:
-- Each day must have 5 different exercises
-- Never repeat the same exercise within a single day
-- Use variety in movement patterns (push/pull, compound/isolation)
+LOWER BODY:
+${formatExerciseList(lowerBodyExercises)}
+
+CRITICAL RULES FOR PROGRAM DESIGN:
+1. UPPER BODY DAYS: Only use exercises from the UPPER BODY list above
+2. LOWER BODY DAYS: Only use exercises from the LOWER BODY list above
+3. Each day must have EXACTLY 5 UNIQUE exercises - NO DUPLICATES
+4. Exercise names must EXACTLY match the names in the lists above
+5. Follow proper split structure:
+   - 3-day: Full Body, Upper, Lower
+   - 4-day: Upper Push, Lower, Upper Pull, Lower
+   - 5-day: Push, Pull, Legs, Upper, Lower
+   - 6-day: Push, Pull, Legs, Push, Pull, Legs
+
+HYPERTROPHY GUIDELINES:
+- Compound exercises: 3-4 sets of 6-10 reps, 120s rest
+- Isolation exercises: 3-4 sets of 10-15 reps, 60-90s rest
+- Progressive overload principle
 
 Respond in valid JSON format only:
 {
@@ -88,48 +118,84 @@ Respond in valid JSON format only:
       exerciseMap[ex.name.toLowerCase()] = ex;
     });
 
-    // Match exercises to database and remove duplicates
+    // Match exercises to database with strict validation
     for (const day of programData.days) {
       const seenExerciseIds = new Set();
-      const uniqueExercises = [];
+      const validatedExercises = [];
+      
+      // Determine if this is an upper or lower body day
+      const dayName = day.name.toLowerCase();
+      const dayFocus = day.focus.toLowerCase();
+      const isUpperDay = dayName.includes('upper') || dayName.includes('push') || 
+                         dayName.includes('pull') || dayName.includes('chest') ||
+                         dayName.includes('back') || dayName.includes('shoulder') ||
+                         dayName.includes('arm');
+      const isLowerDay = dayName.includes('lower') || dayName.includes('leg') ||
+                         dayName.includes('quad') || dayName.includes('hamstring') ||
+                         dayName.includes('glute');
+      
+      // Get appropriate exercise pool
+      const validMuscles = isUpperDay ? ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps'] :
+                           isLowerDay ? ['Legs', 'Quads', 'Hamstrings', 'Glutes', 'Calves'] :
+                           null; // Full body day
       
       for (const ex of day.exercises) {
         const matchedExercise = findExerciseByName(ex.name, exercises);
         
-        // Skip if we've already added this exercise to this day
+        // Validate: No duplicates
         if (seenExerciseIds.has(matchedExercise.id)) {
-          console.log(`Skipping duplicate exercise: ${matchedExercise.name}`);
+          console.log(`⚠️  Skipping duplicate: ${matchedExercise.name}`);
+          continue;
+        }
+        
+        // Validate: Muscle group matches day type
+        if (validMuscles && !validMuscles.includes(matchedExercise.muscle_group)) {
+          console.log(`⚠️  Skipping ${matchedExercise.name} (${matchedExercise.muscle_group}) - doesn't match ${isUpperDay ? 'UPPER' : 'LOWER'} body day`);
           continue;
         }
         
         seenExerciseIds.add(matchedExercise.id);
-        uniqueExercises.push({
+        validatedExercises.push({
           ...ex,
           exercise_id: matchedExercise.id,
           rest_seconds: ex.rest_seconds || 90
         });
       }
       
-      // If we have fewer than 4 exercises after deduplication, add more
-      if (uniqueExercises.length < 4) {
-        const muscleGroups = day.muscle_groups || [];
-        const additionalExercises = exercises.filter(e => 
-          !seenExerciseIds.has(e.id) && 
-          muscleGroups.some(mg => e.muscle_group.toLowerCase().includes(mg.toLowerCase()))
-        ).slice(0, 5 - uniqueExercises.length);
+      // If we have fewer than 4 exercises after validation, add appropriate ones
+      if (validatedExercises.length < 4) {
+        console.log(`⚠️  Only ${validatedExercises.length} valid exercises for ${day.name}. Adding more...`);
         
-        for (const addEx of additionalExercises) {
-          uniqueExercises.push({
+        const muscleGroups = day.muscle_groups || [];
+        let candidateExercises = exercises.filter(e => !seenExerciseIds.has(e.id));
+        
+        // Filter by upper/lower body if specified
+        if (validMuscles) {
+          candidateExercises = candidateExercises.filter(e => validMuscles.includes(e.muscle_group));
+        }
+        
+        // Prefer exercises matching the day's muscle groups
+        const preferredExercises = candidateExercises.filter(e =>
+          muscleGroups.some(mg => e.muscle_group.toLowerCase().includes(mg.toLowerCase()))
+        );
+        
+        const exercisesToAdd = (preferredExercises.length > 0 ? preferredExercises : candidateExercises)
+          .slice(0, 5 - validatedExercises.length);
+        
+        for (const addEx of exercisesToAdd) {
+          validatedExercises.push({
             name: addEx.name,
             sets: 3,
             reps: '10-12',
             exercise_id: addEx.id,
             rest_seconds: 90
           });
+          console.log(`✅ Added ${addEx.name} (${addEx.muscle_group})`);
         }
       }
       
-      day.exercises = uniqueExercises;
+      day.exercises = validatedExercises;
+      console.log(`✅ ${day.name}: ${validatedExercises.length} exercises validated`);
     }
 
     return programData;
