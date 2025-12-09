@@ -360,4 +360,171 @@ nutrition.put('/daily', async (c) => {
   return c.json({ log });
 });
 
+// Export nutrition data as CSV
+nutrition.get('/export/csv', async (c) => {
+  const user = requireAuth(c);
+  const db = c.env.DB;
+  const days = parseInt(c.req.query('days') || '30');
+  const type = c.req.query('type') || 'daily'; // 'daily', 'weekly', 'analytics'
+
+  if (type === 'daily') {
+    const history = await db.prepare(
+      `SELECT * FROM nutrition_log 
+       WHERE user_id = ? AND date >= date('now', '-' || ? || ' days')
+       ORDER BY date DESC`
+    ).bind(user.id, days).all();
+
+    const proteinGoal = user.weight_kg ? user.weight_kg * 2 : 150;
+    const waterGoal = user.weight_kg ? user.weight_kg * 35 : 2500;
+    const creatineGoal = 5;
+
+    let csv = 'Date,Protein (g),Protein Goal (g),Water (ml),Water Goal (ml),Creatine (g),Creatine Goal (g),All Goals Hit\n';
+    
+    history.results.forEach(log => {
+      const hitAll = log.protein_grams >= proteinGoal && log.water_ml >= waterGoal && log.creatine_grams >= creatineGoal;
+      csv += `${log.date},${log.protein_grams || 0},${proteinGoal},${log.water_ml || 0},${waterGoal},${log.creatine_grams || 0},${creatineGoal},${hitAll ? 'Yes' : 'No'}\n`;
+    });
+
+    return new Response(csv, {
+      headers: {
+        'Content-Type': 'text/csv',
+        'Content-Disposition': `attachment; filename="nutrition-daily-${days}days.csv"`
+      }
+    });
+  } else if (type === 'weekly') {
+    // Get analytics data
+    const history = await db.prepare(
+      `SELECT * FROM nutrition_log 
+       WHERE user_id = ? AND date >= date('now', '-' || ? || ' days')
+       ORDER BY date ASC`
+    ).bind(user.id, days).all();
+
+    const logs = history.results || [];
+    const proteinGoal = user.weight_kg ? user.weight_kg * 2 : 150;
+    const waterGoal = user.weight_kg ? user.weight_kg * 35 : 2500;
+    const creatineGoal = 5;
+
+    // Weekly aggregation
+    const weeklyData = [];
+    const weeksCount = Math.ceil(logs.length / 7);
+    
+    for (let week = 0; week < weeksCount; week++) {
+      const weekLogs = logs.slice(week * 7, (week + 1) * 7);
+      if (weekLogs.length === 0) continue;
+      
+      weeklyData.push({
+        week_start: weekLogs[0].date,
+        week_end: weekLogs[weekLogs.length - 1].date,
+        avg_protein: weekLogs.reduce((sum, l) => sum + (l.protein_grams || 0), 0) / weekLogs.length,
+        avg_water: weekLogs.reduce((sum, l) => sum + (l.water_ml || 0), 0) / weekLogs.length,
+        avg_creatine: weekLogs.reduce((sum, l) => sum + (l.creatine_grams || 0), 0) / weekLogs.length,
+        days_logged: weekLogs.length,
+        days_hit_goals: weekLogs.filter(l => 
+          l.protein_grams >= proteinGoal && 
+          l.water_ml >= waterGoal &&
+          l.creatine_grams >= creatineGoal
+        ).length
+      });
+    }
+
+    let csv = 'Week Start,Week End,Avg Protein (g),Avg Water (ml),Avg Creatine (g),Days Logged,Days Hit Goals\n';
+    
+    weeklyData.reverse().forEach(week => {
+      csv += `${week.week_start},${week.week_end},${Math.round(week.avg_protein)},${Math.round(week.avg_water)},${week.avg_creatine.toFixed(1)},${week.days_logged},${week.days_hit_goals}\n`;
+    });
+
+    return new Response(csv, {
+      headers: {
+        'Content-Type': 'text/csv',
+        'Content-Disposition': `attachment; filename="nutrition-weekly-${days}days.csv"`
+      }
+    });
+  }
+
+  return c.json({ error: 'Invalid export type' }, 400);
+});
+
+// Export nutrition data as text-based report (PDF alternative for Workers)
+nutrition.get('/export/report', async (c) => {
+  const user = requireAuth(c);
+  const db = c.env.DB;
+  const days = parseInt(c.req.query('days') || '30');
+
+  // Get analytics data
+  const history = await db.prepare(
+    `SELECT * FROM nutrition_log 
+     WHERE user_id = ? AND date >= date('now', '-' || ? || ' days')
+     ORDER BY date ASC`
+  ).bind(user.id, days).all();
+
+  const logs = history.results || [];
+  const proteinGoal = user.weight_kg ? user.weight_kg * 2 : 150;
+  const waterGoal = user.weight_kg ? user.weight_kg * 35 : 2500;
+  const creatineGoal = 5;
+
+  // Calculate statistics
+  const avgProtein = logs.length > 0 ? logs.reduce((sum, log) => sum + (log.protein_grams || 0), 0) / logs.length : 0;
+  const avgWater = logs.length > 0 ? logs.reduce((sum, log) => sum + (log.water_ml || 0), 0) / logs.length : 0;
+  const avgCreatine = logs.length > 0 ? logs.reduce((sum, log) => sum + (log.creatine_grams || 0), 0) / logs.length : 0;
+  const allGoalsDays = logs.filter(log => 
+    log.protein_grams >= proteinGoal && 
+    log.water_ml >= waterGoal && 
+    log.creatine_grams >= creatineGoal
+  ).length;
+  const adherenceRate = logs.length > 0 ? Math.round((allGoalsDays / logs.length) * 100) : 0;
+
+  // Generate text report
+  let report = `═══════════════════════════════════════════════════\n`;
+  report += `         NUTRITION ANALYTICS REPORT\n`;
+  report += `═══════════════════════════════════════════════════\n\n`;
+  report += `Report Period: ${days} days\n`;
+  report += `Generated: ${new Date().toLocaleString()}\n`;
+  report += `User: ${user.name || user.email}\n\n`;
+  
+  report += `─────────────────────────────────────────────────────\n`;
+  report += `SUMMARY STATISTICS\n`;
+  report += `─────────────────────────────────────────────────────\n`;
+  report += `Total Days Logged:     ${logs.length}\n`;
+  report += `Days Hit All Goals:    ${allGoalsDays}\n`;
+  report += `Adherence Rate:        ${adherenceRate}%\n\n`;
+  report += `Average Daily Protein: ${Math.round(avgProtein)}g (Goal: ${proteinGoal}g)\n`;
+  report += `Average Daily Water:   ${Math.round(avgWater)}ml (Goal: ${waterGoal}ml)\n`;
+  report += `Average Daily Creatine:${avgCreatine.toFixed(1)}g (Goal: ${creatineGoal}g)\n\n`;
+  
+  report += `─────────────────────────────────────────────────────\n`;
+  report += `DAILY LOG\n`;
+  report += `─────────────────────────────────────────────────────\n`;
+  report += `Date       | Protein | Water  | Creatine | Goals\n`;
+  report += `-----------|---------|--------|----------|------\n`;
+  
+  logs.slice().reverse().forEach(log => {
+    const hitAll = log.protein_grams >= proteinGoal && log.water_ml >= waterGoal && log.creatine_grams >= creatineGoal;
+    report += `${log.date} | ${String(log.protein_grams || 0).padEnd(7)} | ${String(log.water_ml || 0).padEnd(6)} | ${String((log.creatine_grams || 0).toFixed(1)).padEnd(8)} | ${hitAll ? '✓' : '✗'}\n`;
+  });
+  
+  report += `\n═══════════════════════════════════════════════════\n`;
+  report += `End of Report\n`;
+  report += `═══════════════════════════════════════════════════\n`;
+
+  return new Response(report, {
+    headers: {
+      'Content-Type': 'text/plain',
+      'Content-Disposition': `attachment; filename="nutrition-report-${days}days.txt"`
+    }
+  });
+});
+
+// Delete a nutrition log entry
+nutrition.delete('/daily/:date', async (c) => {
+  const user = requireAuth(c);
+  const date = c.req.param('date');
+  const db = c.env.DB;
+
+  await db.prepare(
+    'DELETE FROM nutrition_log WHERE user_id = ? AND date = ?'
+  ).bind(user.id, date).run();
+
+  return c.json({ message: 'Nutrition log deleted' });
+});
+
 export default nutrition;

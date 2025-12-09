@@ -1531,31 +1531,124 @@ async function loadNutrition() {
           </div>
         </div>
 
+        <!-- Export Options -->
+        <div style="margin-bottom: 24px; display: flex; gap: 12px; flex-wrap: wrap;">
+          <button class="btn btn-outline" onclick="exportNutritionCSV('daily', 30)">
+            <i class="fas fa-download"></i> Export Daily CSV (30 days)
+          </button>
+          <button class="btn btn-outline" onclick="exportNutritionCSV('weekly', 30)">
+            <i class="fas fa-download"></i> Export Weekly CSV (30 days)
+          </button>
+          <button class="btn btn-outline" onclick="exportNutritionReport(30)">
+            <i class="fas fa-file-alt"></i> Export Report (30 days)
+          </button>
+          <button class="btn btn-outline" onclick="exportNutritionCSV('daily', 90)">
+            <i class="fas fa-download"></i> Export Daily CSV (90 days)
+          </button>
+        </div>
+
         <!-- Weekly Trends -->
         ${weekly_trends.length > 0 ? `
         <div style="margin-bottom: 24px;">
-          <h3><i class="fas fa-calendar-week"></i> Weekly Trends</h3>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3><i class="fas fa-calendar-week"></i> Weekly Trends</h3>
+            <div style="display: flex; gap: 8px;">
+              <input 
+                type="text" 
+                id="weeklyTrendsFilter" 
+                placeholder="Filter..." 
+                oninput="filterWeeklyTrends()"
+                style="padding: 6px 12px; border: 1px solid var(--light); border-radius: 6px; width: 150px;"
+              >
+              <select 
+                id="weeklyTrendsSort" 
+                onchange="sortWeeklyTrends()" 
+                style="padding: 6px 12px; border: 1px solid var(--light); border-radius: 6px;"
+              >
+                <option value="date-desc">Date (Newest)</option>
+                <option value="date-asc">Date (Oldest)</option>
+                <option value="protein-desc">Protein (High-Low)</option>
+                <option value="protein-asc">Protein (Low-High)</option>
+                <option value="water-desc">Water (High-Low)</option>
+                <option value="water-asc">Water (Low-High)</option>
+                <option value="goals-desc">Goals Hit (High-Low)</option>
+                <option value="goals-asc">Goals Hit (Low-High)</option>
+              </select>
+            </div>
+          </div>
           <div class="table-container">
-            <table class="data-table">
+            <table class="data-table" id="weeklyTrendsTable">
               <thead>
                 <tr>
-                  <th>Week</th>
-                  <th>Avg Protein</th>
-                  <th>Avg Water</th>
-                  <th>Avg Creatine</th>
-                  <th>Days Logged</th>
-                  <th>Goals Hit</th>
+                  <th onclick="sortWeeklyTrendsByColumn('week')" style="cursor: pointer;">
+                    Week <i class="fas fa-sort"></i>
+                  </th>
+                  <th onclick="sortWeeklyTrendsByColumn('protein')" style="cursor: pointer;">
+                    Avg Protein <i class="fas fa-sort"></i>
+                  </th>
+                  <th onclick="sortWeeklyTrendsByColumn('water')" style="cursor: pointer;">
+                    Avg Water <i class="fas fa-sort"></i>
+                  </th>
+                  <th onclick="sortWeeklyTrendsByColumn('creatine')" style="cursor: pointer;">
+                    Avg Creatine <i class="fas fa-sort"></i>
+                  </th>
+                  <th onclick="sortWeeklyTrendsByColumn('logged')" style="cursor: pointer;">
+                    Days Logged <i class="fas fa-sort"></i>
+                  </th>
+                  <th onclick="sortWeeklyTrendsByColumn('goals')" style="cursor: pointer;">
+                    Goals Hit <i class="fas fa-sort"></i>
+                  </th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody id="weeklyTrendsBody">
                 ${weekly_trends.map(week => `
-                  <tr>
+                  <tr data-week-start="${week.week_start}" data-protein="${Math.round(week.avg_protein)}" data-water="${Math.round(week.avg_water)}" data-creatine="${week.avg_creatine.toFixed(1)}" data-logged="${week.days_logged}" data-goals="${week.days_hit_goals}">
                     <td><small>${new Date(week.week_start).toLocaleDateString()} - ${new Date(week.week_end).toLocaleDateString()}</small></td>
                     <td><strong>${Math.round(week.avg_protein)}g</strong></td>
                     <td><strong>${Math.round(week.avg_water)}ml</strong></td>
                     <td><strong>${week.avg_creatine.toFixed(1)}g</strong></td>
                     <td>${week.days_logged}</td>
                     <td><span style="color: ${week.days_hit_goals >= 5 ? 'var(--success)' : 'var(--warning)'};">${week.days_hit_goals} days</span></td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        ` : ''}
+        
+        <!-- Daily History with Edit -->
+        ${daily_data.length > 0 ? `
+        <div style="margin-bottom: 24px;">
+          <h3><i class="fas fa-history"></i> Daily History (Last 30 Days)</h3>
+          <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+            <table class="data-table">
+              <thead style="position: sticky; top: 0; background: white; z-index: 10;">
+                <tr>
+                  <th>Date</th>
+                  <th>Protein</th>
+                  <th>Water</th>
+                  <th>Creatine</th>
+                  <th>Goals</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${daily_data.slice().reverse().map(day => `
+                  <tr>
+                    <td><strong>${new Date(day.date).toLocaleDateString()}</strong></td>
+                    <td>${day.protein}g ${day.hit_protein ? '✅' : '❌'}</td>
+                    <td>${day.water}ml ${day.hit_water ? '✅' : '❌'}</td>
+                    <td>${day.creatine}g ${day.hit_creatine ? '✅' : '❌'}</td>
+                    <td>${day.hit_all ? '<span style="color: var(--success);">All Hit ✅</span>' : '<span style="color: var(--warning);">Incomplete</span>'}</td>
+                    <td>
+                      <button class="btn btn-outline" style="padding: 4px 8px; font-size: 12px;" onclick="editNutritionLog('${day.date}', ${day.protein}, ${day.water}, ${day.creatine})">
+                        <i class="fas fa-edit"></i> Edit
+                      </button>
+                      <button class="btn btn-outline" style="padding: 4px 8px; font-size: 12px; color: var(--danger);" onclick="deleteNutritionLog('${day.date}')">
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    </td>
                   </tr>
                 `).join('')}
               </tbody>
@@ -1894,5 +1987,172 @@ async function saveExerciseNotes(exerciseId) {
     closeModal();
   } catch (error) {
     showNotification('Error saving notes: ' + error.message, 'error');
+  }
+}
+
+// Export nutrition data as CSV
+function exportNutritionCSV(type, days) {
+  window.location.href = `/api/nutrition/export/csv?type=${type}&days=${days}`;
+}
+
+// Export nutrition report
+function exportNutritionReport(days) {
+  window.location.href = `/api/nutrition/export/report?days=${days}`;
+}
+
+// Edit nutrition log
+function editNutritionLog(date, protein, water, creatine) {
+  const modalBody = document.getElementById('modalBody');
+  
+  modalBody.innerHTML = `
+    <div style="display: grid; gap: 16px;">
+      <div class="form-group">
+        <label>Date:</label>
+        <input type="date" id="editNutritionDate" value="${date}" readonly class="form-control" style="background: var(--light);">
+      </div>
+      
+      <div class="form-group">
+        <label>Protein (grams):</label>
+        <input type="number" id="editNutritionProtein" value="${protein}" class="form-control" step="1" min="0">
+      </div>
+      
+      <div class="form-group">
+        <label>Water (ml):</label>
+        <input type="number" id="editNutritionWater" value="${water}" class="form-control" step="100" min="0">
+      </div>
+      
+      <div class="form-group">
+        <label>Creatine (grams):</label>
+        <input type="number" id="editNutritionCreatine" value="${creatine}" class="form-control" step="0.5" min="0">
+      </div>
+      
+      <button class="btn btn-primary" onclick="saveNutritionEdit()">
+        <i class="fas fa-save"></i> Save Changes
+      </button>
+    </div>
+  `;
+  
+  openModal('Edit Nutrition Log');
+}
+
+// Save edited nutrition log
+async function saveNutritionEdit() {
+  const date = document.getElementById('editNutritionDate').value;
+  const protein = parseFloat(document.getElementById('editNutritionProtein').value) || 0;
+  const water = parseFloat(document.getElementById('editNutritionWater').value) || 0;
+  const creatine = parseFloat(document.getElementById('editNutritionCreatine').value) || 0;
+  
+  try {
+    await api('/nutrition/daily', {
+      method: 'PUT',
+      body: JSON.stringify({
+        date,
+        protein_grams: protein,
+        water_ml: water,
+        creatine_grams: creatine
+      })
+    });
+    
+    showNotification('Nutrition log updated!', 'success');
+    closeModal();
+    loadNutrition();
+  } catch (error) {
+    showNotification('Error updating nutrition log: ' + error.message, 'error');
+  }
+}
+
+// Delete nutrition log
+async function deleteNutritionLog(date) {
+  if (!confirm(`Delete nutrition log for ${new Date(date).toLocaleDateString()}?`)) return;
+  
+  try {
+    await api(`/nutrition/daily/${date}`, {
+      method: 'DELETE'
+    });
+    
+    showNotification('Nutrition log deleted!', 'success');
+    loadNutrition();
+  } catch (error) {
+    showNotification('Error deleting nutrition log: ' + error.message, 'error');
+  }
+}
+
+// Filter weekly trends table
+function filterWeeklyTrends() {
+  const filterValue = document.getElementById('weeklyTrendsFilter').value.toLowerCase();
+  const tbody = document.getElementById('weeklyTrendsBody');
+  const rows = tbody.getElementsByTagName('tr');
+  
+  for (let row of rows) {
+    const text = row.textContent.toLowerCase();
+    row.style.display = text.includes(filterValue) ? '' : 'none';
+  }
+}
+
+// Sort weekly trends by dropdown
+function sortWeeklyTrends() {
+  const sortValue = document.getElementById('weeklyTrendsSort').value;
+  const tbody = document.getElementById('weeklyTrendsBody');
+  const rows = Array.from(tbody.getElementsByTagName('tr'));
+  
+  rows.sort((a, b) => {
+    let aVal, bVal;
+    
+    switch(sortValue) {
+      case 'date-desc':
+        aVal = new Date(a.dataset.weekStart);
+        bVal = new Date(b.dataset.weekStart);
+        return bVal - aVal;
+      case 'date-asc':
+        aVal = new Date(a.dataset.weekStart);
+        bVal = new Date(b.dataset.weekStart);
+        return aVal - bVal;
+      case 'protein-desc':
+        return parseFloat(b.dataset.protein) - parseFloat(a.dataset.protein);
+      case 'protein-asc':
+        return parseFloat(a.dataset.protein) - parseFloat(b.dataset.protein);
+      case 'water-desc':
+        return parseFloat(b.dataset.water) - parseFloat(a.dataset.water);
+      case 'water-asc':
+        return parseFloat(a.dataset.water) - parseFloat(b.dataset.water);
+      case 'goals-desc':
+        return parseInt(b.dataset.goals) - parseInt(a.dataset.goals);
+      case 'goals-asc':
+        return parseInt(a.dataset.goals) - parseInt(b.dataset.goals);
+      default:
+        return 0;
+    }
+  });
+  
+  rows.forEach(row => tbody.appendChild(row));
+}
+
+// Sort weekly trends by column click
+function sortWeeklyTrendsByColumn(column) {
+  const select = document.getElementById('weeklyTrendsSort');
+  const currentValue = select.value;
+  
+  // Toggle between asc and desc
+  if (currentValue === `${column}-desc`) {
+    select.value = `${column}-asc`;
+  } else {
+    select.value = `${column}-desc`;
+  }
+  
+  // Map column names to sort values
+  const columnMap = {
+    'week': 'date',
+    'protein': 'protein',
+    'water': 'water',
+    'creatine': 'creatine',
+    'logged': 'logged',
+    'goals': 'goals'
+  };
+  
+  if (columnMap[column]) {
+    select.value = currentValue.includes(columnMap[column]) && currentValue.includes('desc') 
+      ? `${columnMap[column]}-asc` 
+      : `${columnMap[column]}-desc`;
+    sortWeeklyTrends();
   }
 }
