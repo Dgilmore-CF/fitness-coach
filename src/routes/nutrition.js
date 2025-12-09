@@ -49,6 +49,29 @@ nutrition.post('/water', async (c) => {
   return c.json({ log, message: 'Water logged' });
 });
 
+// Log creatine intake
+nutrition.post('/creatine', async (c) => {
+  const user = requireAuth(c);
+  const body = await c.req.json();
+  const { grams, date } = body;
+  const db = c.env.DB;
+
+  const logDate = date || new Date().toISOString().split('T')[0];
+
+  // Upsert nutrition log
+  const log = await db.prepare(
+    `INSERT INTO nutrition_log (user_id, date, creatine_grams, updated_at)
+     VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+     ON CONFLICT(user_id, date) 
+     DO UPDATE SET 
+       creatine_grams = creatine_grams + excluded.creatine_grams,
+       updated_at = CURRENT_TIMESTAMP
+     RETURNING *`
+  ).bind(user.id, logDate, grams).first();
+
+  return c.json({ log, message: 'Creatine logged' });
+});
+
 // Get daily nutrition stats
 nutrition.get('/daily', async (c) => {
   const user = requireAuth(c);
@@ -65,14 +88,21 @@ nutrition.get('/daily', async (c) => {
   // Recommended water (35ml per kg body weight)
   const recommendedWater = user.weight_kg ? user.weight_kg * 35 : 2500;
 
+  // Recommended creatine (5g per day standard, 0.03g per kg for loading phase)
+  // Standard maintenance dose is 5g regardless of weight
+  const recommendedCreatine = 5;
+
   return c.json({
     date,
     protein_grams: log?.protein_grams || 0,
     water_ml: log?.water_ml || 0,
+    creatine_grams: log?.creatine_grams || 0,
     protein_goal: recommendedProtein,
     water_goal: recommendedWater,
+    creatine_goal: recommendedCreatine,
     protein_percentage: log?.protein_grams ? (log.protein_grams / recommendedProtein) * 100 : 0,
-    water_percentage: log?.water_ml ? (log.water_ml / recommendedWater) * 100 : 0
+    water_percentage: log?.water_ml ? (log.water_ml / recommendedWater) * 100 : 0,
+    creatine_percentage: log?.creatine_grams ? (log.creatine_grams / recommendedCreatine) * 100 : 0
   });
 });
 
@@ -91,13 +121,16 @@ nutrition.get('/history', async (c) => {
   // Calculate recommended values
   const recommendedProtein = user.weight_kg ? user.weight_kg * 2 : 150;
   const recommendedWater = user.weight_kg ? user.weight_kg * 35 : 2500;
+  const recommendedCreatine = 5;
 
   const enriched = history.results.map(log => ({
     ...log,
     protein_goal: recommendedProtein,
     water_goal: recommendedWater,
+    creatine_goal: recommendedCreatine,
     protein_percentage: (log.protein_grams / recommendedProtein) * 100,
-    water_percentage: (log.water_ml / recommendedWater) * 100
+    water_percentage: (log.water_ml / recommendedWater) * 100,
+    creatine_percentage: (log.creatine_grams / recommendedCreatine) * 100
   }));
 
   return c.json({ history: enriched });
@@ -107,21 +140,22 @@ nutrition.get('/history', async (c) => {
 nutrition.put('/daily', async (c) => {
   const user = requireAuth(c);
   const body = await c.req.json();
-  const { date, protein_grams, water_ml } = body;
+  const { date, protein_grams, water_ml, creatine_grams } = body;
   const db = c.env.DB;
 
   const logDate = date || new Date().toISOString().split('T')[0];
 
   const log = await db.prepare(
-    `INSERT INTO nutrition_log (user_id, date, protein_grams, water_ml, updated_at)
-     VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `INSERT INTO nutrition_log (user_id, date, protein_grams, water_ml, creatine_grams, updated_at)
+     VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
      ON CONFLICT(user_id, date) 
      DO UPDATE SET 
        protein_grams = excluded.protein_grams,
        water_ml = excluded.water_ml,
+       creatine_grams = excluded.creatine_grams,
        updated_at = CURRENT_TIMESTAMP
      RETURNING *`
-  ).bind(user.id, logDate, protein_grams || 0, water_ml || 0).first();
+  ).bind(user.id, logDate, protein_grams || 0, water_ml || 0, creatine_grams || 0).first();
 
   return c.json({ log });
 });

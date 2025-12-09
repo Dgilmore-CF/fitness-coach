@@ -282,47 +282,69 @@ async function viewProgram(programId) {
       <p><em>${program.equipment}</em></p>
 
       ${program.days.map(day => `
-        <div style="margin: 20px 0; padding: 16px; background: var(--light); border-radius: 8px;">
-          <h4>Day ${day.day_number}: ${day.name}</h4>
-          <p style="color: var(--gray); margin-bottom: 10px;">${day.focus}</p>
+        <div style="margin: 20px 0; padding: 20px; background: var(--light); border-radius: 12px;">
+          <h4 style="margin-bottom: 12px;">Day ${day.day_number}: ${day.name}</h4>
+          <p style="color: var(--gray); margin-bottom: 16px; font-weight: 500;">${day.focus}</p>
           
-          <strong>Warm-up Stretches:</strong>
-          <ul style="margin: 10px 0;">
+          <strong style="display: block; margin-bottom: 8px;">Warm-up Stretches:</strong>
+          <ul style="margin: 0 0 16px 20px; line-height: 1.8;">
             ${day.stretches.map(s => `
               <li>${s.name} - ${s.duration_seconds}s (${s.muscle_group})</li>
             `).join('')}
           </ul>
 
-          <strong>Exercises:</strong>
-          <ol style="margin: 10px 0;">
+          <strong style="display: block; margin-bottom: 8px;">Exercises:</strong>
+          <ol style="margin: 0 0 0 20px; line-height: 1.8;">
             ${day.exercises.map(ex => `
-              <li>
-                <strong>${ex.name}</strong> - ${ex.target_sets} sets x ${ex.target_reps} reps
-                <div style="font-size: 12px; color: var(--gray);">
+              <li style="margin-bottom: 16px;">
+                <div style="margin-bottom: 6px;">
+                  <strong style="font-size: 15px;">${ex.name}</strong> - ${ex.target_sets} sets x ${ex.target_reps} reps
+                </div>
+                <div style="font-size: 13px; color: var(--gray); margin-bottom: 8px;">
                   Rest: ${ex.rest_seconds}s | ${ex.muscle_group} | ${ex.equipment}
                 </div>
-                ${ex.tips ? `<div style="font-size: 12px; font-style: italic; margin-top: 4px;">${ex.tips}</div>` : ''}
+                ${ex.tips ? `
+                  <details style="margin-top: 8px; padding: 12px; background: var(--white); border-radius: 8px; border: 1px solid var(--border);">
+                    <summary style="cursor: pointer; color: var(--primary); font-weight: 600; font-size: 13px;">
+                      <i class="fas fa-info-circle"></i> Exercise Tips & Form Cues
+                    </summary>
+                    <div style="margin-top: 12px; font-size: 13px; line-height: 1.6; color: var(--dark);">
+                      ${ex.tips}
+                      <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
+                        <strong style="display: block; margin-bottom: 6px; color: var(--primary);">Key Points:</strong>
+                        <ul style="margin: 0 0 0 20px;">
+                          <li>Focus on controlled movement throughout the entire range of motion</li>
+                          <li>Maintain proper breathing: exhale on exertion, inhale on the negative</li>
+                          <li>Keep core engaged and maintain neutral spine alignment</li>
+                          <li>Use a weight that allows you to complete all reps with good form</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </details>
+                ` : ''}
               </li>
             `).join('')}
           </ol>
         </div>
       `).join('')}
 
-      <button class="btn btn-primary" onclick="startWorkoutFromProgram(${program.id})">
-        <i class="fas fa-play"></i> Start Workout
-      </button>
-      ${!program.active ? `
-        <button class="btn btn-secondary" onclick="activateProgram(${program.id})">
-          Set as Active
+      <div style="margin-top: 24px; display: flex; gap: 12px; flex-wrap: wrap;">
+        <button class="btn btn-primary" onclick="startWorkoutFromProgram(${program.id})">
+          <i class="fas fa-play"></i> Start Workout
         </button>
-      ` : ''}
-      <button class="btn btn-danger" onclick="deleteProgram(${program.id})">
-        <i class="fas fa-trash"></i> Delete
-      </button>
+        ${!program.active ? `
+          <button class="btn btn-secondary" onclick="activateProgram(${program.id})">
+            Set as Active
+          </button>
+        ` : ''}
+        <button class="btn btn-danger" onclick="deleteProgram(${program.id})">
+          <i class="fas fa-trash"></i> Delete
+        </button>
+      </div>
     `;
 
     document.getElementById('modalTitle').textContent = 'Program Details';
-    openModal();
+    openModal(true); // Pass true for wide modal
   } catch (error) {
     showNotification('Error loading program: ' + error.message, 'error');
   }
@@ -845,15 +867,20 @@ async function loadNutrition() {
       <div class="card">
         <h2><i class="fas fa-apple-alt"></i> Today's Nutrition</h2>
         <div class="stats-grid">
-          <div class="stat-card" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+          <div class="stat-card" style="background: var(--secondary);">
             <div class="stat-label">Protein</div>
             <div class="stat-value">${Math.round(daily.protein_grams)}g</div>
             <div class="stat-label">Goal: ${Math.round(daily.protein_goal)}g (${Math.round(daily.protein_percentage)}%)</div>
           </div>
-          <div class="stat-card" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);">
+          <div class="stat-card" style="background: var(--primary);">
             <div class="stat-label">Water</div>
             <div class="stat-value">${Math.round(daily.water_ml)}ml</div>
             <div class="stat-label">Goal: ${Math.round(daily.water_goal)}ml (${Math.round(daily.water_percentage)}%)</div>
+          </div>
+          <div class="stat-card" style="background: #8b5cf6;">
+            <div class="stat-label">Creatine</div>
+            <div class="stat-value">${Math.round(daily.creatine_grams)}g</div>
+            <div class="stat-label">Goal: ${Math.round(daily.creatine_goal)}g (${Math.round(daily.creatine_percentage)}%)</div>
           </div>
         </div>
       </div>
@@ -883,6 +910,22 @@ async function loadNutrition() {
               <button class="btn btn-outline" onclick="logWater(250)">250ml</button>
               <button class="btn btn-outline" onclick="logWater(500)">500ml</button>
               <button class="btn btn-outline" onclick="logWater(1000)">1L</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Creatine (grams):</label>
+            <div style="display: flex; gap: 8px;">
+              <input type="number" id="creatineInput" placeholder="Amount" step="0.5" style="flex: 1;">
+              <button class="btn btn-secondary" onclick="logCreatine()">
+                <i class="fas fa-plus"></i> Add
+              </button>
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 8px;">
+              <button class="btn btn-outline" onclick="logCreatine(5)">5g (Standard)</button>
+            </div>
+            <div style="font-size: 12px; color: var(--gray); margin-top: 8px;">
+              <i class="fas fa-info-circle"></i> Recommended: 5g daily for maintenance. Take with carbs post-workout for optimal absorption.
             </div>
           </div>
         </div>
@@ -932,6 +975,27 @@ async function logWater(amount) {
     loadNutrition();
   } catch (error) {
     showNotification('Error logging water: ' + error.message, 'error');
+  }
+}
+
+async function logCreatine(amount) {
+  const grams = amount || parseFloat(document.getElementById('creatineInput').value);
+  
+  if (!grams) {
+    showNotification('Please enter creatine amount', 'warning');
+    return;
+  }
+
+  try {
+    await api('/nutrition/creatine', {
+      method: 'POST',
+      body: JSON.stringify({ grams })
+    });
+
+    showNotification('Creatine logged!', 'success');
+    loadNutrition();
+  } catch (error) {
+    showNotification('Error logging creatine: ' + error.message, 'error');
   }
 }
 
@@ -1070,12 +1134,33 @@ function formatDuration(seconds) {
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
-function openModal() {
-  document.getElementById('modal').classList.add('active');
+function openModal(wide = false) {
+  const modal = document.getElementById('modal');
+  const modalContent = document.querySelector('.modal-content');
+  
+  // Add or remove wide class
+  if (wide) {
+    modalContent.classList.add('wide');
+  } else {
+    modalContent.classList.remove('wide');
+  }
+  
+  modal.classList.add('active');
+  
+  // Click outside to close
+  setTimeout(() => {
+    modal.onclick = function(e) {
+      if (e.target === modal) {
+        closeModal();
+      }
+    };
+  }, 100);
 }
 
 function closeModal() {
-  document.getElementById('modal').classList.remove('active');
+  const modal = document.getElementById('modal');
+  modal.classList.remove('active');
+  modal.onclick = null;
 }
 
 function showNotification(message, type = 'success') {

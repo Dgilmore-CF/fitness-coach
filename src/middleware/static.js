@@ -405,6 +405,10 @@ function getIndexHTML() {
             border: 1px solid var(--border);
         }
         
+        .modal-content.wide {
+            max-width: 900px;
+        }
+        
         .modal-header {
             display: flex;
             justify-content: space-between;
