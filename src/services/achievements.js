@@ -433,7 +433,7 @@ export async function getRecentPRs(db, userId, limit = 10) {
       pr.*,
       e.name as exercise_name,
       e.muscle_group,
-      w.completed_at as workout_date
+      w.end_time as workout_date
     FROM personal_records pr
     JOIN exercises e ON pr.exercise_id = e.id
     LEFT JOIN workouts w ON pr.workout_id = w.id
