@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { requireAuth } from '../middleware/auth';
 import { calculateOneRepMax, getAIRecommendations } from '../services/ai';
+import { checkAndAwardAchievements } from '../services/achievements';
 
 const workouts = new Hono();
 
@@ -154,7 +155,14 @@ workouts.post('/:id/complete', async (c) => {
   const ai = c.env.AI;
   await getAIRecommendations(db, ai, user.id, workoutId);
 
-  return c.json({ workout, message: 'Workout completed' });
+  // Check and award achievements
+  const newAchievements = await checkAndAwardAchievements(db, user.id, workoutId);
+
+  return c.json({ 
+    workout, 
+    message: 'Workout completed',
+    achievements: newAchievements
+  });
 });
 
 // Add exercise to workout

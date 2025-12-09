@@ -121,6 +121,9 @@ function switchTab(tabName) {
     case 'analytics':
       loadAnalytics();
       break;
+    case 'achievements':
+      loadAchievements();
+      break;
     case 'nutrition':
       loadNutrition();
       break;
@@ -1066,7 +1069,7 @@ async function completeWorkout() {
   if (!confirm('Are you sure you want to complete this workout?')) return;
 
   try {
-    await api(`/workouts/${state.currentWorkout.id}/complete`, { method: 'POST' });
+    const result = await api(`/workouts/${state.currentWorkout.id}/complete`, { method: 'POST' });
     
     if (state.workoutTimer) {
       clearInterval(state.workoutTimer);
@@ -1078,10 +1081,49 @@ async function completeWorkout() {
     state.workoutStartTime = null;
     
     showNotification('Workout completed! Great job!', 'success');
+    
+    // Show achievement notifications
+    if (result.achievements && result.achievements.length > 0) {
+      setTimeout(() => {
+        result.achievements.forEach((achievement, index) => {
+          setTimeout(() => {
+            showAchievementNotification(achievement);
+          }, index * 1500); // Stagger notifications
+        });
+      }, 1000);
+    }
+    
     loadWorkout();
   } catch (error) {
     showNotification('Error completing workout: ' + error.message, 'error');
   }
+}
+
+// Show achievement earned notification
+function showAchievementNotification(achievement) {
+  const notification = document.createElement('div');
+  notification.className = 'achievement-notification';
+  notification.innerHTML = `
+    <div style="display: flex; align-items: center; gap: 16px;">
+      <div style="font-size: 48px;">${achievement.icon}</div>
+      <div>
+        <div style="font-weight: bold; font-size: 18px; margin-bottom: 4px;">Achievement Unlocked!</div>
+        <div style="font-size: 16px; color: var(--dark); margin-bottom: 4px;">${achievement.name}</div>
+        <div style="font-size: 13px; color: var(--gray);">${achievement.description}</div>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(notification);
+  
+  // Trigger animation
+  setTimeout(() => notification.classList.add('show'), 100);
+  
+  // Remove after 5 seconds
+  setTimeout(() => {
+    notification.classList.remove('show');
+    setTimeout(() => notification.remove(), 500);
+  }, 5000);
 }
 
 // Analytics
@@ -1172,6 +1214,172 @@ async function loadAnalytics() {
     `;
   } catch (error) {
     container.innerHTML = `<div class="card"><p>Error loading analytics: ${error.message}</p></div>`;
+  }
+}
+
+// Achievements
+async function loadAchievements() {
+  const container = document.getElementById('achievements');
+  
+  try {
+    const [achievementsData, prsData, streakData] = await Promise.all([
+      api('/achievements'),
+      api('/achievements/prs?limit=10'),
+      api('/achievements/streak')
+    ]);
+    
+    const { earned, stats } = achievementsData;
+    const { prs } = prsData;
+    const { streak } = streakData;
+    
+    // Group achievements by category
+    const achievementsByCategory = {};
+    earned.forEach(ach => {
+      if (!achievementsByCategory[ach.category]) {
+        achievementsByCategory[ach.category] = [];
+      }
+      achievementsByCategory[ach.category].push(ach);
+    });
+    
+    // Calculate streak weeks
+    const currentWeeks = Math.floor(streak.current_streak / 7);
+    const longestWeeks = Math.floor(streak.longest_streak / 7);
+    
+    container.innerHTML = `
+      <div class="card">
+        <h2><i class="fas fa-trophy"></i> Achievements & Challenges</h2>
+        
+        <!-- Stats Overview -->
+        <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 30px;">
+          <div class="stat-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+            <div class="stat-icon" style="font-size: 32px;">🔥</div>
+            <div class="stat-value" style="font-size: 36px;">${currentWeeks}</div>
+            <div class="stat-label">Week Streak</div>
+            <div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">Best: ${longestWeeks} weeks</div>
+          </div>
+          
+          <div class="stat-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
+            <div class="stat-icon" style="font-size: 32px;">💪</div>
+            <div class="stat-value" style="font-size: 36px;">${stats.totalWorkouts}</div>
+            <div class="stat-label">Total Workouts</div>
+          </div>
+          
+          <div class="stat-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white;">
+            <div class="stat-icon" style="font-size: 32px;">📈</div>
+            <div class="stat-value" style="font-size: 36px;">${stats.totalPRs}</div>
+            <div class="stat-label">Personal Records</div>
+          </div>
+          
+          <div class="stat-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white;">
+            <div class="stat-icon" style="font-size: 32px;">🏆</div>
+            <div class="stat-value" style="font-size: 36px;">${earned.length}</div>
+            <div class="stat-label">Achievements Earned</div>
+          </div>
+        </div>
+        
+        <!-- Recent Personal Records -->
+        ${prs.length > 0 ? `
+        <div style="margin-bottom: 30px;">
+          <h3><i class="fas fa-medal"></i> Recent Personal Records</h3>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Exercise</th>
+                  <th>Type</th>
+                  <th>Record</th>
+                  <th>Previous</th>
+                  <th>Improvement</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${prs.map(pr => {
+                  const improvement = pr.previous_value ? 
+                    `+${((pr.record_value - pr.previous_value) / pr.previous_value * 100).toFixed(1)}%` : 
+                    'First PR!';
+                  const improvementColor = pr.previous_value ? '#4CAF50' : '#2196F3';
+                  return `
+                    <tr>
+                      <td><strong>${pr.exercise_name}</strong></td>
+                      <td><span class="badge">${pr.record_type.toUpperCase()}</span></td>
+                      <td><strong style="color: var(--secondary);">${pr.record_value.toFixed(1)} kg</strong></td>
+                      <td>${pr.previous_value ? pr.previous_value.toFixed(1) + ' kg' : '-'}</td>
+                      <td><span style="color: ${improvementColor}; font-weight: bold;">${improvement}</span></td>
+                      <td>${new Date(pr.achieved_at).toLocaleDateString()}</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        ` : '<p style="margin: 20px 0;">No personal records yet. Keep pushing!</p>'}
+        
+        <!-- Earned Achievements -->
+        <div style="margin-bottom: 30px;">
+          <h3><i class="fas fa-award"></i> Earned Achievements</h3>
+          ${Object.keys(achievementsByCategory).length > 0 ? Object.entries(achievementsByCategory).map(([category, achievements]) => `
+            <div style="margin-bottom: 24px;">
+              <h4 style="text-transform: capitalize; color: var(--primary); margin-bottom: 12px;">
+                ${category === 'consistency' ? '🔥' : category === 'strength' ? '💪' : category === 'volume' ? '📊' : '⭐'} 
+                ${category}
+              </h4>
+              <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px;">
+                ${achievements.map(ach => {
+                  const tierColors = {
+                    bronze: 'linear-gradient(135deg, #CD7F32 0%, #8B4513 100%)',
+                    silver: 'linear-gradient(135deg, #C0C0C0 0%, #808080 100%)',
+                    gold: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)',
+                    platinum: 'linear-gradient(135deg, #E5E4E2 0%, #71797E 100%)'
+                  };
+                  return `
+                    <div style="background: ${tierColors[ach.tier]}; padding: 16px; border-radius: 12px; color: white;">
+                      <div style="font-size: 48px; margin-bottom: 8px;">${ach.icon}</div>
+                      <div style="font-weight: bold; font-size: 16px; margin-bottom: 4px;">${ach.name}</div>
+                      <div style="font-size: 13px; opacity: 0.9; margin-bottom: 8px;">${ach.description}</div>
+                      <div style="font-size: 12px; opacity: 0.8;">
+                        <i class="fas fa-calendar"></i> ${new Date(ach.earned_at).toLocaleDateString()}
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          `).join('') : '<p>No achievements earned yet. Complete workouts to unlock achievements!</p>'}
+        </div>
+        
+        ${streak.current_streak > 0 ? `
+        <!-- Streak Calendar -->
+        <div>
+          <h3><i class="fas fa-fire"></i> Workout Streak</h3>
+          <div style="background: var(--light); padding: 20px; border-radius: 12px; border-left: 4px solid var(--secondary);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <div>
+                <div style="font-size: 14px; color: var(--gray);">Current Streak</div>
+                <div style="font-size: 32px; font-weight: bold; color: var(--primary);">${currentWeeks} ${currentWeeks === 1 ? 'Week' : 'Weeks'}</div>
+              </div>
+              <div>
+                <div style="font-size: 14px; color: var(--gray);">Longest Streak</div>
+                <div style="font-size: 32px; font-weight: bold; color: var(--secondary);">${longestWeeks} ${longestWeeks === 1 ? 'Week' : 'Weeks'}</div>
+              </div>
+              <div>
+                <div style="font-size: 14px; color: var(--gray);">Since</div>
+                <div style="font-size: 16px; font-weight: bold;">${new Date(streak.streak_start_date).toLocaleDateString()}</div>
+              </div>
+            </div>
+            ${streak.last_workout_date ? `
+              <div style="font-size: 14px; color: var(--gray);">
+                Last workout: ${new Date(streak.last_workout_date).toLocaleDateString()}
+              </div>
+            ` : ''}
+          </div>
+        </div>
+        ` : ''}
+      </div>
+    `;
+  } catch (error) {
+    container.innerHTML = `<div class="card"><p>Error loading achievements: ${error.message}</p></div>`;
   }
 }
 

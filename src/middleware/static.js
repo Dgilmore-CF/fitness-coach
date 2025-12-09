@@ -481,6 +481,36 @@ function getIndexHTML() {
             }
         }
         
+        /* Achievement Notification */
+        .achievement-notification {
+            position: fixed;
+            top: 100px;
+            right: -500px;
+            width: 400px;
+            max-width: calc(100vw - 40px);
+            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            transition: right 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            z-index: 10000;
+            animation: achievementPulse 2s ease-in-out infinite;
+        }
+        
+        .achievement-notification.show {
+            right: 20px;
+        }
+        
+        @keyframes achievementPulse {
+            0%, 100% {
+                box-shadow: 0 8px 32px rgba(255, 215, 0, 0.3);
+            }
+            50% {
+                box-shadow: 0 8px 32px rgba(255, 215, 0, 0.6);
+            }
+        }
+        
         .hidden {
             display: none !important;
         }
@@ -526,6 +556,9 @@ function getIndexHTML() {
             <button class="tab" onclick="switchTab('analytics')">
                 <i class="fas fa-chart-line"></i> Analytics
             </button>
+            <button class="tab" onclick="switchTab('achievements')">
+                <i class="fas fa-trophy"></i> Achievements
+            </button>
             <button class="tab" onclick="switchTab('nutrition')">
                 <i class="fas fa-apple-alt"></i> Nutrition
             </button>
@@ -545,6 +578,10 @@ function getIndexHTML() {
 
         <div id="analytics" class="tab-content">
             <!-- Analytics content will be loaded here -->
+        </div>
+
+        <div id="achievements" class="tab-content">
+            <!-- Achievements content will be loaded here -->
         </div>
 
         <div id="nutrition" class="tab-content">
