@@ -93,8 +93,8 @@ async function checkConsistencyAchievements(db, userId) {
   
   // Get total workouts
   const { total } = await db.prepare(
-    'SELECT COUNT(*) as total FROM workouts WHERE user_id = ? AND status = ?'
-  ).bind(userId, 'completed').first();
+    'SELECT COUNT(*) as total FROM workouts WHERE user_id = ? AND completed = 1'
+  ).bind(userId).first();
   
   // Get streak data
   const streak = await db.prepare(
@@ -320,7 +320,7 @@ async function checkMilestoneAchievements(db, userId) {
     FROM programs p
     JOIN program_days pd ON p.id = pd.program_id
     JOIN workouts w ON w.program_day_id = pd.id
-    WHERE p.user_id = ? AND w.status = 'completed'
+    WHERE p.user_id = ? AND w.completed = 1
     GROUP BY p.id
     HAVING COUNT(DISTINCT pd.day_number) = p.days_per_week
   `).bind(userId).first();
@@ -406,8 +406,8 @@ export async function getUserAchievements(db, userId) {
   ).bind(userId).first();
   
   const { totalWorkouts } = await db.prepare(
-    'SELECT COUNT(*) as totalWorkouts FROM workouts WHERE user_id = ? AND status = ?'
-  ).bind(userId, 'completed').first();
+    'SELECT COUNT(*) as totalWorkouts FROM workouts WHERE user_id = ? AND completed = 1'
+  ).bind(userId).first();
   
   const { totalPRs } = await db.prepare(
     'SELECT COUNT(*) as totalPRs FROM personal_records WHERE user_id = ?'
