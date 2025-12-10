@@ -5419,32 +5419,152 @@ function loadLearn() {
     <div id="endurance-section" class="card">
       <h2 style="color: var(--secondary);"><i class="fas fa-running"></i> Muscular Endurance Training</h2>
       
-      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-info-circle"></i> What is Muscular Endurance?</h3>
-      <p style="line-height: 1.7; color: var(--text-secondary);">
-        <strong>Muscular endurance</strong> is the ability of a muscle or muscle group to perform repeated contractions against a resistance for an extended period. It emphasizes fatigue resistance and the ability to maintain force output over time.
+      <div style="padding: 16px; background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.05) 100%); border-radius: 12px; margin-bottom: 24px;">
+        <p style="font-size: 15px; line-height: 1.8; color: var(--text-primary); margin: 0;">
+          <strong>Muscular endurance training</strong> develops the ability to sustain repeated contractions or maintain force output over extended periods. This comprehensive guide covers energy systems, metabolic adaptations, and sport-specific applications backed by research.
+        </p>
+      </div>
+
+      <h3 style="margin-top: 32px; color: var(--text-primary); font-size: 20px;"><i class="fas fa-battery-three-quarters"></i> What is Muscular Endurance?</h3>
+      <p style="line-height: 1.8; color: var(--text-secondary); margin-top: 12px;">
+        <strong>Muscular endurance</strong> is the capacity of muscles to perform repeated contractions against submaximal resistance or maintain a contraction for extended durations without fatigue. Unlike strength (maximal force) or hypertrophy (muscle size), endurance training prioritizes <strong>fatigue resistance</strong> and <strong>work capacity</strong>.
+      </p>
+      <p style="line-height: 1.8; color: var(--text-secondary); margin-top: 12px;">
+        This quality is essential for athletes competing in endurance events, combat sports requiring sustained output, and occupations demanding prolonged physical exertion. Research shows trained endurance athletes can maintain 60-70% of maximal force output for extended periods compared to 20-30% in untrained individuals.
+        <br><a href="https://pubmed.ncbi.nlm.nih.gov/17326698/" target="_blank" style="color: var(--secondary); text-decoration: none; font-weight: 600;">📖 Moritani et al., 1981 - Neural factors in muscle endurance</a>
       </p>
 
-      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-chart-line"></i> Physiological Adaptations</h3>
-      <div style="display: grid; gap: 12px; margin-top: 12px;">
-        <div style="padding: 16px; background: var(--bg-secondary); border-left: 4px solid var(--secondary); border-radius: 8px;">
-          <strong style="color: var(--secondary);">Mitochondrial Density</strong>
-          <p style="margin-top: 8px; line-height: 1.6; color: var(--text-secondary);">
-            High-rep training increases mitochondrial content in muscle cells, improving aerobic energy production and delaying fatigue.
-            <br><em style="font-size: 13px;">Source: Holloszy, J.O. (2008). Regulation of mitochondrial biogenesis. Journal of Applied Physiology.</em>
+      <h4 style="margin-top: 24px; color: var(--text-primary); font-size: 17px;"><i class="fas fa-bolt"></i> Types of Muscular Endurance</h4>
+      <div style="display: grid; gap: 16px; margin-top: 12px;">
+        <div style="padding: 20px; background: var(--bg-secondary); border-left: 4px solid #10b981; border-radius: 8px;">
+          <strong style="color: #10b981; font-size: 16px;">1. Dynamic Muscular Endurance</strong>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary);">
+            Ability to perform repeated concentric and eccentric contractions (e.g., push-ups, squats, running). Most common type, involving rhythmic movement patterns.
+          </p>
+          <p style="margin-top: 8px; line-height: 1.7; color: var(--text-secondary); font-size: 14px;">
+            <strong>Examples:</strong> CrossFit WODs, circuit training, high-rep calisthenics, distance running
           </p>
         </div>
-        <div style="padding: 16px; background: var(--bg-secondary); border-left: 4px solid var(--secondary); border-radius: 8px;">
-          <strong style="color: var(--secondary);">Capillary Density</strong>
-          <p style="margin-top: 8px; line-height: 1.6; color: var(--text-secondary);">
-            Increased capillarization improves oxygen and nutrient delivery to working muscles, enhancing endurance capacity.
-            <br><em style="font-size: 13px;">Source: Andersen, P. & Henriksson, J. (1977). Capillary supply of the quadriceps femoris. Acta Physiologica Scandinavica.</em>
+        <div style="padding: 20px; background: var(--bg-secondary); border-left: 4px solid #059669; border-radius: 8px;">
+          <strong style="color: #059669; font-size: 16px;">2. Static Muscular Endurance (Isometric)</strong>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary);">
+            Ability to maintain a fixed position under load without movement (e.g., planks, wall sits). Tests time-to-exhaustion at constant force output.
+          </p>
+          <p style="margin-top: 8px; line-height: 1.7; color: var(--text-secondary); font-size: 14px;">
+            <strong>Examples:</strong> Gymnastics holds, rock climbing, core stabilization
           </p>
         </div>
-        <div style="padding: 16px; background: var(--bg-secondary); border-left: 4px solid var(--secondary); border-radius: 8px;">
-          <strong style="color: var(--secondary);">Buffering Capacity</strong>
-          <p style="margin-top: 8px; line-height: 1.6; color: var(--text-secondary);">
-            Training improves the muscle's ability to buffer lactate and hydrogen ions, delaying the onset of fatigue.
-            <br><em style="font-size: 13px;">Source: Bishop, D., et al. (2004). The effects of strength training. Journal of Strength and Conditioning Research.</em>
+        <div style="padding: 20px; background: var(--bg-secondary); border-left: 4px solid #047857; border-radius: 8px;">
+          <strong style="color: #047857; font-size: 16px;">3. Anaerobic Muscular Endurance</strong>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary);">
+            Ability to sustain high-intensity efforts for 30 seconds to 2 minutes, heavily taxing glycolytic system. Characterized by lactate accumulation and "burn."
+          </p>
+          <p style="margin-top: 8px; line-height: 1.7; color: var(--text-secondary); font-size: 14px;">
+            <strong>Examples:</strong> 400m-800m running, 100m-200m swimming, wrestling matches
+          </p>
+        </div>
+        <div style="padding: 20px; background: var(--bg-secondary); border-left: 4px solid #065f46; border-radius: 8px;">
+          <strong style="color: #065f46; font-size: 16px;">4. Aerobic Muscular Endurance</strong>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary);">
+            Ability to sustain low-to-moderate intensity efforts for extended periods (>2 minutes), relying primarily on oxidative metabolism.
+          </p>
+          <p style="margin-top: 8px; line-height: 1.7; color: var(--text-secondary); font-size: 14px;">
+            <strong>Examples:</strong> Distance running, cycling, swimming; military ruck marches
+          </p>
+        </div>
+      </div>
+
+      <h3 style="margin-top: 32px; color: var(--text-primary); font-size: 20px;"><i class="fas fa-chart-line"></i> Physiological Adaptations</h3>
+      <p style="line-height: 1.8; color: var(--text-secondary); margin-top: 12px;">
+        Muscular endurance training triggers specific metabolic and structural adaptations that enhance fatigue resistance:
+      </p>
+
+      <div style="display: grid; gap: 16px; margin-top: 16px;">
+        <div style="padding: 20px; background: var(--bg-secondary); border-left: 4px solid #10b981; border-radius: 8px;">
+          <strong style="color: #10b981; font-size: 17px;">1. Mitochondrial Biogenesis</strong>
+          <p style="margin-top: 12px; line-height: 1.7; color: var(--text-secondary);">
+            <strong>The Powerhouse Expansion:</strong> High-rep training dramatically increases mitochondrial density (number and size) in muscle cells. Mitochondria are the "powerhouses" producing ATP aerobically.
+          </p>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary);">
+            <strong>Mechanism:</strong> Endurance training activates PGC-1α (peroxisome proliferator-activated receptor gamma coactivator 1-alpha), the master regulator of mitochondrial biogenesis. This increases oxidative capacity by 50-100% in trained individuals.
+          </p>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary); font-size: 14px;">
+            <strong>Result:</strong> More efficient energy production, reduced reliance on glycolysis, less lactate accumulation, improved fat oxidation
+          </p>
+          <div style="margin-top: 12px; padding: 12px; background: rgba(16, 185, 129, 0.1); border-radius: 6px;">
+            <p style="margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-secondary);">
+              📚 <strong>Key Research:</strong>
+              <br>• <a href="https://pubmed.ncbi.nlm.nih.gov/18162482/" target="_blank" style="color: var(--secondary);">Holloszy, 2008 - Regulation of mitochondrial biogenesis</a>
+              <br>• <a href="https://pubmed.ncbi.nlm.nih.gov/15947721/" target="_blank" style="color: var(--secondary);">Hood et al., 2006 - Exercise-induced mitochondrial adaptations</a>
+            </p>
+          </div>
+        </div>
+
+        <div style="padding: 20px; background: var(--bg-secondary); border-left: 4px solid #10b981; border-radius: 8px;">
+          <strong style="color: #10b981; font-size: 17px;">2. Capillary Density (Angiogenesis)</strong>
+          <p style="margin-top: 12px; line-height: 1.7; color: var(--text-secondary);">
+            <strong>Enhanced Blood Flow:</strong> Training increases capillary density around muscle fibers by 15-25%, creating a denser vascular network for oxygen and nutrient delivery.
+          </p>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary);">
+            <strong>Mechanism:</strong> Repeated muscle contractions create local hypoxia (low oxygen), triggering VEGF (vascular endothelial growth factor) release. This stimulates new capillary formation around active muscle fibers.
+          </p>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary); font-size: 14px;">
+            <strong>Result:</strong> Faster oxygen delivery, improved waste removal, better thermoregulation, enhanced recovery
+          </p>
+          <div style="margin-top: 12px; padding: 12px; background: rgba(16, 185, 129, 0.1); border-radius: 6px;">
+            <p style="margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-secondary);">
+              📚 <strong>Key Research:</strong>
+              <br>• <a href="https://pubmed.ncbi.nlm.nih.gov/577088/" target="_blank" style="color: var(--secondary);">Andersen & Henriksson, 1977 - Capillary supply</a>
+              <br>• <a href="https://pubmed.ncbi.nlm.nih.gov/19910840/" target="_blank" style="color: var(--secondary);">Egginton, 2009 - Activity-induced angiogenesis</a>
+            </p>
+          </div>
+        </div>
+
+        <div style="padding: 20px; background: var(--bg-secondary); border-left: 4px solid #10b981; border-radius: 8px;">
+          <strong style="color: #10b981; font-size: 17px;">3. Enhanced Buffering Capacity</strong>
+          <p style="margin-top: 12px; line-height: 1.7; color: var(--text-secondary);">
+            <strong>Lactate Tolerance:</strong> Training improves muscle's ability to buffer hydrogen ions (H+) and manage lactate accumulation, the primary causes of "the burn" during high-rep sets.
+          </p>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary);">
+            <strong>Mechanisms:</strong>
+          </p>
+          <ul style="margin: 8px 0 0 20px; line-height: 1.8; color: var(--text-secondary);">
+            <li><strong>Increased buffering proteins:</strong> Carnosine, bicarbonate systems</li>
+            <li><strong>Enhanced lactate clearance:</strong> Better transport and utilization as fuel</li>
+            <li><strong>Improved pH regulation:</strong> Maintains optimal enzyme function</li>
+          </ul>
+          <div style="margin-top: 12px; padding: 12px; background: rgba(16, 185, 129, 0.1); border-radius: 6px;">
+            <p style="margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-secondary);">
+              📚 <strong>Key Research:</strong>
+              <br>• <a href="https://pubmed.ncbi.nlm.nih.gov/15064596/" target="_blank" style="color: var(--secondary);">Bishop et al., 2004 - Effects on buffering capacity</a>
+              <br>• <a href="https://pubmed.ncbi.nlm.nih.gov/20847704/" target="_blank" style="color: var(--secondary);">Edge et al., 2006 - Lactate threshold adaptations</a>
+            </p>
+          </div>
+        </div>
+
+        <div style="padding: 20px; background: var(--bg-secondary); border-left: 4px solid #10b981; border-radius: 8px;">
+          <strong style="color: #10b981; font-size: 17px;">4. Fiber Type Transformation</strong>
+          <p style="margin-top: 12px; line-height: 1.7; color: var(--text-secondary);">
+            <strong>Shift Toward Endurance:</strong> Endurance training causes Type IIx (fast-twitch glycolytic) fibers to become more Type IIa (fast-twitch oxidative), gaining endurance characteristics while maintaining some power.
+          </p>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary); font-size: 14px;">
+            <strong>Note:</strong> Complete conversion (IIx → IIa → I) is limited. Training primarily enhances oxidative capacity of existing fibers rather than fully converting fiber types.
+          </p>
+          <div style="margin-top: 12px; padding: 12px; background: rgba(16, 185, 129, 0.1); border-radius: 6px;">
+            <p style="margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-secondary);">
+              📚 <strong>Key Research:</strong>
+              <br>• <a href="https://pubmed.ncbi.nlm.nih.gov/2674114/" target="_blank" style="color: var(--secondary);">Pette & Staron, 1997 - Fiber type transformations</a>
+            </p>
+          </div>
+        </div>
+
+        <div style="padding: 20px; background: var(--bg-secondary); border-left: 4px solid #10b981; border-radius: 8px;">
+          <strong style="color: #10b981; font-size: 17px;">5. Substrate Utilization Efficiency</strong>
+          <p style="margin-top: 12px; line-height: 1.7; color: var(--text-secondary);">
+            Training improves the body's ability to use fat as fuel during submaximal efforts, sparing glycogen for higher intensities. Trained athletes can oxidize 50-100% more fat at given intensities.
+          </p>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary); font-size: 14px;">
+            <strong>Result:</strong> Extended performance before glycogen depletion ("hitting the wall"), improved endurance capacity
           </p>
         </div>
       </div>
