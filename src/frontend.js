@@ -5570,54 +5570,213 @@ function loadLearn() {
         </div>
       </div>
 
-      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-cogs"></i> Optimal Training Parameters</h3>
-      <div style="overflow-x: auto; margin-top: 12px;">
-        <table style="width: 100%; border-collapse: collapse;">
-          <tr style="background: var(--light);">
-            <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border);">Variable</th>
-            <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border);">Recommendation</th>
-            <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border);">Rationale</th>
-          </tr>
-          <tr>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Rep Range</strong></td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);">15-25+ reps</td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">Extended time under tension builds endurance</td>
-          </tr>
-          <tr>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Sets per Exercise</strong></td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);">2-4 sets</td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">Moderate volume with high reps</td>
-          </tr>
-          <tr>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Frequency</strong></td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);">3-5x per week</td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">Frequent stimulation of endurance adaptations</td>
-          </tr>
-          <tr>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Intensity</strong></td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);">40-60% 1RM</td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">Light to moderate loads</td>
-          </tr>
-          <tr>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Rest Between Sets</strong></td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);">30-60 seconds</td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">Short rest maintains metabolic stress</td>
-          </tr>
-          <tr>
-            <td style="padding: 12px;"><strong>Tempo</strong></td>
-            <td style="padding: 12px;">Steady, controlled pace</td>
-            <td style="padding: 12px; font-size: 13px;">Consistent movement pattern</td>
-          </tr>
+      <h3 style="margin-top: 32px; color: var(--text-primary); font-size: 20px;"><i class="fas fa-cogs"></i> Evidence-Based Training Parameters</h3>
+      <p style="line-height: 1.8; color: var(--text-secondary); margin-top: 12px;">
+        Research-backed guidelines for maximizing muscular endurance:
+      </p>
+
+      <div style="overflow-x: auto; margin-top: 16px;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+          <thead>
+            <tr style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white;">
+              <th style="padding: 14px; text-align: left; border-bottom: 2px solid #10b981; font-weight: 700;">Variable</th>
+              <th style="padding: 14px; text-align: left; border-bottom: 2px solid #10b981; font-weight: 700;">Optimal Range</th>
+              <th style="padding: 14px; text-align: left; border-bottom: 2px solid #10b981; font-weight: 700;">Scientific Rationale</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="background: var(--bg-secondary);">
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);"><strong>Rep Range</strong></td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);">15-30+ reps (or 30-120s)</td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border); line-height: 1.6;">
+                Extended time under tension promotes metabolic adaptations. Higher reps (20-30+) develop aerobic endurance, moderate reps (15-20) target anaerobic endurance.
+                <br><a href="https://pubmed.ncbi.nlm.nih.gov/22990567/" target="_blank" style="color: var(--secondary); font-size: 12px;">Schoenfeld et al., 2015 - Effects of rep ranges</a>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);"><strong>Sets per Exercise</strong></td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);">2-5 sets</td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border); line-height: 1.6;">
+                Moderate volume allows accumulation of high-rep work. Total time under tension matters more than set count. Circuit training may use 1-2 sets per exercise with multiple rounds.
+              </td>
+            </tr>
+            <tr style="background: var(--bg-secondary);">
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);"><strong>Frequency</strong></td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);">3-6x per week</td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border); line-height: 1.6;">
+                High frequency enhances metabolic adaptations. Endurance recovers faster than strength, allowing more frequent training. Daily sessions possible with proper load management.
+                <br><a href="https://pubmed.ncbi.nlm.nih.gov/11991778/" target="_blank" style="color: var(--secondary); font-size: 12px;">Bompa & Buzzichelli, 2015 - Periodization for endurance</a>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);"><strong>Intensity (Load)</strong></td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);">40-70% 1RM</td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border); line-height: 1.6;">
+                Light to moderate loads allow high reps without excessive joint stress. Lower intensities (40-50%) develop aerobic endurance, higher (60-70%) target anaerobic capacity.
+              </td>
+            </tr>
+            <tr style="background: var(--bg-secondary);">
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);"><strong>Rest Between Sets</strong></td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);">30-90 seconds</td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border); line-height: 1.6;">
+                Short rest periods maintain metabolic stress and simulate endurance conditions. 30-45s for conditioning, 60-90s for strength-endurance. Circuit training may use minimal rest.
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 14px;"><strong>Tempo</strong></td>
+              <td style="padding: 14px;">Steady, controlled pace<br>Or varied for HIIT</td>
+              <td style="padding: 14px; line-height: 1.6;">
+                Consistent tempo maintains metabolic demand. Explosive movements (plyometrics) develop power-endurance. Varied tempo in intervals trains multiple energy systems.
+              </td>
+            </tr>
+          </tbody>
         </table>
       </div>
 
-      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-user"></i> Best For</h3>
-      <ul style="margin-top: 12px; line-height: 2; color: var(--text-secondary);">
-        <li>Endurance athletes (runners, cyclists, swimmers)</li>
-        <li>Combat sports athletes (MMA, boxing)</li>
-        <li>Individuals focusing on work capacity</li>
-        <li>Rehabilitation and injury prevention</li>
-      </ul>
+      <div style="margin-top: 20px; padding: 16px; background: rgba(16, 185, 129, 0.1); border-left: 4px solid #10b981; border-radius: 8px;">
+        <p style="margin: 0; line-height: 1.7; color: var(--text-secondary);">
+          <strong style="color: #10b981;">💡 Key Takeaway:</strong> Muscular endurance training emphasizes time under tension and metabolic stress through high reps, moderate loads, and short rest periods. Focus on accumulating volume while managing fatigue.
+        </p>
+      </div>
+
+      <h3 style="margin-top: 32px; color: var(--text-primary); font-size: 20px;"><i class="fas fa-fire"></i> Training Methods for Endurance</h3>
+      <p style="line-height: 1.8; color: var(--text-secondary); margin-top: 12px;">
+        Various training approaches effectively build muscular endurance:
+      </p>
+
+      <div style="display: grid; gap: 12px; margin-top: 16px;">
+        <details style="padding: 16px; background: var(--bg-secondary); border-radius: 8px; cursor: pointer; border-left: 3px solid #10b981;">
+          <summary style="font-weight: 700; font-size: 15px; color: #10b981; cursor: pointer;">🔄 Circuit Training</summary>
+          <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Method:</strong> Perform series of exercises back-to-back with minimal rest, then repeat circuit</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Example:</strong> 5 exercises, 15-20 reps each, 30s rest between exercises, 2-3min rest between circuits, 3-5 rounds</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Benefits:</strong> Time-efficient, combines strength and cardio, high metabolic demand, sport-specific</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Best for:</strong> General fitness, fat loss, work capacity, functional training</p>
+          </div>
+        </details>
+
+        <details style="padding: 16px; background: var(--bg-secondary); border-radius: 8px; cursor: pointer; border-left: 3px solid #10b981;">
+          <summary style="font-weight: 700; font-size: 15px; color: #10b981; cursor: pointer;">⚡ High-Intensity Interval Training (HIIT)</summary>
+          <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Method:</strong> Alternate between high-intensity work and low-intensity recovery periods</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Example:</strong> 30-60s max effort, 60-120s active recovery, 8-12 rounds</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Benefits:</strong> Improves both aerobic and anaerobic capacity, time-efficient, boosts metabolism</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Best for:</strong> Athletes, fat loss, conditioning, VO2max improvement</p>
+          </div>
+        </details>
+
+        <details style="padding: 16px; background: var(--bg-secondary); border-radius: 8px; cursor: pointer; border-left: 3px solid #10b981;">
+          <summary style="font-weight: 700; font-size: 15px; color: #10b981; cursor: pointer;">🎯 Tempo Training</summary>
+          <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Method:</strong> Maintain specific tempo for extended duration (e.g., 60-90s per set)</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Example:</strong> 3-1-3-1 tempo (3s eccentric, 1s pause, 3s concentric, 1s pause), 10-15 reps</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Benefits:</strong> Increased time under tension, muscle control, mind-muscle connection</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Best for:</strong> Hypertrophy, technique refinement, injury prevention</p>
+          </div>
+        </details>
+
+        <details style="padding: 16px; background: var(--bg-secondary); border-radius: 8px; cursor: pointer; border-left: 3px solid #10b981;">
+          <summary style="font-weight: 700; font-size: 15px; color: #10b981; cursor: pointer;">🏋️ Complexes & Density Training</summary>
+          <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Method:</strong> Perform multiple exercises with same implement without rest, or accumulate max volume in set time</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Example:</strong> Barbell complex: Row-Clean-Press-Squat-RDL, 6 reps each, 4 rounds</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Benefits:</strong> Intense metabolic demand, full-body conditioning, efficient</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Best for:</strong> Conditioning, fat loss, time-crunched athletes</p>
+          </div>
+        </details>
+      </div>
+
+      <h3 style="margin-top: 32px; color: var(--text-primary); font-size: 20px;"><i class="fas fa-utensils"></i> Nutrition for Muscular Endurance</h3>
+      <p style="line-height: 1.8; color: var(--text-secondary); margin-top: 12px;">
+        Endurance training has unique nutritional demands:
+      </p>
+
+      <div style="display: grid; gap: 16px; margin-top: 16px;">
+        <div style="padding: 18px; background: var(--bg-secondary); border-radius: 8px;">
+          <strong style="color: #10b981; font-size: 16px;">🍚 Carbohydrates: THE Priority</strong>
+          <p style="margin: 12px 0 0 0; line-height: 1.7; color: var(--text-secondary);">
+            <strong>5-10 g/kg daily</strong> - Highest carb needs of any training type. Glycogen depletion is primary limiter of endurance performance. Pre-training carbs maximize performance, post-training replenishment is critical for recovery.
+          </p>
+        </div>
+
+        <div style="padding: 18px; background: var(--bg-secondary); border-radius: 8px;">
+          <strong style="color: #10b981; font-size: 16px;">🥩 Protein: 1.2-1.6 g/kg</strong>
+          <p style="margin: 12px 0 0 0; line-height: 1.7; color: var(--text-secondary);">
+            Lower than strength/hypertrophy training. Focus on recovery and preventing catabolism during long sessions. Distribute evenly across meals. Leucine-rich sources post-training.
+          </p>
+        </div>
+
+        <div style="padding: 18px; background: var(--bg-secondary); border-radius: 8px;">
+          <strong style="color: #10b981; font-size: 16px;">💧 Hydration: Critical</strong>
+          <p style="margin: 12px 0 0 0; line-height: 1.7; color: var(--text-secondary);">
+            <strong>Before:</strong> 5-7 ml/kg 2-4hrs pre-training. <strong>During:</strong> 0.4-0.8 L/hr depending on sweat rate. <strong>After:</strong> 150% of fluid lost (weigh pre/post). Electrolytes essential for sessions >1hr.
+          </p>
+        </div>
+
+        <div style="padding: 18px; background: var(--bg-secondary); border-radius: 8px;">
+          <strong style="color: #10b981; font-size: 16px;">💊 Effective Supplements</strong>
+          <ul style="margin: 12px 0 0 20px; line-height: 1.8; color: var(--text-secondary);">
+            <li><strong>Beta-alanine (3-6g/day):</strong> Buffers lactate, delays fatigue</li>
+            <li><strong>Sodium bicarbonate (0.3g/kg):</strong> Improves buffering capacity for high-intensity work</li>
+            <li><strong>Caffeine (3-6mg/kg):</strong> Enhances endurance performance, reduces perceived effort</li>
+            <li><strong>Beetroot juice/Nitrates:</strong> Improves oxygen efficiency, reduces energy cost</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3 style="margin-top: 32px; color: var(--text-primary); font-size: 20px;"><i class="fas fa-clock"></i> Timeline of Endurance Adaptations</h3>
+      <div style="padding: 18px; background: var(--bg-secondary); border-radius: 8px; margin-top: 16px;">
+        <ul style="margin: 0; padding: 0 0 0 20px; line-height: 2; color: var(--text-secondary);">
+          <li><strong>Weeks 1-2:</strong> Neuromuscular coordination improvements, reduced perceived exertion</li>
+          <li><strong>Weeks 2-4:</strong> Initial metabolic adaptations, improved lactate clearance</li>
+          <li><strong>Weeks 4-8:</strong> Significant mitochondrial biogenesis, increased capillary density</li>
+          <li><strong>Weeks 8-12:</strong> Enhanced buffering capacity, improved substrate utilization</li>
+          <li><strong>Months 3-6:</strong> Fiber type adaptations, optimized energy systems</li>
+          <li><strong>6+ months:</strong> Continued refinement, approaching genetic potential for endurance</li>
+        </ul>
+        <p style="margin: 16px 0 0 0; font-size: 14px; color: var(--text-secondary); line-height: 1.7;">
+          <strong>Note:</strong> Endurance adaptations occur faster than strength but detrain quickly - consistency is key!
+        </p>
+      </div>
+
+      <h3 style="margin-top: 32px; color: var(--text-primary); font-size: 20px;"><i class="fas fa-user-check"></i> Who Should Focus on Muscular Endurance?</h3>
+      <div style="display: grid; gap: 10px; margin-top: 16px;">
+        <div style="padding: 14px 18px; background: var(--bg-secondary); border-left: 3px solid #10b981; border-radius: 6px;">
+          <strong style="color: #10b981;">✓ Endurance Athletes</strong> - Runners, cyclists, swimmers, triathletes
+        </div>
+        <div style="padding: 14px 18px; background: var(--bg-secondary); border-left: 3px solid #10b981; border-radius: 6px;">
+          <strong style="color: #10b981;">✓ Combat Sports</strong> - MMA, boxing, wrestling requiring sustained output
+        </div>
+        <div style="padding: 14px 18px; background: var(--bg-secondary); border-left: 3px solid #10b981; border-radius: 6px;">
+          <strong style="color: #10b981;">✓ CrossFit & Functional Fitness</strong> - Work capacity emphasis
+        </div>
+        <div style="padding: 14px 18px; background: var(--bg-secondary); border-left: 3px solid #10b981; border-radius: 6px;">
+          <strong style="color: #10b981;">✓ Military & Tactical Athletes</strong> - Rucking, long missions, sustained operations
+        </div>
+        <div style="padding: 14px 18px; background: var(--bg-secondary); border-left: 3px solid #10b981; border-radius: 6px;">
+          <strong style="color: #10b981;">✓ Team Sports</strong> - Soccer, basketball, lacrosse with repeated sprints
+        </div>
+        <div style="padding: 14px 18px; background: var(--bg-secondary); border-left: 3px solid #10b981; border-radius: 6px;">
+          <strong style="color: #10b981;">✓ General Fitness & Fat Loss</strong> - High metabolic demand training
+        </div>
+      </div>
+
+      <div style="margin-top: 24px; padding: 20px; background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.08) 100%); border-radius: 12px; border: 2px solid rgba(16, 185, 129, 0.3);">
+        <h4 style="margin: 0 0 12px 0; color: #10b981; font-size: 17px;"><i class="fas fa-book-open"></i> Further Reading & Resources</h4>
+        <div style="display: grid; gap: 8px;">
+          <a href="https://www.strongerbyscience.com/complete-strength-training-guide/#Muscular_Endurance" target="_blank" style="color: var(--secondary); text-decoration: none; line-height: 1.6;">📘 Stronger by Science - Muscular Endurance Training</a>
+          <a href="https://www.8weeksout.com/" target="_blank" style="color: var(--secondary); text-decoration: none; line-height: 1.6;">📘 8 Weeks Out - Conditioning for Combat Sports</a>
+          <a href="https://www.crossfit.com/essentials/metabolic-conditioning" target="_blank" style="color: var(--secondary); text-decoration: none; line-height: 1.6;">📘 CrossFit - Metabolic Conditioning Principles</a>
+          <a href="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3737860/" target="_blank" style="color: var(--secondary); text-decoration: none; line-height: 1.6;">📄 NCBI - Endurance Training Adaptations (Review)</a>
+          <strong style="margin-top: 8px; display: block; color: #10b981;">Recommended Books:</strong>
+          <span style="color: var(--text-secondary); font-size: 14px; line-height: 1.7;">
+            • "Tactical Barbell: Conditioning" - K. Black<br>
+            • "The Science of Running" - Steve Magness<br>
+            • "Training for the New Alpinism" - House & Johnston<br>
+            • "Overcoming Gravity" - Steven Low (bodyweight endurance)
+          </span>
+        </div>
+      </div>
     </div>
 
     <!-- Cardio Training -->
