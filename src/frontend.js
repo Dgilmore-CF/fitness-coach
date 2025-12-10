@@ -776,6 +776,11 @@ async function startWorkout() {
     const programData = await api(\`/programs/\${activeProgram.id}\`);
     const program = programData.program;
 
+    if (!program || !program.days || program.days.length === 0) {
+      showNotification('No workout days found in this program', 'warning');
+      return;
+    }
+
     // Show day selection
     const modalBody = document.getElementById('modalBody');
     modalBody.innerHTML = \`
@@ -783,9 +788,9 @@ async function startWorkout() {
       <div class="exercise-list">
         \${program.days.map(day => \`
           <div class="exercise-item" onclick="startWorkoutDay(\${program.id}, \${day.id})">
-            <strong>Day \${day.day_number}: \${day.name}</strong>
-            <div style="color: var(--gray); font-size: 14px;">\${day.focus}</div>
-            <div style="font-size: 12px; margin-top: 4px;">\${day.exercises.length} exercises</div>
+            <strong>Day \${day.day_number}: \${day.name || 'Workout Day'}</strong>
+            <div style="color: var(--gray); font-size: 14px;">\${day.focus || 'Training'}</div>
+            <div style="font-size: 12px; margin-top: 4px;">\${(day.exercises && day.exercises.length) || 0} exercises</div>
           </div>
         \`).join('')}
       </div>
@@ -794,6 +799,7 @@ async function startWorkout() {
     document.getElementById('modalTitle').textContent = 'Start Workout';
     openModal();
   } catch (error) {
+    console.error('Error starting workout:', error);
     showNotification('Error starting workout: ' + error.message, 'error');
   }
 }
@@ -805,6 +811,11 @@ async function startWorkoutFromProgram(programId) {
     const programData = await api(\`/programs/\${programId}\`);
     const program = programData.program;
 
+    if (!program || !program.days || program.days.length === 0) {
+      showNotification('No workout days found in this program', 'warning');
+      return;
+    }
+
     // Show day selection
     const modalBody = document.getElementById('modalBody');
     modalBody.innerHTML = \`
@@ -812,9 +823,9 @@ async function startWorkoutFromProgram(programId) {
       <div class="exercise-list">
         \${program.days.map(day => \`
           <div class="exercise-item" onclick="startWorkoutDay(\${program.id}, \${day.id})">
-            <strong>Day \${day.day_number}: \${day.name}</strong>
-            <div style="color: var(--gray); font-size: 14px;">\${day.focus}</div>
-            <div style="font-size: 12px; margin-top: 4px;">\${day.exercises.length} exercises</div>
+            <strong>Day \${day.day_number}: \${day.name || 'Workout Day'}</strong>
+            <div style="color: var(--gray); font-size: 14px;">\${day.focus || 'Training'}</div>
+            <div style="font-size: 12px; margin-top: 4px;">\${(day.exercises && day.exercises.length) || 0} exercises</div>
           </div>
         \`).join('')}
       </div>
@@ -823,6 +834,7 @@ async function startWorkoutFromProgram(programId) {
     document.getElementById('modalTitle').textContent = 'Start Workout';
     openModal();
   } catch (error) {
+    console.error('Error starting workout from program:', error);
     showNotification('Error starting workout: ' + error.message, 'error');
   }
 }

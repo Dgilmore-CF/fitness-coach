@@ -346,9 +346,21 @@ workouts.delete('/:id', async (c) => {
     return c.json({ error: 'Workout not found' }, 404);
   }
 
-  // Delete all related data (cascades should handle this, but let's be explicit)
-  await db.prepare('DELETE FROM sets WHERE workout_id = ?').bind(workoutId).run();
+  // Delete all related data
+  // First, get all workout_exercise IDs for this workout
+  const workoutExercises = await db.prepare(
+    'SELECT id FROM workout_exercises WHERE workout_id = ?'
+  ).bind(workoutId).all();
+
+  // Delete sets for each workout_exercise
+  for (const we of workoutExercises.results || []) {
+    await db.prepare('DELETE FROM sets WHERE workout_exercise_id = ?').bind(we.id).run();
+  }
+
+  // Delete workout_exercises
   await db.prepare('DELETE FROM workout_exercises WHERE workout_id = ?').bind(workoutId).run();
+  
+  // Delete the workout itself
   await db.prepare('DELETE FROM workouts WHERE id = ?').bind(workoutId).run();
 
   return c.json({ message: 'Workout deleted successfully' });
