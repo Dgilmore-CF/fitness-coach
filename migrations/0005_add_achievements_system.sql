@@ -63,7 +63,7 @@ CREATE INDEX IF NOT EXISTS idx_personal_records_user ON personal_records(user_id
 CREATE INDEX IF NOT EXISTS idx_personal_records_exercise ON personal_records(user_id, exercise_id);
 
 -- Seed achievement definitions
-INSERT INTO achievement_definitions (key, name, description, icon, category, tier, requirement_value) VALUES
+INSERT OR IGNORE INTO achievement_definitions (key, name, description, icon, category, tier, requirement_value) VALUES
 -- Consistency Achievements
 ('first_workout', 'Getting Started', 'Complete your first workout', '🎯', 'consistency', 'bronze', 1),
 ('week_streak_1', 'Week Warrior', 'Complete workouts for 1 consecutive week', '🔥', 'consistency', 'bronze', 1),
