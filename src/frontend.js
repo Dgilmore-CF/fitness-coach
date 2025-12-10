@@ -1231,7 +1231,43 @@ function renderMuscleMap(program, selectedDayIndex) {
   // Extract unique muscle groups
   const muscleGroups = [...new Set(day.exercises.map(ex => ex.muscle_group).filter(Boolean))];
   
-  // Muscle group colors
+  // Generate professional SVG muscle visualization
+  const muscleMapSVG = generateMuscleMapSVG(muscleGroups);
+  
+  return \`
+    <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 16px; padding: 20px;">
+      <h4 style="margin: 0 0 16px 0; font-size: 14px; font-weight: 600; color: var(--gray); text-transform: uppercase; letter-spacing: 0.5px;">
+        <i class="fas fa-crosshairs"></i> Targeted Muscles
+      </h4>
+      
+      <!-- Professional SVG Muscle Map -->
+      <div style="background: white; border-radius: 12px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+        \${muscleMapSVG}
+      </div>
+      
+      <!-- Muscle Legend -->
+      <div style="margin-top: 16px; display: flex; flex-wrap: wrap; gap: 8px;">
+        \${muscleGroups.map(muscle => {
+          const color = getMuscleColor(muscle);
+          return \`
+            <div style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: white; border-radius: 20px; border: 2px solid \${color}; font-size: 12px; font-weight: 600;">
+              <div style="width: 10px; height: 10px; border-radius: 50%; background: \${color};"></div>
+              <span style="color: \${color};">\${muscle}</span>
+            </div>
+          \`;
+        }).join('')}
+      </div>
+      
+      <!-- Exercise Count -->
+      <div style="margin-top: 12px; text-align: center; font-size: 12px; color: var(--gray);">
+        <i class="fas fa-dumbbell"></i> \${day.exercises.length} exercises targeting \${muscleGroups.length} muscle group\${muscleGroups.length !== 1 ? 's' : ''}
+      </div>
+    </div>
+  \`;
+}
+
+// Helper: Get consistent muscle colors
+function getMuscleColor(muscle) {
   const muscleColors = {
     'Chest': '#e74c3c',
     'Back': '#3498db',
@@ -1244,24 +1280,154 @@ function renderMuscleMap(program, selectedDayIndex) {
     'Glutes': '#d35400',
     'Calves': '#8e44ad',
     'Abs': '#e67e22',
-    'Core': '#c0392b'
+    'Core': '#c0392b',
+    'Forearms': '#95a5a6',
+    'Traps': '#34495e',
+    'Lats': '#2980b9'
   };
+  return muscleColors[muscle] || '#4F46E5';
+}
 
+// Generate professional SVG muscle map
+function generateMuscleMapSVG(activeMuscles) {
+  const isActive = (muscle) => activeMuscles.includes(muscle);
+  const getOpacity = (muscle) => isActive(muscle) ? '1' : '0.15';
+  const getColor = (muscle) => isActive(muscle) ? getMuscleColor(muscle) : '#cbd5e1';
+  
   return \`
-    <div style="display: flex; flex-direction: column; gap: 8px;">
-      \${muscleGroups.length > 0 ? muscleGroups.map(muscle => \`
-        <div style="display: flex; align-items: center; gap: 12px; padding: 8px; background: var(--light); border-radius: 8px;">
-          <div style="width: 12px; height: 12px; border-radius: 50%; background: \${muscleColors[muscle] || 'var(--primary)'};"></div>
-          <span style="font-size: 14px; font-weight: 600;">\${muscle}</span>
-        </div>
-      \`).join('') : '<p style="color: var(--gray); font-size: 14px; text-align: center; padding: 20px;">No muscle groups specified</p>'}
-    </div>
-    
-    <!-- Simple body diagram placeholder -->
-    <div style="margin-top: 20px; text-align: center; padding: 20px; background: var(--light); border-radius: 12px;">
-      <i class="fas fa-male" style="font-size: 80px; color: var(--primary); opacity: 0.3;"></i>
-      <div style="margin-top: 12px; font-size: 12px; color: var(--gray);">Muscle Map Visualization</div>
-    </div>
+    <svg viewBox="0 0 600 700" style="width: 100%; max-width: 400px; height: auto; margin: 0 auto; display: block;">
+      <defs>
+        <!-- Gradients for depth -->
+        <linearGradient id="chestGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" style="stop-color:\${getColor('Chest')};stop-opacity:\${getOpacity('Chest')}" />
+          <stop offset="100%" style="stop-color:\${getColor('Chest')};stop-opacity:\${parseFloat(getOpacity('Chest')) * 0.7}" />
+        </linearGradient>
+        <linearGradient id="absGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" style="stop-color:\${getColor('Abs')};stop-opacity:\${getOpacity('Abs')}" />
+          <stop offset="100%" style="stop-color:\${getColor('Abs')};stop-opacity:\${parseFloat(getOpacity('Abs')) * 0.7}" />
+        </linearGradient>
+        <linearGradient id="quadsGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" style="stop-color:\${getColor('Quads')};stop-opacity:\${getOpacity('Quads')}" />
+          <stop offset="100%" style="stop-color:\${getColor('Quads')};stop-opacity:\${parseFloat(getOpacity('Quads')) * 0.7}" />
+        </linearGradient>
+        <radialGradient id="shoulderGrad" cx="50%" cy="50%">
+          <stop offset="0%" style="stop-color:\${getColor('Shoulders')};stop-opacity:\${getOpacity('Shoulders')}" />
+          <stop offset="100%" style="stop-color:\${getColor('Shoulders')};stop-opacity:\${parseFloat(getOpacity('Shoulders')) * 0.6}" />
+        </radialGradient>
+      </defs>
+      
+      <!-- Body Outline -->
+      <ellipse cx="300" cy="100" rx="55" ry="65" fill="#f8f9fa" stroke="#cbd5e1" stroke-width="2"/>
+      
+      <!-- Shoulders (Front) -->
+      <ellipse cx="230" cy="160" rx="45" ry="35" fill="url(#shoulderGrad)" stroke="\${isActive('Shoulders') ? getColor('Shoulders') : '#cbd5e1'}" stroke-width="\${isActive('Shoulders') ? '3' : '2'}" opacity="\${getOpacity('Shoulders')}" class="muscle-part">
+        \${isActive('Shoulders') ? '<animate attributeName="opacity" values="0.8;1;0.8" dur="2s" repeatCount="indefinite"/>' : ''}
+      </ellipse>
+      <ellipse cx="370" cy="160" rx="45" ry="35" fill="url(#shoulderGrad)" stroke="\${isActive('Shoulders') ? getColor('Shoulders') : '#cbd5e1'}" stroke-width="\${isActive('Shoulders') ? '3' : '2'}" opacity="\${getOpacity('Shoulders')}" class="muscle-part">
+        \${isActive('Shoulders') ? '<animate attributeName="opacity" values="0.8;1;0.8" dur="2s" repeatCount="indefinite"/>' : ''}
+      </ellipse>
+      
+      <!-- Chest -->
+      <path d="M 250 180 Q 270 160 300 165 Q 330 160 350 180 Q 340 230 300 240 Q 260 230 250 180" 
+            fill="url(#chestGrad)" 
+            stroke="\${isActive('Chest') ? getColor('Chest') : '#cbd5e1'}" 
+            stroke-width="\${isActive('Chest') ? '3' : '2'}" 
+            opacity="\${getOpacity('Chest')}" 
+            class="muscle-part">
+        \${isActive('Chest') ? '<animate attributeName="opacity" values="0.8;1;0.8" dur="2s" repeatCount="indefinite"/>' : ''}
+      </path>
+      
+      <!-- Biceps (Front) -->
+      <ellipse cx="205" cy="250" rx="22" ry="50" fill="\${getColor('Biceps')}" stroke="\${isActive('Biceps') ? getColor('Biceps') : '#cbd5e1'}" stroke-width="\${isActive('Biceps') ? '3' : '2'}" opacity="\${getOpacity('Biceps')}" class="muscle-part">
+        \${isActive('Biceps') ? '<animate attributeName="opacity" values="0.8;1;0.8" dur="2s" repeatCount="indefinite"/>' : ''}
+      </ellipse>
+      <ellipse cx="395" cy="250" rx="22" ry="50" fill="\${getColor('Biceps')}" stroke="\${isActive('Biceps') ? getColor('Biceps') : '#cbd5e1'}" stroke-width="\${isActive('Biceps') ? '3' : '2'}" opacity="\${getOpacity('Biceps')}" class="muscle-part">
+        \${isActive('Biceps') ? '<animate attributeName="opacity" values="0.8;1;0.8" dur="2s" repeatCount="indefinite"/>' : ''}
+      </ellipse>
+      
+      <!-- Abs/Core -->
+      <rect x="270" y="245" width="60" height="35" rx="8" fill="url(#absGrad)" stroke="\${isActive('Abs') || isActive('Core') ? getColor('Abs') : '#cbd5e1'}" stroke-width="\${isActive('Abs') || isActive('Core') ? '3' : '2'}" opacity="\${Math.max(parseFloat(getOpacity('Abs')), parseFloat(getOpacity('Core')))}" class="muscle-part">
+        \${isActive('Abs') || isActive('Core') ? '<animate attributeName="opacity" values="0.8;1;0.8" dur="2s" repeatCount="indefinite"/>' : ''}
+      </rect>
+      <rect x="275" y="285" width="50" height="30" rx="6" fill="url(#absGrad)" stroke="\${isActive('Abs') || isActive('Core') ? getColor('Abs') : '#cbd5e1'}" stroke-width="\${isActive('Abs') || isActive('Core') ? '3' : '2'}" opacity="\${Math.max(parseFloat(getOpacity('Abs')), parseFloat(getOpacity('Core')))}" class="muscle-part">
+        \${isActive('Abs') || isActive('Core') ? '<animate attributeName="opacity" values="0.8;1;0.8" dur="2s" repeatCount="indefinite"/>' : ''}
+      </rect>
+      <rect x="280" y="320" width="40" height="25" rx="5" fill="url(#absGrad)" stroke="\${isActive('Abs') || isActive('Core') ? getColor('Abs') : '#cbd5e1'}" stroke-width="\${isActive('Abs') || isActive('Core') ? '3' : '2'}" opacity="\${Math.max(parseFloat(getOpacity('Abs')), parseFloat(getOpacity('Core')))}" class="muscle-part">
+        \${isActive('Abs') || isActive('Core') ? '<animate attributeName="opacity" values="0.8;1;0.8" dur="2s" repeatCount="indefinite"/>' : ''}
+      </rect>
+      
+      <!-- Forearms -->
+      <rect x="195" y="305" width="18" height="65" rx="9" fill="\${getColor('Forearms')}" stroke="\${isActive('Forearms') ? getColor('Forearms') : '#cbd5e1'}" stroke-width="\${isActive('Forearms') ? '3' : '2'}" opacity="\${getOpacity('Forearms')}" class="muscle-part"/>
+      <rect x="387" y="305" width="18" height="65" rx="9" fill="\${getColor('Forearms')}" stroke="\${isActive('Forearms') ? getColor('Forearms') : '#cbd5e1'}" stroke-width="\${isActive('Forearms') ? '3' : '2'}" opacity="\${getOpacity('Forearms')}" class="muscle-part"/>
+      
+      <!-- Quads -->
+      <ellipse cx="265" cy="450" rx="32" ry="95" fill="url(#quadsGrad)" stroke="\${isActive('Quads') || isActive('Legs') ? getColor('Quads') : '#cbd5e1'}" stroke-width="\${isActive('Quads') || isActive('Legs') ? '3' : '2'}" opacity="\${Math.max(parseFloat(getOpacity('Quads')), parseFloat(getOpacity('Legs')))}" class="muscle-part">
+        \${isActive('Quads') || isActive('Legs') ? '<animate attributeName="opacity" values="0.8;1;0.8" dur="2s" repeatCount="indefinite"/>' : ''}
+      </ellipse>
+      <ellipse cx="335" cy="450" rx="32" ry="95" fill="url(#quadsGrad)" stroke="\${isActive('Quads') || isActive('Legs') ? getColor('Quads') : '#cbd5e1'}" stroke-width="\${isActive('Quads') || isActive('Legs') ? '3' : '2'}" opacity="\${Math.max(parseFloat(getOpacity('Quads')), parseFloat(getOpacity('Legs')))}" class="muscle-part">
+        \${isActive('Quads') || isActive('Legs') ? '<animate attributeName="opacity" values="0.8;1;0.8" dur="2s" repeatCount="indefinite"/>' : ''}
+      </ellipse>
+      
+      <!-- Calves -->
+      <ellipse cx="265" cy="600" rx="24" ry="55" fill="\${getColor('Calves')}" stroke="\${isActive('Calves') || isActive('Legs') ? getColor('Calves') : '#cbd5e1'}" stroke-width="\${isActive('Calves') || isActive('Legs') ? '3' : '2'}" opacity="\${Math.max(parseFloat(getOpacity('Calves')), parseFloat(getOpacity('Legs')))}" class="muscle-part">
+        \${isActive('Calves') || isActive('Legs') ? '<animate attributeName="opacity" values="0.8;1;0.8" dur="2s" repeatCount="indefinite"/>' : ''}
+      </ellipse>
+      <ellipse cx="335" cy="600" rx="24" ry="55" fill="\${getColor('Calves')}" stroke="\${isActive('Calves') || isActive('Legs') ? getColor('Calves') : '#cbd5e1'}" stroke-width="\${isActive('Calves') || isActive('Legs') ? '3' : '2'}" opacity="\${Math.max(parseFloat(getOpacity('Calves')), parseFloat(getOpacity('Legs')))}" class="muscle-part">
+        \${isActive('Calves') || isActive('Legs') ? '<animate attributeName="opacity" values="0.8;1;0.8" dur="2s" repeatCount="indefinite"/>' : ''}
+      </ellipse>
+      
+      <!-- Back View Indicator -->
+      \${(isActive('Back') || isActive('Traps') || isActive('Lats') || isActive('Hamstrings') || isActive('Glutes')) ? \`
+        <g opacity="0.9">
+          <rect x="20" y="150" width="150" height="400" rx="20" fill="white" stroke="#e5e7eb" stroke-width="2"/>
+          <text x="95" y="175" text-anchor="middle" font-size="12" font-weight="600" fill="#6b7280">BACK VIEW</text>
+          
+          <!-- Back/Lats -->
+          \${isActive('Back') || isActive('Lats') ? \`
+            <path d="M 60 200 Q 50 250 60 320 L 95 310 L 95 210 Z" fill="\${getColor('Back')}" stroke="\${getColor('Back')}" stroke-width="2" opacity="0.9">
+              <animate attributeName="opacity" values="0.7;0.9;0.7" dur="2s" repeatCount="indefinite"/>
+            </path>
+            <path d="M 130 200 Q 140 250 130 320 L 95 310 L 95 210 Z" fill="\${getColor('Back')}" stroke="\${getColor('Back')}" stroke-width="2" opacity="0.9">
+              <animate attributeName="opacity" values="0.7;0.9;0.7" dur="2s" repeatCount="indefinite"/>
+            </path>
+          \` : ''}
+          
+          <!-- Traps -->
+          \${isActive('Traps') ? \`
+            <path d="M 75 195 Q 95 185 115 195 L 105 215 L 85 215 Z" fill="\${getColor('Traps')}" stroke="\${getColor('Traps')}" stroke-width="2" opacity="0.9">
+              <animate attributeName="opacity" values="0.7;0.9;0.7" dur="2s" repeatCount="indefinite"/>
+            </path>
+          \` : ''}
+          
+          <!-- Glutes -->
+          \${isActive('Glutes') || isActive('Legs') ? \`
+            <ellipse cx="75" cy="360" rx="22" ry="35" fill="\${getColor('Glutes')}" stroke="\${getColor('Glutes')}" stroke-width="2" opacity="0.9">
+              <animate attributeName="opacity" values="0.7;0.9;0.7" dur="2s" repeatCount="indefinite"/>
+            </ellipse>
+            <ellipse cx="115" cy="360" rx="22" ry="35" fill="\${getColor('Glutes')}" stroke="\${getColor('Glutes')}" stroke-width="2" opacity="0.9">
+              <animate attributeName="opacity" values="0.7;0.9;0.7" dur="2s" repeatCount="indefinite"/>
+            </ellipse>
+          \` : ''}
+          
+          <!-- Hamstrings -->
+          \${isActive('Hamstrings') || isActive('Legs') ? \`
+            <ellipse cx="75" cy="450" rx="20" ry="60" fill="\${getColor('Hamstrings')}" stroke="\${getColor('Hamstrings')}" stroke-width="2" opacity="0.9">
+              <animate attributeName="opacity" values="0.7;0.9;0.7" dur="2s" repeatCount="indefinite"/>
+            </ellipse>
+            <ellipse cx="115" cy="450" rx="20" ry="60" fill="\${getColor('Hamstrings')}" stroke="\${getColor('Hamstrings')}" stroke-width="2" opacity="0.9">
+              <animate attributeName="opacity" values="0.7;0.9;0.7" dur="2s" repeatCount="indefinite"/>
+            </ellipse>
+          \` : ''}
+        </g>
+      \` : ''}
+      
+      <!-- Labels for Active Muscles -->
+      \${activeMuscles.slice(0, 3).map((muscle, idx) => \`
+        <text x="300" y="\${30 + idx * 20}" text-anchor="middle" font-size="12" font-weight="600" fill="\${getMuscleColor(muscle)}">
+          \${muscle.toUpperCase()}
+        </text>
+      \`).join('')}
+    </svg>
   \`;
 }
 
