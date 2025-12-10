@@ -1010,6 +1010,9 @@ function getIndexHTML() {
             <button class="tab" onclick="switchTab('nutrition')">
                 <i class="fas fa-apple-alt"></i> Nutrition
             </button>
+            <button class="tab" onclick="switchTab('learn')">
+                <i class="fas fa-graduation-cap"></i> Learn
+            </button>
         </div>
 
         <div id="dashboard" class="tab-content active">
@@ -1034,6 +1037,10 @@ function getIndexHTML() {
 
         <div id="nutrition" class="tab-content">
             <!-- Nutrition content will be loaded here -->
+        </div>
+
+        <div id="learn" class="tab-content">
+            <!-- Learn content will be loaded here -->
         </div>
     </div>
 

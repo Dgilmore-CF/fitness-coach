@@ -32,12 +32,13 @@ programs.post('/generate', async (c) => {
 
   // Create program in database
   const program = await db.prepare(
-    `INSERT INTO programs (user_id, name, days_per_week, goal, equipment, ai_generated, active)
-     VALUES (?, ?, ?, ?, ?, 1, 1)
+    `INSERT INTO programs (user_id, name, description, days_per_week, goal, equipment, ai_generated, active)
+     VALUES (?, ?, ?, ?, ?, ?, 1, 1)
      RETURNING *`
   ).bind(
     user.id,
     programData.name,
+    programData.description || `AI-generated ${days_per_week}-day ${goal} training program designed for your fitness goals.`,
     days_per_week,
     goal,
     'Smith Machine, Olympic Bar, Cable Trainer, Leg Extension/Curl, Rower'
@@ -93,7 +94,7 @@ programs.post('/generate', async (c) => {
 programs.post('/manual', async (c) => {
   const user = requireAuth(c);
   const body = await c.req.json();
-  const { name, days_per_week, goal, days } = body;
+  const { name, description, days_per_week, goal, days } = body;
 
   if (!name || !days_per_week || !days || days.length === 0) {
     return c.json({ error: 'Missing required fields' }, 400);
@@ -103,12 +104,13 @@ programs.post('/manual', async (c) => {
 
   // Create program in database
   const program = await db.prepare(
-    `INSERT INTO programs (user_id, name, days_per_week, goal, equipment, ai_generated, active)
-     VALUES (?, ?, ?, ?, ?, 0, 0)
+    `INSERT INTO programs (user_id, name, description, days_per_week, goal, equipment, ai_generated, active)
+     VALUES (?, ?, ?, ?, ?, ?, 0, 0)
      RETURNING *`
   ).bind(
     user.id,
     name,
+    description || `Custom ${days_per_week}-day training program.`,
     days_per_week,
     goal || 'hypertrophy',
     'Custom Selection'

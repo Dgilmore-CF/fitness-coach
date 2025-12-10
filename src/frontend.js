@@ -183,6 +183,9 @@ function switchTab(tabName) {
     case 'nutrition':
       loadNutrition();
       break;
+    case 'learn':
+      loadLearn();
+      break;
   }
 }
 
@@ -4364,4 +4367,626 @@ showWorkoutSummary = async function() {
   
   disableKeyboardShortcuts();
 };
+
+// Load comprehensive training education content
+function loadLearn() {
+  const container = document.getElementById('learn');
+  
+  container.innerHTML = \`
+    <div class="card">
+      <h2><i class="fas fa-graduation-cap"></i> Training Education Center</h2>
+      <p style="color: var(--text-secondary); font-size: 14px; margin-top: 8px;">
+        Comprehensive, scientifically-backed information about training methods, styles, and variables for all experience levels.
+      </p>
+    </div>
+
+    <!-- Quick Navigation -->
+    <div class="card" style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white; border: none;">
+      <h3 style="color: white; margin-bottom: 16px;"><i class="fas fa-compass"></i> Quick Navigation</h3>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;">
+        <button onclick="document.getElementById('hypertrophy-section').scrollIntoView({behavior: 'smooth'})" 
+                style="padding: 12px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; color: white; cursor: pointer; font-weight: 600; transition: all 0.2s;">
+          💪 Hypertrophy
+        </button>
+        <button onclick="document.getElementById('strength-section').scrollIntoView({behavior: 'smooth'})"
+                style="padding: 12px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; color: white; cursor: pointer; font-weight: 600; transition: all 0.2s;">
+          🏋️ Strength
+        </button>
+        <button onclick="document.getElementById('endurance-section').scrollIntoView({behavior: 'smooth'})"
+                style="padding: 12px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; color: white; cursor: pointer; font-weight: 600; transition: all 0.2s;">
+          🏃 Endurance
+        </button>
+        <button onclick="document.getElementById('cardio-section').scrollIntoView({behavior: 'smooth'})"
+                style="padding: 12px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; color: white; cursor: pointer; font-weight: 600; transition: all 0.2s;">
+          ❤️ Cardio
+        </button>
+        <button onclick="document.getElementById('comparison-section').scrollIntoView({behavior: 'smooth'})"
+                style="padding: 12px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; color: white; cursor: pointer; font-weight: 600; transition: all 0.2s;">
+          🔍 Compare
+        </button>
+        <button onclick="document.getElementById('variables-section').scrollIntoView({behavior: 'smooth'})"
+                style="padding: 12px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; color: white; cursor: pointer; font-weight: 600; transition: all 0.2s;">
+          📊 Variables
+        </button>
+      </div>
+    </div>
+
+    <!-- Hypertrophy Training -->
+    <div id="hypertrophy-section" class="card">
+      <h2 style="color: var(--primary);"><i class="fas fa-dumbbell"></i> Hypertrophy Training (Muscle Building)</h2>
+      
+      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-info-circle"></i> What is Hypertrophy?</h3>
+      <p style="line-height: 1.7; color: var(--text-secondary);">
+        <strong>Hypertrophy</strong> refers to the increase in muscle size through the enlargement of muscle fibers. It occurs when muscle protein synthesis exceeds muscle protein breakdown, typically achieved through resistance training combined with adequate nutrition and recovery.
+      </p>
+
+      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-chart-line"></i> Scientific Principles</h3>
+      <div style="display: grid; gap: 12px; margin-top: 12px;">
+        <div style="padding: 16px; background: var(--bg-secondary); border-left: 4px solid var(--primary); border-radius: 8px;">
+          <strong style="color: var(--primary);">Mechanical Tension</strong>
+          <p style="margin-top: 8px; line-height: 1.6; color: var(--text-secondary);">
+            The primary driver of muscle growth. Progressive overload through increasing weight, reps, or sets creates mechanical stress that signals muscle adaptation.
+            <br><em style="font-size: 13px;">Source: Schoenfeld, B.J. (2010). The mechanisms of muscle hypertrophy. Journal of Strength and Conditioning Research.</em>
+          </p>
+        </div>
+        <div style="padding: 16px; background: var(--bg-secondary); border-left: 4px solid var(--secondary); border-radius: 8px;">
+          <strong style="color: var(--secondary);">Metabolic Stress</strong>
+          <p style="margin-top: 8px; line-height: 1.6; color: var(--text-secondary);">
+            The "pump" feeling from higher rep ranges (8-15 reps) creates cellular swelling and metabolite accumulation, contributing to muscle growth.
+            <br><em style="font-size: 13px;">Source: Schoenfeld, B.J. (2013). Potential mechanisms for a role of metabolic stress. Sports Medicine.</em>
+          </p>
+        </div>
+        <div style="padding: 16px; background: var(--bg-secondary); border-left: 4px solid var(--warning); border-radius: 8px;">
+          <strong style="color: var(--warning);">Muscle Damage</strong>
+          <p style="margin-top: 8px; line-height: 1.6; color: var(--text-secondary);">
+            Controlled muscle damage from eccentric (lowering) phases triggers repair and growth. Recovery is crucial for this adaptation.
+            <br><em style="font-size: 13px;">Source: Clarkson, P.M. & Hubal, M.J. (2002). Exercise-induced muscle damage in humans. American Journal of Physical Medicine.</em>
+          </p>
+        </div>
+      </div>
+
+      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-cogs"></i> Optimal Training Parameters</h3>
+      <div style="overflow-x: auto; margin-top: 12px;">
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr style="background: var(--light);">
+            <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border);">Variable</th>
+            <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border);">Recommendation</th>
+            <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border);">Rationale</th>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Rep Range</strong></td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);">6-15 reps</td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">Optimal balance of mechanical tension and metabolic stress</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Sets per Muscle</strong></td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);">10-20 sets/week</td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">Dose-response relationship for muscle growth</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Frequency</strong></td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);">2-3x per muscle/week</td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">Maximizes protein synthesis opportunities</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Intensity</strong></td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);">60-85% 1RM</td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">Sufficient load for mechanical tension</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Rest Between Sets</strong></td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);">60-120 seconds</td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">Balances recovery and metabolic stress</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px;"><strong>Tempo</strong></td>
+            <td style="padding: 12px;">2-3 sec eccentric, 1 sec concentric</td>
+            <td style="padding: 12px; font-size: 13px;">Controlled movement maximizes time under tension</td>
+          </tr>
+        </table>
+      </div>
+      <p style="margin-top: 12px; font-size: 13px; font-style: italic; color: var(--text-secondary);">
+        Source: Schoenfeld, B.J., et al. (2017). Dose-response relationship between weekly resistance training volume and increases in muscle mass. Journal of Sports Sciences.
+      </p>
+
+      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-user"></i> Best For</h3>
+      <ul style="margin-top: 12px; line-height: 2; color: var(--text-secondary);">
+        <li>Bodybuilders and physique athletes</li>
+        <li>Individuals seeking aesthetic improvements</li>
+        <li>Athletes needing muscle mass for their sport</li>
+        <li>General fitness enthusiasts wanting to build muscle</li>
+      </ul>
+    </div>
+
+    <!-- Strength Training -->
+    <div id="strength-section" class="card">
+      <h2 style="color: var(--danger);"><i class="fas fa-weight-hanging"></i> Strength Training (Maximal Force Production)</h2>
+      
+      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-info-circle"></i> What is Strength Training?</h3>
+      <p style="line-height: 1.7; color: var(--text-secondary);">
+        <strong>Strength training</strong> focuses on maximizing the amount of force a muscle or muscle group can produce. It emphasizes neural adaptations, motor unit recruitment, and improving intermuscular coordination rather than muscle size alone.
+      </p>
+
+      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-brain"></i> Neural Adaptations</h3>
+      <div style="display: grid; gap: 12px; margin-top: 12px;">
+        <div style="padding: 16px; background: var(--bg-secondary); border-left: 4px solid var(--danger); border-radius: 8px;">
+          <strong style="color: var(--danger);">Motor Unit Recruitment</strong>
+          <p style="margin-top: 8px; line-height: 1.6; color: var(--text-secondary);">
+            Heavy loads (>85% 1RM) recruit high-threshold motor units more efficiently, increasing maximal force production without significant muscle growth.
+            <br><em style="font-size: 13px;">Source: Sale, D.G. (1988). Neural adaptation to resistance training. Medicine and Science in Sports and Exercise.</em>
+          </p>
+        </div>
+        <div style="padding: 16px; background: var(--bg-secondary); border-left: 4px solid var(--danger); border-radius: 8px;">
+          <strong style="color: var(--danger);">Rate Coding</strong>
+          <p style="margin-top: 8px; line-height: 1.6; color: var(--text-secondary);">
+            Frequency at which motor units fire action potentials increases with training, allowing faster and more powerful contractions.
+            <br><em style="font-size: 13px;">Source: Van Cutsem, M., et al. (1998). Changes in single motor unit behavior. Journal of Physiology.</em>
+          </p>
+        </div>
+        <div style="padding: 16px; background: var(--bg-secondary); border-left: 4px solid var(--danger); border-radius: 8px;">
+          <strong style="color: var(--danger);">Synchronization</strong>
+          <p style="margin-top: 8px; line-height: 1.6; color: var(--text-secondary);">
+            Improved coordination between muscle groups and reduction in antagonist muscle co-activation enhances force transfer.
+            <br><em style="font-size: 13px;">Source: Aagaard, P., et al. (2002). Neural adaptation to strength training. Scandinavian Journal of Medicine.</em>
+          </p>
+        </div>
+      </div>
+
+      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-cogs"></i> Optimal Training Parameters</h3>
+      <div style="overflow-x: auto; margin-top: 12px;">
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr style="background: var(--light);">
+            <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border);">Variable</th>
+            <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border);">Recommendation</th>
+            <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border);">Rationale</th>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Rep Range</strong></td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);">1-6 reps</td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">Maximizes neural adaptations and force production</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Sets per Exercise</strong></td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);">3-8 sets</td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">Adequate volume for strength adaptation</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Frequency</strong></td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);">3-6x per week</td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">High frequency improves motor patterns</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Intensity</strong></td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);">85-100% 1RM</td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">Heavy loads required for strength gains</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Rest Between Sets</strong></td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);">3-5 minutes</td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">Complete recovery for maximal effort</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px;"><strong>Tempo</strong></td>
+            <td style="padding: 12px;">Explosive concentric, controlled eccentric</td>
+            <td style="padding: 12px; font-size: 13px;">Rate of force development is key</td>
+          </tr>
+        </table>
+      </div>
+      <p style="margin-top: 12px; font-size: 13px; font-style: italic; color: var(--text-secondary);">
+        Source: Kraemer, W.J. & Ratamess, N.A. (2004). Fundamentals of resistance training. Medicine and Science in Sports and Exercise.
+      </p>
+
+      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-user"></i> Best For</h3>
+      <ul style="margin-top: 12px; line-height: 2; color: var(--text-secondary);">
+        <li>Powerlifters and strength athletes</li>
+        <li>Athletes requiring maximal force (sprinters, throwers)</li>
+        <li>Advanced lifters pursuing performance goals</li>
+        <li>Individuals preparing for strength competitions</li>
+      </ul>
+    </div>
+
+    <!-- Endurance Training -->
+    <div id="endurance-section" class="card">
+      <h2 style="color: var(--secondary);"><i class="fas fa-running"></i> Muscular Endurance Training</h2>
+      
+      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-info-circle"></i> What is Muscular Endurance?</h3>
+      <p style="line-height: 1.7; color: var(--text-secondary);">
+        <strong>Muscular endurance</strong> is the ability of a muscle or muscle group to perform repeated contractions against a resistance for an extended period. It emphasizes fatigue resistance and the ability to maintain force output over time.
+      </p>
+
+      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-chart-line"></i> Physiological Adaptations</h3>
+      <div style="display: grid; gap: 12px; margin-top: 12px;">
+        <div style="padding: 16px; background: var(--bg-secondary); border-left: 4px solid var(--secondary); border-radius: 8px;">
+          <strong style="color: var(--secondary);">Mitochondrial Density</strong>
+          <p style="margin-top: 8px; line-height: 1.6; color: var(--text-secondary);">
+            High-rep training increases mitochondrial content in muscle cells, improving aerobic energy production and delaying fatigue.
+            <br><em style="font-size: 13px;">Source: Holloszy, J.O. (2008). Regulation of mitochondrial biogenesis. Journal of Applied Physiology.</em>
+          </p>
+        </div>
+        <div style="padding: 16px; background: var(--bg-secondary); border-left: 4px solid var(--secondary); border-radius: 8px;">
+          <strong style="color: var(--secondary);">Capillary Density</strong>
+          <p style="margin-top: 8px; line-height: 1.6; color: var(--text-secondary);">
+            Increased capillarization improves oxygen and nutrient delivery to working muscles, enhancing endurance capacity.
+            <br><em style="font-size: 13px;">Source: Andersen, P. & Henriksson, J. (1977). Capillary supply of the quadriceps femoris. Acta Physiologica Scandinavica.</em>
+          </p>
+        </div>
+        <div style="padding: 16px; background: var(--bg-secondary); border-left: 4px solid var(--secondary); border-radius: 8px;">
+          <strong style="color: var(--secondary);">Buffering Capacity</strong>
+          <p style="margin-top: 8px; line-height: 1.6; color: var(--text-secondary);">
+            Training improves the muscle's ability to buffer lactate and hydrogen ions, delaying the onset of fatigue.
+            <br><em style="font-size: 13px;">Source: Bishop, D., et al. (2004). The effects of strength training. Journal of Strength and Conditioning Research.</em>
+          </p>
+        </div>
+      </div>
+
+      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-cogs"></i> Optimal Training Parameters</h3>
+      <div style="overflow-x: auto; margin-top: 12px;">
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr style="background: var(--light);">
+            <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border);">Variable</th>
+            <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border);">Recommendation</th>
+            <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border);">Rationale</th>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Rep Range</strong></td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);">15-25+ reps</td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">Extended time under tension builds endurance</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Sets per Exercise</strong></td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);">2-4 sets</td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">Moderate volume with high reps</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Frequency</strong></td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);">3-5x per week</td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">Frequent stimulation of endurance adaptations</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Intensity</strong></td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);">40-60% 1RM</td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">Light to moderate loads</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Rest Between Sets</strong></td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);">30-60 seconds</td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">Short rest maintains metabolic stress</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px;"><strong>Tempo</strong></td>
+            <td style="padding: 12px;">Steady, controlled pace</td>
+            <td style="padding: 12px; font-size: 13px;">Consistent movement pattern</td>
+          </tr>
+        </table>
+      </div>
+
+      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-user"></i> Best For</h3>
+      <ul style="margin-top: 12px; line-height: 2; color: var(--text-secondary);">
+        <li>Endurance athletes (runners, cyclists, swimmers)</li>
+        <li>Combat sports athletes (MMA, boxing)</li>
+        <li>Individuals focusing on work capacity</li>
+        <li>Rehabilitation and injury prevention</li>
+      </ul>
+    </div>
+
+    <!-- Cardio Training -->
+    <div id="cardio-section" class="card">
+      <h2 style="color: var(--warning);"><i class="fas fa-heartbeat"></i> Cardiovascular Training</h2>
+      
+      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-info-circle"></i> What is Cardiovascular Training?</h3>
+      <p style="line-height: 1.7; color: var(--text-secondary);">
+        <strong>Cardiovascular training</strong> (aerobic exercise) improves the efficiency of the cardiovascular system in absorbing and transporting oxygen. It enhances heart health, aerobic capacity (VO2max), and overall metabolic health.
+      </p>
+
+      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-heart"></i> Cardiovascular Adaptations</h3>
+      <div style="display: grid; gap: 12px; margin-top: 12px;">
+        <div style="padding: 16px; background: var(--bg-secondary); border-left: 4px solid var(--warning); border-radius: 8px;">
+          <strong style="color: var(--warning);">Increased Stroke Volume</strong>
+          <p style="margin-top: 8px; line-height: 1.6; color: var(--text-secondary);">
+            The heart becomes more efficient, pumping more blood per beat. This reduces resting heart rate and improves exercise capacity.
+            <br><em style="font-size: 13px;">Source: Levine, B.D. (2008). VO2max: what do we know, and what do we still need to know? Journal of Physiology.</em>
+          </p>
+        </div>
+        <div style="padding: 16px; background: var(--bg-secondary); border-left: 4px solid var(--warning); border-radius: 8px;">
+          <strong style="color: var(--warning);">Enhanced VO2max</strong>
+          <p style="margin-top: 8px; line-height: 1.6; color: var(--text-secondary);">
+            Maximal oxygen uptake increases through improved cardiac output and oxygen extraction at the muscle level.
+            <br><em style="font-size: 13px;">Source: Bassett, D.R. & Howley, E.T. (2000). Limiting factors for maximum oxygen uptake. Medicine and Science in Sports.</em>
+          </p>
+        </div>
+        <div style="padding: 16px; background: var(--bg-secondary); border-left: 4px solid var(--warning); border-radius: 8px;">
+          <strong style="color: var(--warning);">Metabolic Efficiency</strong>
+          <p style="margin-top: 8px; line-height: 1.6; color: var(--text-secondary);">
+            Improved fat oxidation, insulin sensitivity, and mitochondrial function enhance metabolic health and endurance.
+            <br><em style="font-size: 13px;">Source: Helgerud, J., et al. (2007). Aerobic high-intensity intervals. American Journal of Physiology.</em>
+          </p>
+        </div>
+      </div>
+
+      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-layer-group"></i> Training Zones</h3>
+      <div style="overflow-x: auto; margin-top: 12px;">
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr style="background: var(--light);">
+            <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border);">Zone</th>
+            <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border);">Intensity (% HRmax)</th>
+            <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border);">Duration</th>
+            <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border);">Primary Benefit</th>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Zone 1 (Recovery)</strong></td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);">50-60%</td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);">20-40 min</td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">Active recovery, base building</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Zone 2 (Endurance)</strong></td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);">60-70%</td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);">30-90 min</td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">Fat oxidation, aerobic base</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Zone 3 (Tempo)</strong></td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);">70-80%</td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);">20-40 min</td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">Lactate threshold improvement</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Zone 4 (Threshold)</strong></td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);">80-90%</td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);">10-30 min</td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">VO2max improvement</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px;"><strong>Zone 5 (Max)</strong></td>
+            <td style="padding: 12px;">90-100%</td>
+            <td style="padding: 12px;">1-5 min intervals</td>
+            <td style="padding: 12px; font-size: 13px;">Anaerobic capacity, speed</td>
+          </tr>
+        </table>
+      </div>
+
+      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-clock"></i> Training Methods</h3>
+      <div style="display: grid; gap: 12px; margin-top: 12px;">
+        <div style="padding: 16px; background: var(--bg-secondary); border-radius: 8px;">
+          <strong style="color: var(--warning);">Steady State (LISS)</strong>
+          <p style="margin-top: 8px; line-height: 1.6; color: var(--text-secondary);">
+            Continuous moderate intensity (Zone 2-3) for 30-60 minutes. Best for building aerobic base and fat oxidation.
+          </p>
+        </div>
+        <div style="padding: 16px; background: var(--bg-secondary); border-radius: 8px;">
+          <strong style="color: var(--warning);">High-Intensity Interval Training (HIIT)</strong>
+          <p style="margin-top: 8px; line-height: 1.6; color: var(--text-secondary);">
+            Short bursts (20-90 sec) at 85-95% HRmax with recovery periods. Improves VO2max and metabolic rate efficiently.
+            <br><em style="font-size: 13px;">Source: Gibala, M.J. & McGee, S.L. (2008). Metabolic adaptations to short-term high-intensity interval training. Exercise and Sport Sciences Reviews.</em>
+          </p>
+        </div>
+        <div style="padding: 16px; background: var(--bg-secondary); border-radius: 8px;">
+          <strong style="color: var(--warning);">Fartlek Training</strong>
+          <p style="margin-top: 8px; line-height: 1.6; color: var(--text-secondary);">
+            Variable intensity "speed play" combining different zones. Excellent for sport-specific conditioning.
+          </p>
+        </div>
+      </div>
+
+      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-user"></i> Best For</h3>
+      <ul style="margin-top: 12px; line-height: 2; color: var(--text-secondary);">
+        <li>Overall health and longevity</li>
+        <li>Weight loss and body composition</li>
+        <li>Endurance athletes (runners, cyclists, triathletes)</li>
+        <li>Heart health and disease prevention</li>
+      </ul>
+    </div>
+
+    <!-- Comparison Section -->
+    <div id="comparison-section" class="card" style="background: linear-gradient(135deg, var(--bg-primary) 0%, var(--light) 100%);">
+      <h2><i class="fas fa-balance-scale"></i> Training Method Comparison</h2>
+      
+      <div style="overflow-x: auto; margin-top: 20px;">
+        <table style="width: 100%; border-collapse: collapse; background: var(--bg-primary);">
+          <tr style="background: var(--primary); color: white;">
+            <th style="padding: 12px; text-align: left; border: 1px solid var(--border);">Aspect</th>
+            <th style="padding: 12px; text-align: left; border: 1px solid var(--border);">Hypertrophy</th>
+            <th style="padding: 12px; text-align: left; border: 1px solid var(--border);">Strength</th>
+            <th style="padding: 12px; text-align: left; border: 1px solid var(--border);">Endurance</th>
+            <th style="padding: 12px; text-align: left; border: 1px solid var(--border);">Cardio</th>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border: 1px solid var(--border); font-weight: 600;">Primary Goal</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">Muscle size ↑</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">Force production ↑</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">Fatigue resistance ↑</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">Aerobic capacity ↑</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border: 1px solid var(--border); font-weight: 600;">Rep Range</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">6-15 reps</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">1-6 reps</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">15-25+ reps</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">Continuous</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border: 1px solid var(--border); font-weight: 600;">Intensity</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">60-85% 1RM</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">85-100% 1RM</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">40-60% 1RM</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">50-90% HRmax</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border: 1px solid var(--border); font-weight: 600;">Rest Periods</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">60-120 sec</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">3-5 min</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">30-60 sec</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">Varies</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border: 1px solid var(--border); font-weight: 600;">Weekly Frequency</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">2-3x per muscle</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">3-6x</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">3-5x</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">3-6x</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border: 1px solid var(--border); font-weight: 600;">Primary Adaptation</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">Structural (muscle fibers)</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">Neural (motor units)</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">Metabolic (mitochondria)</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">Cardiovascular (heart, lungs)</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border: 1px solid var(--border); font-weight: 600;">Time to See Results</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">6-12 weeks</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">4-8 weeks</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">4-8 weeks</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">2-6 weeks</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border: 1px solid var(--border); font-weight: 600;">Calorie Burn</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">Moderate</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">Low-Moderate</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">Moderate-High</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">High</td>
+          </tr>
+        </table>
+      </div>
+
+      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-puzzle-piece"></i> Can You Combine Them?</h3>
+      <p style="line-height: 1.7; color: var(--text-secondary); margin-top: 12px;">
+        <strong>Yes!</strong> Concurrent training (combining multiple training styles) is effective when properly programmed. Research shows:
+      </p>
+      <ul style="margin-top: 12px; line-height: 2; color: var(--text-secondary);">
+        <li><strong>Hypertrophy + Cardio:</strong> Moderate cardio doesn't impair muscle growth. Keep cardio sessions separate from resistance training or on non-lifting days.</li>
+        <li><strong>Strength + Cardio:</strong> High-intensity cardio may interfere with strength gains. Prioritize strength training and use low-intensity cardio.</li>
+        <li><strong>Periodization:</strong> Cycle through different training phases (e.g., 4-6 weeks hypertrophy, 4-6 weeks strength, 2-3 weeks endurance).</li>
+        <li><strong>Interference Effect:</strong> Excessive cardio can inhibit muscle and strength gains. Limit to 2-3 sessions per week if building muscle/strength is primary.</li>
+      </ul>
+      <p style="margin-top: 12px; font-size: 13px; font-style: italic; color: var(--text-secondary);">
+        Source: Wilson, J.M., et al. (2012). Concurrent training: a meta-analysis. Journal of Strength and Conditioning Research.
+      </p>
+    </div>
+
+    <!-- Training Variables -->
+    <div id="variables-section" class="card">
+      <h2><i class="fas fa-sliders-h"></i> Key Training Variables</h2>
+      
+      <div style="display: grid; gap: 16px; margin-top: 20px;">
+        <!-- Volume -->
+        <div style="padding: 20px; background: var(--bg-secondary); border-radius: 12px; border-left: 4px solid var(--primary);">
+          <h3 style="color: var(--primary); margin-bottom: 12px;"><i class="fas fa-chart-bar"></i> Volume</h3>
+          <p style="line-height: 1.7; color: var(--text-secondary);">
+            <strong>Definition:</strong> Total amount of work performed (Sets × Reps × Weight)
+          </p>
+          <p style="line-height: 1.7; color: var(--text-secondary); margin-top: 8px;">
+            <strong>Importance:</strong> Volume is the primary driver of hypertrophy. More volume generally equals more growth, up to a point (10-20 sets per muscle per week).
+          </p>
+          <p style="line-height: 1.7; color: var(--text-secondary); margin-top: 8px;">
+            <strong>Progressive Overload:</strong> Gradually increase volume over time by adding sets, reps, or weight.
+          </p>
+        </div>
+
+        <!-- Intensity -->
+        <div style="padding: 20px; background: var(--bg-secondary); border-radius: 12px; border-left: 4px solid var(--danger);">
+          <h3 style="color: var(--danger); margin-bottom: 12px;"><i class="fas fa-fire"></i> Intensity</h3>
+          <p style="line-height: 1.7; color: var(--text-secondary);">
+            <strong>Definition:</strong> Percentage of one-rep max (1RM) or effort level (RPE)
+          </p>
+          <p style="line-height: 1.7; color: var(--text-secondary); margin-top: 8px;">
+            <strong>Importance:</strong> Determines the type of adaptation. Higher intensity (>85% 1RM) = strength. Moderate (60-85%) = hypertrophy.
+          </p>
+          <p style="line-height: 1.7; color: var(--text-secondary); margin-top: 8px;">
+            <strong>RPE Scale:</strong> Rate of Perceived Exertion (1-10 scale). RPE 7-9 is ideal for most training.
+          </p>
+        </div>
+
+        <!-- Frequency -->
+        <div style="padding: 20px; background: var(--bg-secondary); border-radius: 12px; border-left: 4px solid var(--secondary);">
+          <h3 style="color: var(--secondary); margin-bottom: 12px;"><i class="fas fa-calendar-alt"></i> Frequency</h3>
+          <p style="line-height: 1.7; color: var(--text-secondary);">
+            <strong>Definition:</strong> How often you train a muscle group per week
+          </p>
+          <p style="line-height: 1.7; color: var(--text-secondary); margin-top: 8px;">
+            <strong>Importance:</strong> Higher frequency (2-3x per week per muscle) allows for better volume distribution and more frequent protein synthesis stimulation.
+          </p>
+          <p style="line-height: 1.7; color: var(--text-secondary); margin-top: 8px;">
+            <strong>Recommendation:</strong> Train each muscle group at least 2x per week for optimal growth.
+          </p>
+        </div>
+
+        <!-- Rest -->
+        <div style="padding: 20px; background: var(--bg-secondary); border-radius: 12px; border-left: 4px solid var(--warning);">
+          <h3 style="color: var(--warning); margin-bottom: 12px;"><i class="fas fa-pause-circle"></i> Rest & Recovery</h3>
+          <p style="line-height: 1.7; color: var(--text-secondary);">
+            <strong>Definition:</strong> Time between sets and between training sessions
+          </p>
+          <p style="line-height: 1.7; color: var(--text-secondary); margin-top: 8px;">
+            <strong>Between Sets:</strong> Strength (3-5 min), Hypertrophy (60-120 sec), Endurance (30-60 sec)
+          </p>
+          <p style="line-height: 1.7; color: var(--text-secondary); margin-top: 8px;">
+            <strong>Between Sessions:</strong> Allow 48-72 hours recovery for the same muscle group. Sleep 7-9 hours for optimal recovery.
+          </p>
+        </div>
+
+        <!-- Tempo -->
+        <div style="padding: 20px; background: var(--bg-secondary); border-radius: 12px; border-left: 4px solid #9333ea;">
+          <h3 style="color: #9333ea; margin-bottom: 12px;"><i class="fas fa-stopwatch"></i> Tempo</h3>
+          <p style="line-height: 1.7; color: var(--text-secondary);">
+            <strong>Definition:</strong> Speed of movement during each rep (Eccentric-Pause-Concentric-Pause)
+          </p>
+          <p style="line-height: 1.7; color: var(--text-secondary); margin-top: 8px;">
+            <strong>Hypertrophy:</strong> 2-3 sec eccentric, 1 sec concentric (controlled)
+          </p>
+          <p style="line-height: 1.7; color: var(--text-secondary); margin-top: 8px;">
+            <strong>Strength:</strong> Explosive concentric, controlled eccentric
+          </p>
+          <p style="line-height: 1.7; color: var(--text-secondary); margin-top: 8px;">
+            <strong>Importance:</strong> Time under tension affects muscle growth and neural adaptation.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scientific Resources -->
+    <div class="card" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);">
+      <h2><i class="fas fa-book-open"></i> Scientific References & Further Reading</h2>
+      
+      <div style="margin-top: 20px;">
+        <h3 style="color: var(--text-primary); margin-bottom: 12px;">Key Research Papers</h3>
+        <ul style="line-height: 2; color: var(--text-secondary); font-size: 14px;">
+          <li>Schoenfeld, B.J. (2010). "The mechanisms of muscle hypertrophy and their application to resistance training." <em>Journal of Strength and Conditioning Research</em>, 24(10), 2857-2872.</li>
+          <li>Kraemer, W.J. & Ratamess, N.A. (2004). "Fundamentals of resistance training: progression and exercise prescription." <em>Medicine and Science in Sports and Exercise</em>, 36(4), 674-688.</li>
+          <li>Gibala, M.J., et al. (2012). "Physiological adaptations to low-volume, high-intensity interval training in health and disease." <em>Journal of Physiology</em>, 590(5), 1077-1084.</li>
+          <li>Wilson, J.M., et al. (2012). "Concurrent training: a meta-analysis examining interference of aerobic and resistance exercises." <em>Journal of Strength and Conditioning Research</em>, 26(8), 2293-2307.</li>
+          <li>Helgerud, J., et al. (2007). "Aerobic high-intensity intervals improve VO2max more than moderate training." <em>Medicine and Science in Sports and Exercise</em>, 39(4), 665-671.</li>
+        </ul>
+      </div>
+
+      <div style="margin-top: 24px;">
+        <h3 style="color: var(--text-primary); margin-bottom: 12px;">Recommended Books</h3>
+        <ul style="line-height: 2; color: var(--text-secondary); font-size: 14px;">
+          <li><strong>"Science and Practice of Strength Training"</strong> by Vladimir Zatsiorsky & William Kraemer</li>
+          <li><strong>"The Muscle and Strength Pyramid: Training"</strong> by Eric Helms, Andy Morgan, & Andrea Valdez</li>
+          <li><strong>"Periodization Training for Sports"</strong> by Tudor Bompa & Carlo Buzzichelli</li>
+          <li><strong>"Essentials of Strength Training and Conditioning"</strong> by NSCA</li>
+        </ul>
+      </div>
+
+      <div style="margin-top: 24px;">
+        <h3 style="color: var(--text-primary); margin-bottom: 12px;">Evidence-Based Resources</h3>
+        <ul style="line-height: 2; color: var(--text-secondary); font-size: 14px;">
+          <li><strong>Stronger By Science:</strong> Research reviews and practical applications</li>
+          <li><strong>Renaissance Periodization:</strong> Science-based hypertrophy and strength content</li>
+          <li><strong>MASS Research Review:</strong> Monthly journal article reviews</li>
+          <li><strong>PubMed/NCBI:</strong> Direct access to research papers</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Disclaimer -->
+    <div style="padding: 16px; background: var(--light); border-radius: 12px; border: 2px dashed var(--border); margin-top: 24px;">
+      <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6;">
+        <i class="fas fa-info-circle" style="color: var(--primary);"></i> 
+        <strong>Disclaimer:</strong> This information is for educational purposes only and should not replace professional medical or training advice. Always consult with a qualified healthcare provider or certified trainer before beginning any new exercise program, especially if you have pre-existing health conditions. Individual results may vary based on genetics, training experience, nutrition, recovery, and other factors.
+      </p>
+    </div>
+  \`;
+}
 `;

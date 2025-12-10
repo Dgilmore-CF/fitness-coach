@@ -295,9 +295,10 @@ Now create a similar ${days_per_week}-day ${goal} program structure for this use
 
 ${user.gender === 'female' ? 'Note: Consider typical female training preferences - may benefit from higher rep ranges, emphasis on glutes/legs, and appropriate exercise selection.' : user.gender === 'male' ? 'Note: Consider typical male training preferences - balanced upper/lower split, compound movements, progressive overload focus.' : ''}
 
-IMPORTANT: Return ONLY the structure (name and days array WITHOUT exercises). Follow this exact format:
+IMPORTANT: Return ONLY the structure with name, description, and days array (WITHOUT exercises). Follow this exact format:
 {
   "name": "Program name",
+  "description": "A 2-3 sentence description explaining the program's approach, target audience, and expected outcomes. Be specific about training style and benefits.",
   "days": [
     {
       "day_number": 1,
