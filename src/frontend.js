@@ -5110,57 +5110,188 @@ function loadLearn() {
         </div>
       </div>
 
-      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-cogs"></i> Optimal Training Parameters</h3>
-      <div style="overflow-x: auto; margin-top: 12px;">
-        <table style="width: 100%; border-collapse: collapse;">
-          <tr style="background: var(--light);">
-            <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border);">Variable</th>
-            <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border);">Recommendation</th>
-            <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border);">Rationale</th>
-          </tr>
-          <tr>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Rep Range</strong></td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);">1-6 reps</td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">Maximizes neural adaptations and force production</td>
-          </tr>
-          <tr>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Sets per Exercise</strong></td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);">3-8 sets</td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">Adequate volume for strength adaptation</td>
-          </tr>
-          <tr>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Frequency</strong></td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);">3-6x per week</td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">High frequency improves motor patterns</td>
-          </tr>
-          <tr>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Intensity</strong></td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);">85-100% 1RM</td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">Heavy loads required for strength gains</td>
-          </tr>
-          <tr>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Rest Between Sets</strong></td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);">3-5 minutes</td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">Complete recovery for maximal effort</td>
-          </tr>
-          <tr>
-            <td style="padding: 12px;"><strong>Tempo</strong></td>
-            <td style="padding: 12px;">Explosive concentric, controlled eccentric</td>
-            <td style="padding: 12px; font-size: 13px;">Rate of force development is key</td>
-          </tr>
-        </table>
-      </div>
-      <p style="margin-top: 12px; font-size: 13px; font-style: italic; color: var(--text-secondary);">
-        Source: Kraemer, W.J. & Ratamess, N.A. (2004). Fundamentals of resistance training. Medicine and Science in Sports and Exercise.
+      <h3 style="margin-top: 32px; color: var(--text-primary); font-size: 20px;"><i class="fas fa-cogs"></i> Evidence-Based Training Parameters</h3>
+      <p style="line-height: 1.8; color: var(--text-secondary); margin-top: 12px;">
+        Research-backed guidelines for maximizing strength gains:
       </p>
 
-      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-user"></i> Best For</h3>
-      <ul style="margin-top: 12px; line-height: 2; color: var(--text-secondary);">
-        <li>Powerlifters and strength athletes</li>
-        <li>Athletes requiring maximal force (sprinters, throwers)</li>
-        <li>Advanced lifters pursuing performance goals</li>
-        <li>Individuals preparing for strength competitions</li>
-      </ul>
+      <div style="overflow-x: auto; margin-top: 16px;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+          <thead>
+            <tr style="background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%); color: white;">
+              <th style="padding: 14px; text-align: left; border-bottom: 2px solid #dc2626; font-weight: 700;">Variable</th>
+              <th style="padding: 14px; text-align: left; border-bottom: 2px solid #dc2626; font-weight: 700;">Optimal Range</th>
+              <th style="padding: 14px; text-align: left; border-bottom: 2px solid #dc2626; font-weight: 700;">Scientific Rationale</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="background: var(--bg-secondary);">
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);"><strong>Rep Range</strong></td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);">1-6 reps (focus 1-5)</td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border); line-height: 1.6;">
+                Heavy loads (>80% 1RM) maximize neural adaptations. Singles and doubles are most specific to 1RM but triples and sets of 5 accumulate more quality volume.
+                <br><a href="https://pubmed.ncbi.nlm.nih.gov/28834797/" target="_blank" style="color: var(--danger); font-size: 12px;">Schoenfeld et al., 2017 - Strength adaptations</a>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);"><strong>Weekly Volume</strong></td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);">12-24 sets per lift pattern</td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border); line-height: 1.6;">
+                More than hypertrophy due to high frequency. Squat: 12-20 sets, Hinge: 8-15 sets, Press: 10-18 sets. Advanced lifters need more.
+                <br><a href="https://pubmed.ncbi.nlm.nih.gov/27941492/" target="_blank" style="color: var(--danger); font-size: 12px;">Ralston et al., 2017 - Volume and strength</a>
+              </td>
+            </tr>
+            <tr style="background: var(--bg-secondary);">
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);"><strong>Frequency</strong></td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);">3-6x per lift per week</td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border); line-height: 1.6;">
+                High frequency allows skill practice and volume distribution. Bulgarian and Norwegian methods have daily maximal training. Higher frequency superior if volume is equated.
+                <br><a href="https://pubmed.ncbi.nlm.nih.gov/30558719/" target="_blank" style="color: var(--danger); font-size: 12px;">Grgic et al., 2018 - Frequency and strength</a>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);"><strong>Intensity (Load)</strong></td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);">80-100% 1RM (emphasis >85%)</td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border); line-height: 1.6;">
+                Specificity principle: To get stronger at heavy loads, lift heavy loads. Most work 80-90%, some >90%, occasional max attempts. Lighter loads (70-80%) for volume.
+                <br><a href="https://pubmed.ncbi.nlm.nih.gov/22344059/" target="_blank" style="color: var(--danger); font-size: 12px;">Schoenfeld et al., 2017 - Loading recommendations</a>
+              </td>
+            </tr>
+            <tr style="background: var(--bg-secondary);">
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);"><strong>Rest</strong></td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);">3-5 min (up to 10 for maximal)</td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border); line-height: 1.6;">
+                Complete ATP-PC recovery takes 3-5 min. Longer rest allows high intensity maintenance. >2 min superior to shorter. Elite lifters may rest 5-10 min between near-max.
+                <br><a href="https://pubmed.ncbi.nlm.nih.gov/26605807/" target="_blank" style="color: var(--danger); font-size: 12px;">Schoenfeld et al., 2016 - Rest intervals</a>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);"><strong>Tempo</strong></td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);">Controlled eccentric (2-3s)<br>Explosive concentric</td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border); line-height: 1.6;">
+                <strong>Compensatory Acceleration Training (CAT):</strong> Attempt to accelerate bar throughout range. Maximizes force and neural drive. Controlled eccentrics minimize injury risk.
+                <br><a href="https://pubmed.ncbi.nlm.nih.gov/23897021/" target="_blank" style="color: var(--danger); font-size: 12px;">Kawamori & Haff, 2004 - Force-velocity</a>
+              </td>
+            </tr>
+            <tr style="background: var(--bg-secondary);">
+              <td style="padding: 14px;"><strong>Proximity to Failure</strong></td>
+              <td style="padding: 14px;">Leave 1-3 RIR (training)<br>Max effort (testing/peaking)</td>
+              <td style="padding: 14px; line-height: 1.6;">
+                Training to failure frequently increases injury risk and CNS fatigue without benefits. Use RPE 7-9 for most training. Reserve maximal attempts for testing or peaking.
+                <br><a href="https://pubmed.ncbi.nlm.nih.gov/27768473/" target="_blank" style="color: var(--danger); font-size: 12px;">Davies et al., 2016 - Failure training</a>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="margin-top: 20px; padding: 16px; background: rgba(220, 38, 38, 0.1); border-left: 4px solid #dc2626; border-radius: 8px;">
+        <p style="margin: 0; line-height: 1.7; color: var(--text-secondary);">
+          <strong style="color: #dc2626;">💡 Key Takeaway:</strong> Strength training requires heavy loads, adequate volume across high frequency, complete recovery, and consistent practice of specific movements. Unlike hypertrophy, maximal strength cannot be achieved with light loads regardless of effort.
+        </p>
+      </div>
+
+      <h3 style="margin-top: 32px; color: var(--text-primary); font-size: 20px;"><i class="fas fa-calendar-week"></i> Periodization for Strength</h3>
+      <p style="line-height: 1.8; color: var(--text-secondary); margin-top: 12px;">
+        <strong>Periodization</strong> is systematic variation of training variables to optimize performance and prevent overtraining. Essential for long-term strength progress.
+      </p>
+
+      <div style="display: grid; gap: 12px; margin-top: 16px;">
+        <details style="padding: 16px; background: var(--bg-secondary); border-radius: 8px; cursor: pointer; border-left: 3px solid #dc2626;">
+          <summary style="font-weight: 700; font-size: 15px; color: #dc2626; cursor: pointer;">📈 Linear Periodization (Classic Model)</summary>
+          <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Structure:</strong> Progress from high volume/low intensity → low volume/high intensity over 8-16 weeks</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;">
+              <strong>Phases:</strong>
+              <br>• Hypertrophy (weeks 1-4): 8-12 reps, 70-75% 1RM, 3-4 sets
+              <br>• Strength (weeks 5-8): 4-6 reps, 80-85% 1RM, 4-5 sets
+              <br>• Power/Peaking (weeks 9-12): 1-3 reps, 90-95% 1RM, 3-5 sets
+              <br>• Taper (weeks 13-14): Reduce volume 40-60%, maintain intensity
+            </p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Best for:</strong> Beginners, single-peak competitions (yearly)</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Pros:</strong> Simple, predictable, well-researched</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Cons:</strong> Detraining of untrained qualities, less variety</p>
+          </div>
+        </details>
+
+        <details style="padding: 16px; background: var(--bg-secondary); border-radius: 8px; cursor: pointer; border-left: 3px solid #dc2626;">
+          <summary style="font-weight: 700; font-size: 15px; color: #dc2626; cursor: pointer;">🔄 Daily Undulating Periodization (DUP)</summary>
+          <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Structure:</strong> Vary intensity and volume day-to-day within each week</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;">
+              <strong>Example weekly setup:</strong>
+              <br>• Monday: Heavy (3x3 @ 85-90% 1RM)
+              <br>• Wednesday: Light (3x8 @ 65-70% 1RM)
+              <br>• Friday: Medium (3x5 @ 75-80% 1RM)
+            </p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Best for:</strong> Intermediate to advanced, multiple competitions yearly</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Pros:</strong> Maintains all qualities, interesting, flexible</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Cons:</strong> More complex, may be too variable for beginners</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0; font-size: 13px;">
+              <a href="https://pubmed.ncbi.nlm.nih.gov/26666744/" target="_blank" style="color: var(--danger);">Research shows DUP may be superior to linear for experienced lifters</a>
+            </p>
+          </div>
+        </details>
+
+        <details style="padding: 16px; background: var(--bg-secondary); border-radius: 8px; cursor: pointer; border-left: 3px solid #dc2626;">
+          <summary style="font-weight: 700; font-size: 15px; color: #dc2626; cursor: pointer;">🧱 Block Periodization</summary>
+          <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Structure:</strong> Focus on one quality per 2-4 week block, then transition</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;">
+              <strong>Blocks:</strong>
+              <br>• <strong>Accumulation:</strong> High volume, lower intensity, build capacity (70-80% 1RM)
+              <br>• <strong>Intensification:</strong> Reduce volume, increase intensity (80-90% 1RM)
+              <br>• <strong>Realization:</strong> Low volume, peak intensity, express strength (90-100% 1RM)
+            </p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Best for:</strong> Advanced/elite athletes, multiple peaks yearly</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Pros:</strong> Focused development, prevents staleness, residual effects</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Cons:</strong> Requires experience, complex planning</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0; font-size: 13px;">
+              <a href="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3438871/" target="_blank" style="color: var(--danger);">Popularized by Verkhoshansky - Soviet training theory</a>
+            </p>
+          </div>
+        </details>
+
+        <details style="padding: 16px; background: var(--bg-secondary); border-radius: 8px; cursor: pointer; border-left: 3px solid #dc2626;">
+          <summary style="font-weight: 700; font-size: 15px; color: #dc2626; cursor: pointer;">⚡ Conjugate Method (Westside Barbell)</summary>
+          <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Structure:</strong> Train maximal effort, dynamic effort, and repetition effort simultaneously</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;">
+              <strong>Weekly template:</strong>
+              <br>• <strong>Max Effort Lower:</strong> Work to 1-3RM on squat/deadlift variation
+              <br>• <strong>Max Effort Upper:</strong> Work to 1-3RM on bench press variation
+              <br>• <strong>Dynamic Effort Lower:</strong> 8-12 sets of 2 reps at 50-60% with bands/chains
+              <br>• <strong>Dynamic Effort Upper:</strong> 8-9 sets of 3 reps at 50-60% with bands/chains
+            </p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Best for:</strong> Equipped powerlifters, advanced raw lifters, variety seekers</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Pros:</strong> Addresses all strength aspects, prevents accommodation, exciting</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Cons:</strong> Very demanding, requires extensive exercise library</p>
+          </div>
+        </details>
+      </div>
+
+      <h3 style="margin-top: 32px; color: var(--text-primary); font-size: 20px;"><i class="fas fa-user-check"></i> Who Should Focus on Strength Training?</h3>
+      <div style="display: grid; gap: 10px; margin-top: 16px;">
+        <div style="padding: 14px 18px; background: var(--bg-secondary); border-left: 3px solid #dc2626; border-radius: 6px;">
+          <strong style="color: #dc2626;">✓ Powerlifters & Strongman Athletes</strong> - Primary training focus
+        </div>
+        <div style="padding: 14px 18px; background: var(--bg-secondary); border-left: 3px solid #dc2626; border-radius: 6px;">
+          <strong style="color: #dc2626;">✓ Olympic Weightlifters</strong> - Strength base for snatch/clean & jerk
+        </div>
+        <div style="padding: 14px 18px; background: var(--bg-secondary); border-left: 3px solid #dc2626; border-radius: 6px;">
+          <strong style="color: #dc2626;">✓ Field Sport Athletes</strong> - Football, rugby, throwing, sprinting
+        </div>
+        <div style="padding: 14px 18px; background: var(--bg-secondary); border-left: 3px solid #dc2626; border-radius: 6px;">
+          <strong style="color: #dc2626;">✓ Combat Sports Athletes</strong> - MMA, wrestling, boxing (weight-class)
+        </div>
+        <div style="padding: 14px 18px; background: var(--bg-secondary); border-left: 3px solid #dc2626; border-radius: 6px;">
+          <strong style="color: #dc2626;">✓ Older Adults</strong> - Prevent sarcopenia, maintain independence
+          <br><a href="https://pubmed.ncbi.nlm.nih.gov/29517930/" target="_blank" style="color: var(--danger); font-size: 12px;">Peterson et al., 2010 - Resistance training for older adults</a>
+        </div>
+        <div style="padding: 14px 18px; background: var(--bg-secondary); border-left: 3px solid #dc2626; border-radius: 6px;">
+          <strong style="color: #dc2626;">✓ Anyone Seeking Performance</strong> - Strength transfers to all activities
+        </div>
+      </div>
     </div>
 
     <!-- Endurance Training -->
