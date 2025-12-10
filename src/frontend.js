@@ -890,45 +890,97 @@ async function loadWorkoutInterface() {
       startWorkoutTimer();
     }
 
+    const totalSets = workout.exercises.reduce((sum, ex) => sum + (ex.sets?.length || 0), 0);
+    const totalVolume = workout.exercises.reduce((sum, ex) => {
+      return sum + (ex.sets || []).reduce((exSum, set) => exSum + (set.weight_kg * set.reps), 0);
+    }, 0);
+
     container.innerHTML = \`
-      <div class="card">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <h2><i class="fas fa-stopwatch"></i> \${workout.day_name || 'Workout Session'}</h2>
-          <div id="workoutTimer" class="timer-display" style="font-size: 24px;">00:00:00</div>
+      <!-- Header Card -->
+      <div class="card" style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white; border: none;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+          <div>
+            <h2 style="color: white; margin-bottom: 8px;"><i class="fas fa-dumbbell"></i> \${workout.day_name || 'Workout Session'}</h2>
+            <div style="font-size: 14px; opacity: 0.9;">\${workout.day_focus || 'Strength Training'}</div>
+          </div>
+          <div style="text-align: right;">
+            <div id="workoutTimer" style="font-size: 32px; font-weight: bold; font-family: 'Courier New', monospace;">00:00:00</div>
+            <div style="font-size: 12px; opacity: 0.8; margin-top: 4px;">Duration</div>
+          </div>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.2);">
+          <div>
+            <div style="font-size: 12px; opacity: 0.8;">Exercises</div>
+            <div style="font-size: 24px; font-weight: bold;">\${workout.exercises.length}</div>
+          </div>
+          <div>
+            <div style="font-size: 12px; opacity: 0.8;">Sets Completed</div>
+            <div style="font-size: 24px; font-weight: bold;">\${totalSets}</div>
+          </div>
+          <div>
+            <div style="font-size: 12px; opacity: 0.8;">Volume (kg)</div>
+            <div style="font-size: 24px; font-weight: bold;">\${Math.round(totalVolume)}</div>
+          </div>
         </div>
       </div>
 
+      <!-- Quick Actions -->
       <div class="card">
-        <h3><i class="fas fa-stopwatch"></i> Rest Timer</h3>
-        <div id="restTimer" class="timer-display">00:00</div>
-        <div class="timer-controls">
-          <button class="btn btn-secondary" onclick="startRestTimer(60)">60s</button>
-          <button class="btn btn-secondary" onclick="startRestTimer(90)">90s</button>
-          <button class="btn btn-secondary" onclick="startRestTimer(120)">120s</button>
-          <button class="btn btn-outline" onclick="stopRestTimer()">Stop</button>
+        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+          <button class="btn btn-primary" onclick="completeWorkout()" style="flex: 1; min-width: 150px;">
+            <i class="fas fa-check-circle"></i> Complete Workout
+          </button>
+          <button class="btn btn-secondary" onclick="switchToCardio()" style="flex: 1; min-width: 150px;">
+            <i class="fas fa-running"></i> Switch to Cardio
+          </button>
+          <button class="btn btn-danger" onclick="deleteWorkout()" style="min-width: 150px;">
+            <i class="fas fa-trash"></i> Delete Workout
+          </button>
         </div>
       </div>
 
-      <div class="card">
-        <h3><i class="fas fa-list"></i> Exercises</h3>
-        <div id="exerciseList">
-          \${workout.exercises.map((ex, idx) => renderExercise(ex, idx)).join('')}
+      <!-- Rest Timer -->
+      <div class="card" style="background: var(--light); border: 2px solid var(--border);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <h3 style="margin: 0;"><i class="fas fa-clock"></i> Rest Timer</h3>
+          <button class="btn btn-outline" onclick="stopRestTimer()" style="padding: 6px 12px; font-size: 12px;">
+            <i class="fas fa-stop"></i> Reset
+          </button>
         </div>
-        <button class="btn btn-outline" onclick="addExerciseToWorkout()">
-          <i class="fas fa-plus"></i> Add Exercise
-        </button>
+        <div id="restTimer" style="font-size: 48px; font-weight: bold; text-align: center; font-family: 'Courier New', monospace; color: var(--primary); margin: 16px 0;">00:00</div>
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
+          <button class="btn btn-secondary" onclick="startRestTimer(60)" style="font-size: 14px;">60s</button>
+          <button class="btn btn-secondary" onclick="startRestTimer(90)" style="font-size: 14px;">90s</button>
+          <button class="btn btn-secondary" onclick="startRestTimer(120)" style="font-size: 14px;">2min</button>
+          <button class="btn btn-secondary" onclick="startRestTimer(180)" style="font-size: 14px;">3min</button>
+        </div>
       </div>
 
+      <!-- Exercises -->
       <div class="card">
-        <h3><i class="fas fa-notes-medical"></i> Workout Notes</h3>
-        <textarea id="workoutNotes" class="form-control" rows="3" placeholder="Add notes about your workout...">\${workout.notes || ''}</textarea>
-        <button class="btn btn-outline" onclick="saveWorkoutNotes()" style="margin-top: 10px;">Save Notes</button>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h3 style="margin: 0;"><i class="fas fa-list-check"></i> Exercises</h3>
+          <button class="btn btn-outline" onclick="addExerciseToWorkout()" style="padding: 8px 16px;">
+            <i class="fas fa-plus"></i> Add Exercise
+          </button>
+        </div>
+        <div id="exerciseList" style="display: flex; flex-direction: column; gap: 16px;">
+          \${workout.exercises.map((ex, idx) => renderExerciseEnhanced(ex, idx)).join('')}
+        </div>
       </div>
 
+      <!-- Workout Notes -->
       <div class="card">
-        <button class="btn btn-primary" onclick="completeWorkout()">
-          <i class="fas fa-check"></i> Complete Workout
-        </button>
+        <h3><i class="fas fa-sticky-note"></i> Session Notes</h3>
+        <div style="background: var(--light); border-radius: 12px; padding: 16px; margin-top: 12px;">
+          <textarea id="workoutNotes" 
+            placeholder="How did this workout feel? Any modifications made? Energy levels? Notes for next time..." 
+            style="width: 100%; min-height: 120px; border: 2px solid var(--border); border-radius: 8px; padding: 12px; font-size: 14px; resize: vertical; font-family: inherit;">\${workout.notes || ''}</textarea>
+          <button class="btn btn-primary" onclick="saveWorkoutNotes()" style="margin-top: 12px; width: 100%;">
+            <i class="fas fa-save"></i> Save Notes
+          </button>
+        </div>
       </div>
     \`;
 
@@ -938,53 +990,126 @@ async function loadWorkoutInterface() {
   }
 }
 
-// Render exercise
-function renderExercise(exercise, index) {
+// Render exercise with enhanced UI
+function renderExerciseEnhanced(exercise, index) {
   const system = (state.user && state.user.measurement_system) || 'metric';
   const isImperial = system === 'imperial';
   const weightUnit = isImperial ? 'lbs' : 'kg';
   const weightStep = isImperial ? '5' : '2.5';
   
+  const completedSets = (exercise.sets || []).length;
+  const targetSets = exercise.target_sets || 3;
+  const setsProgress = Math.min((completedSets / targetSets) * 100, 100);
+  
+  // Auto-fill last weight and reps from previous set
+  const lastSet = exercise.sets && exercise.sets.length > 0 ? exercise.sets[exercise.sets.length - 1] : null;
+  const defaultWeight = lastSet ? formatWeight(lastSet.weight_kg, system).replace(weightUnit, '').trim() : '';
+  const defaultReps = lastSet ? lastSet.reps : (exercise.target_reps || '');
+  
   return \`
-    <div class="exercise-item" id="exercise-\${exercise.id}">
-      <div style="margin-bottom: 10px;">
-        <strong>\${index + 1}. \${exercise.name}</strong>
-        <div style="font-size: 12px; color: var(--gray);">
-          \${exercise.muscle_group} | \${exercise.equipment}
-          \${exercise.is_unilateral ? ' | <strong>UNILATERAL (weight doubles)</strong>' : ''}
-        </div>
-        \${exercise.tips ? \`
-          <details style="margin-top: 8px;">
-            <summary style="cursor: pointer; color: var(--primary);"><i class="fas fa-info-circle"></i> Exercise Tips</summary>
-            <p style="font-size: 13px; margin-top: 8px;">\${exercise.tips}</p>
-          </details>
-        \` : ''}
-      </div>
-
-      <div class="set-tracker">
-        \${(exercise.sets || []).map((set, setIdx) => \`
-          <div class="set-item completed">
-            <div>Set \${set.set_number}</div>
-            <div>\${formatWeight(set.weight_kg, system)} x \${set.reps}</div>
-            <div style="font-size: 10px;">1RM: \${formatWeight(set.one_rep_max_kg, system)}</div>
+    <div style="background: var(--white); border: 2px solid var(--border); border-radius: 16px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);" id="exercise-\${exercise.id}">
+      <!-- Exercise Header -->
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+        <div style="flex: 1;">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+            <div style="background: var(--primary); color: white; width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px;">
+              \${index + 1}
+            </div>
+            <h4 style="margin: 0; font-size: 18px; font-weight: 600;">\${exercise.name}</h4>
           </div>
-        \`).join('')}
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;">
+            <span style="background: var(--secondary-light); color: var(--secondary); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">
+              <i class="fas fa-bullseye"></i> \${exercise.muscle_group}
+            </span>
+            <span style="background: var(--primary-light); color: var(--primary); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">
+              <i class="fas fa-dumbbell"></i> \${exercise.equipment}
+            </span>
+            \${exercise.is_unilateral ? '<span style="background: var(--warning); color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;"><i class="fas fa-balance-scale"></i> Unilateral</span>' : ''}
+          </div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size: 24px; font-weight: bold; color: var(--primary);">\${completedSets}/\${targetSets}</div>
+          <div style="font-size: 11px; color: var(--gray); text-transform: uppercase; letter-spacing: 0.5px;">Sets</div>
+        </div>
       </div>
 
-      <div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
-        <input type="number" id="weight-\${exercise.id}" placeholder="Weight (\${weightUnit})" step="\${weightStep}" 
-               style="width: 110px; padding: 8px; border: 2px solid var(--light); border-radius: 6px;">
-        <input type="number" id="reps-\${exercise.id}" placeholder="Reps" min="1"
-               style="width: 80px; padding: 8px; border: 2px solid var(--light); border-radius: 6px;">
-        <button class="btn btn-secondary" onclick="recordSet(\${exercise.id})">
-          <i class="fas fa-plus"></i> Add Set
-        </button>
-        <button class="btn btn-outline" onclick="showExerciseNotes(\${exercise.id})">
-          <i class="fas fa-sticky-note"></i> Notes
-        </button>
+      <!-- Progress Bar -->
+      <div style="background: var(--light); height: 8px; border-radius: 4px; margin-bottom: 16px; overflow: hidden;">
+        <div style="background: linear-gradient(90deg, var(--secondary) 0%, var(--primary) 100%); height: 100%; width: \${setsProgress}%; transition: width 0.3s;"></div>
+      </div>
+
+      <!-- Exercise Tips (Comprehensive) -->
+      \${exercise.tips ? \`
+      <details style="margin-bottom: 16px; background: var(--light); border-radius: 12px; padding: 12px;">
+        <summary style="cursor: pointer; font-weight: 600; color: var(--primary); user-select: none;">
+          <i class="fas fa-lightbulb"></i> Form & Technique Guide
+        </summary>
+        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
+          <div style="font-size: 14px; line-height: 1.6; color: var(--dark); white-space: pre-wrap;">\${exercise.tips}</div>
+          \${exercise.target_reps ? \`
+          <div style="margin-top: 12px; padding: 12px; background: var(--white); border-radius: 8px; border-left: 4px solid var(--primary);">
+            <strong style="color: var(--primary);"><i class="fas fa-chart-line"></i> AI Recommendation:</strong><br>
+            <span style="font-size: 14px;">\${targetSets} sets × \${exercise.target_reps} reps @ \${exercise.target_rpe ? \`RPE \${exercise.target_rpe}\` : 'moderate intensity'}</span>
+          </div>
+          \` : ''}
+        </div>
+      </details>
+      \` : ''}
+
+      <!-- Completed Sets -->
+      \${(exercise.sets && exercise.sets.length > 0) ? \`
+      <div style="margin-bottom: 16px;">
+        <div style="font-size: 13px; font-weight: 600; color: var(--gray); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">
+          <i class="fas fa-check-circle"></i> Completed Sets
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px;">
+          \${exercise.sets.map((set, setIdx) => \`
+            <div style="background: linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%); color: white; padding: 12px; border-radius: 10px; position: relative;">
+              <button onclick="deleteSet(\${exercise.id}, \${set.id})" 
+                style="position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.2); border: none; color: white; width: 24px; height: 24px; border-radius: 50%; cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: center;"
+                title="Delete set">
+                <i class="fas fa-times"></i>
+              </button>
+              <div style="font-size: 11px; opacity: 0.9; margin-bottom: 4px;">Set \${set.set_number}</div>
+              <div style="font-size: 18px; font-weight: bold;">\${formatWeight(set.weight_kg, system)} × \${set.reps}</div>
+              <div style="font-size: 11px; opacity: 0.9; margin-top: 4px;">1RM: \${formatWeight(set.one_rep_max_kg, system)}</div>
+            </div>
+          \`).join('')}
+        </div>
+      </div>
+      \` : ''}
+
+      <!-- Add Set Form -->
+      <div style="background: var(--light); border-radius: 12px; padding: 16px;">
+        <div style="font-size: 13px; font-weight: 600; color: var(--gray); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
+          <i class="fas fa-plus-circle"></i> Record Next Set
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr auto auto; gap: 8px; align-items: end;">
+          <div>
+            <label style="font-size: 12px; color: var(--gray); display: block; margin-bottom: 4px; font-weight: 600;">Weight (\${weightUnit})</label>
+            <input type="number" id="weight-\${exercise.id}" value="\${defaultWeight}" placeholder="0" step="\${weightStep}" 
+                   style="width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 16px; font-weight: 600;">
+          </div>
+          <div>
+            <label style="font-size: 12px; color: var(--gray); display: block; margin-bottom: 4px; font-weight: 600;">Reps</label>
+            <input type="number" id="reps-\${exercise.id}" value="\${defaultReps}" placeholder="0" min="1"
+                   style="width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 16px; font-weight: 600;">
+          </div>
+          <button class="btn btn-primary" onclick="recordSet(\${exercise.id})" style="padding: 12px 24px; font-size: 16px;">
+            <i class="fas fa-check"></i> Add
+          </button>
+          <button class="btn btn-outline" onclick="showExerciseNotes(\${exercise.id})" style="padding: 12px 16px;">
+            <i class="fas fa-sticky-note"></i>
+          </button>
+        </div>
       </div>
     </div>
   \`;
+}
+
+// Render exercise (legacy - keep for compatibility)
+function renderExercise(exercise, index) {
+  return renderExerciseEnhanced(exercise, index);
 }
 
 // Record set
@@ -2184,6 +2309,135 @@ function sortWeeklyTrendsByColumn(column) {
       ? \`\${columnMap[column]}-asc\` 
       : \`\${columnMap[column]}-desc\`;
     sortWeeklyTrends();
+  }
+}
+
+// Delete a set
+async function deleteSet(exerciseId, setId) {
+  if (!confirm('Delete this set?')) return;
+  
+  try {
+    await api(\`/workouts/\${state.currentWorkout.id}/exercises/\${exerciseId}/sets/\${setId}\`, {
+      method: 'DELETE'
+    });
+    
+    showNotification('Set deleted!', 'success');
+    loadWorkoutInterface();
+  } catch (error) {
+    showNotification('Error deleting set: ' + error.message, 'error');
+  }
+}
+
+// Delete entire workout
+async function deleteWorkout() {
+  if (!confirm('Are you sure you want to delete this entire workout? This cannot be undone.')) return;
+  
+  try {
+    await api(\`/workouts/\${state.currentWorkout.id}\`, {
+      method: 'DELETE'
+    });
+    
+    // Clear workout state
+    state.currentWorkout = null;
+    if (state.workoutTimer) {
+      clearInterval(state.workoutTimer);
+      state.workoutTimer = null;
+    }
+    stopRestTimer();
+    
+    showNotification('Workout deleted successfully', 'success');
+    switchTab('workout');
+  } catch (error) {
+    showNotification('Error deleting workout: ' + error.message, 'error');
+  }
+}
+
+// Switch workout to cardio session
+function switchToCardio() {
+  const modalBody = document.getElementById('modalBody');
+  
+  modalBody.innerHTML = \`
+    <div style="display: grid; gap: 16px;">
+      <div class="form-group">
+        <label><i class="fas fa-running"></i> Cardio Type:</label>
+        <select id="cardioType" class="form-control">
+          <option value="Running">Running</option>
+          <option value="Cycling">Cycling</option>
+          <option value="Swimming">Swimming</option>
+          <option value="Rowing">Rowing</option>
+          <option value="Elliptical">Elliptical</option>
+          <option value="Stairs">Stair Climber</option>
+          <option value="HIIT">HIIT</option>
+          <option value="Walking">Walking</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label><i class="fas fa-clock"></i> Duration (minutes):</label>
+        <input type="number" id="cardioDuration" class="form-control" placeholder="30" min="1">
+      </div>
+      
+      <div class="form-group">
+        <label><i class="fas fa-route"></i> Distance (optional):</label>
+        <input type="text" id="cardioDistance" class="form-control" placeholder="e.g., 5K, 10 miles">
+      </div>
+      
+      <div class="form-group">
+        <label><i class="fas fa-sticky-note"></i> Notes:</label>
+        <textarea id="cardioNotes" class="form-control" rows="3" placeholder="How did it feel? Average pace? Heart rate? Intensity level..."></textarea>
+      </div>
+      
+      <div style="background: var(--warning); color: white; padding: 12px; border-radius: 8px; font-size: 14px;">
+        <i class="fas fa-info-circle"></i> <strong>Note:</strong> This will mark the workout as complete and replace it with a cardio session. All strength training data will be removed.
+      </div>
+      
+      <button class="btn btn-primary" onclick="confirmCardioSwitch()" style="width: 100%;">
+        <i class="fas fa-check"></i> Confirm Switch to Cardio
+      </button>
+    </div>
+  \`;
+  
+  openModal('Switch to Cardio Session');
+}
+
+// Confirm cardio switch
+async function confirmCardioSwitch() {
+  const cardioType = document.getElementById('cardioType').value;
+  const duration = parseInt(document.getElementById('cardioDuration').value);
+  const distance = document.getElementById('cardioDistance').value;
+  const notes = document.getElementById('cardioNotes').value;
+  
+  if (!duration) {
+    showNotification('Please enter duration', 'warning');
+    return;
+  }
+  
+  try {
+    await api(\`/workouts/\${state.currentWorkout.id}/cardio\`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        is_cardio: true,
+        cardio_type: cardioType,
+        duration_minutes: duration,
+        distance: distance || null,
+        notes: notes || null
+      })
+    });
+    
+    // Clear workout state
+    state.currentWorkout = null;
+    if (state.workoutTimer) {
+      clearInterval(state.workoutTimer);
+      state.workoutTimer = null;
+    }
+    stopRestTimer();
+    
+    showNotification('Cardio session recorded!', 'success');
+    closeModal();
+    switchTab('analytics');
+  } catch (error) {
+    showNotification('Error recording cardio: ' + error.message, 'error');
   }
 }
 `;

@@ -331,4 +331,58 @@ workouts.put('/:workoutId/exercises/:exerciseId/notes', async (c) => {
   return c.json({ workout_exercise: workoutExercise });
 });
 
+// Delete workout
+workouts.delete('/:id', async (c) => {
+  const user = requireAuth(c);
+  const workoutId = c.req.param('id');
+  const db = c.env.DB;
+
+  // Verify workout belongs to user
+  const workout = await db.prepare(
+    'SELECT * FROM workouts WHERE id = ? AND user_id = ?'
+  ).bind(workoutId, user.id).first();
+
+  if (!workout) {
+    return c.json({ error: 'Workout not found' }, 404);
+  }
+
+  // Delete all related data (cascades should handle this, but let's be explicit)
+  await db.prepare('DELETE FROM sets WHERE workout_id = ?').bind(workoutId).run();
+  await db.prepare('DELETE FROM workout_exercises WHERE workout_id = ?').bind(workoutId).run();
+  await db.prepare('DELETE FROM workouts WHERE id = ?').bind(workoutId).run();
+
+  return c.json({ message: 'Workout deleted successfully' });
+});
+
+// Mark workout as cardio
+workouts.put('/:id/cardio', async (c) => {
+  const user = requireAuth(c);
+  const workoutId = c.req.param('id');
+  const body = await c.req.json();
+  const { is_cardio, cardio_type, duration_minutes, distance, notes } = body;
+  const db = c.env.DB;
+
+  // Verify workout belongs to user
+  const workout = await db.prepare(
+    'SELECT * FROM workouts WHERE id = ? AND user_id = ?'
+  ).bind(workoutId, user.id).first();
+
+  if (!workout) {
+    return c.json({ error: 'Workout not found' }, 404);
+  }
+
+  // Update workout with cardio information
+  const updated = await db.prepare(`
+    UPDATE workouts 
+    SET notes = ?, completed = 1, end_time = CURRENT_TIMESTAMP
+    WHERE id = ? 
+    RETURNING *
+  `).bind(
+    `CARDIO SESSION${cardio_type ? ` - ${cardio_type}` : ''}${duration_minutes ? ` - ${duration_minutes} min` : ''}${distance ? ` - ${distance}` : ''}${notes ? `\n\n${notes}` : ''}`,
+    workoutId
+  ).first();
+
+  return c.json({ workout: updated });
+});
+
 export default workouts;
