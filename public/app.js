@@ -5782,108 +5782,321 @@ function loadLearn() {
     <div id="cardio-section" class="card">
       <h2 style="color: var(--warning);"><i class="fas fa-heartbeat"></i> Cardiovascular Training</h2>
       
-      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-info-circle"></i> What is Cardiovascular Training?</h3>
-      <p style="line-height: 1.7; color: var(--text-secondary);">
-        <strong>Cardiovascular training</strong> (aerobic exercise) improves the efficiency of the cardiovascular system in absorbing and transporting oxygen. It enhances heart health, aerobic capacity (VO2max), and overall metabolic health.
+      <div style="padding: 16px; background: linear-gradient(135deg, rgba(251, 191, 36, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%); border-radius: 12px; margin-bottom: 24px;">
+        <p style="font-size: 15px; line-height: 1.8; color: var(--text-primary); margin: 0;">
+          <strong>Cardiovascular training</strong> is the foundation of health and endurance performance, improving the efficiency of oxygen delivery and utilization. This comprehensive guide covers heart rate zones, VO2max science, training methods, and longevity benefits backed by research.
+        </p>
+      </div>
+
+      <h3 style="margin-top: 32px; color: var(--text-primary); font-size: 20px;"><i class="fas fa-heart-pulse"></i> What is Cardiovascular Training?</h3>
+      <p style="line-height: 1.8; color: var(--text-secondary); margin-top: 12px;">
+        <strong>Cardiovascular (cardio) training</strong>, also called aerobic exercise, systematically improves the cardiovascular and respiratory systems' ability to deliver oxygen to working muscles and utilize it for energy production. Unlike resistance training that primarily stresses muscles, cardio training primarily stresses the <strong>heart, lungs, and blood vessels</strong>.
+      </p>
+      <p style="line-height: 1.8; color: var(--text-secondary); margin-top: 12px;">
+        This type of training is the most powerful intervention for improving overall health, reducing disease risk, and extending lifespan. Research shows regular cardio training reduces cardiovascular disease risk by 30-40%, all-cause mortality by 20-30%, and significantly improves quality of life in all age groups.
+        <br><a href="https://pubmed.ncbi.nlm.nih.gov/26181488/" target="_blank" style="color: var(--warning); text-decoration: none; font-weight: 600;">📖 Wen et al., 2011 - Minimum exercise for mortality reduction</a>
       </p>
 
-      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-heart"></i> Cardiovascular Adaptations</h3>
-      <div style="display: grid; gap: 12px; margin-top: 12px;">
-        <div style="padding: 16px; background: var(--bg-secondary); border-left: 4px solid var(--warning); border-radius: 8px;">
-          <strong style="color: var(--warning);">Increased Stroke Volume</strong>
-          <p style="margin-top: 8px; line-height: 1.6; color: var(--text-secondary);">
-            The heart becomes more efficient, pumping more blood per beat. This reduces resting heart rate and improves exercise capacity.
-            <br><em style="font-size: 13px;">Source: Levine, B.D. (2008). VO2max: what do we know, and what do we still need to know? Journal of Physiology.</em>
+      <h4 style="margin-top: 24px; color: var(--text-primary); font-size: 17px;"><i class="fas fa-stopwatch"></i> Types of Cardiovascular Training</h4>
+      <div style="display: grid; gap: 16px; margin-top: 12px;">
+        <div style="padding: 20px; background: var(--bg-secondary); border-left: 4px solid #f59e0b; border-radius: 8px;">
+          <strong style="color: #f59e0b; font-size: 16px;">1. LISS (Low-Intensity Steady State)</strong>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary);">
+            Continuous moderate intensity (Zone 2: 60-70% HRmax) for extended periods (30-90 minutes). The "conversational pace" - you can talk but not sing.
+          </p>
+          <p style="margin-top: 8px; line-height: 1.7; color: var(--text-secondary); font-size: 14px;">
+            <strong>Examples:</strong> Jogging, cycling, swimming, brisk walking, rowing<br>
+            <strong>Benefits:</strong> Fat oxidation, aerobic base, recovery, longevity
           </p>
         </div>
-        <div style="padding: 16px; background: var(--bg-secondary); border-left: 4px solid var(--warning); border-radius: 8px;">
-          <strong style="color: var(--warning);">Enhanced VO2max</strong>
-          <p style="margin-top: 8px; line-height: 1.6; color: var(--text-secondary);">
-            Maximal oxygen uptake increases through improved cardiac output and oxygen extraction at the muscle level.
-            <br><em style="font-size: 13px;">Source: Bassett, D.R. & Howley, E.T. (2000). Limiting factors for maximum oxygen uptake. Medicine and Science in Sports.</em>
+        <div style="padding: 20px; background: var(--bg-secondary); border-left: 4px solid #f97316; border-radius: 8px;">
+          <strong style="color: #f97316; font-size: 16px;">2. MISS (Moderate-Intensity Steady State)</strong>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary);">
+            Sustained efforts at lactate threshold pace (Zone 3: 70-80% HRmax) for 20-40 minutes. The "comfortably hard" intensity where lactate begins accumulating.
+          </p>
+          <p style="margin-top: 8px; line-height: 1.7; color: var(--text-secondary); font-size: 14px;">
+            <strong>Examples:</strong> Tempo runs, threshold pace cycling<br>
+            <strong>Benefits:</strong> Lactate threshold improvement, race pace tolerance
           </p>
         </div>
-        <div style="padding: 16px; background: var(--bg-secondary); border-left: 4px solid var(--warning); border-radius: 8px;">
-          <strong style="color: var(--warning);">Metabolic Efficiency</strong>
-          <p style="margin-top: 8px; line-height: 1.6; color: var(--text-secondary);">
-            Improved fat oxidation, insulin sensitivity, and mitochondrial function enhance metabolic health and endurance.
-            <br><em style="font-size: 13px;">Source: Helgerud, J., et al. (2007). Aerobic high-intensity intervals. American Journal of Physiology.</em>
+        <div style="padding: 20px; background: var(--bg-secondary); border-left: 4px solid #dc2626; border-radius: 8px;">
+          <strong style="color: #dc2626; font-size: 16px;">3. HIIT (High-Intensity Interval Training)</strong>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary);">
+            Alternating periods of high intensity (Zone 4-5: 85-100% HRmax) with recovery periods. Work intervals typically 20 seconds to 4 minutes.
+          </p>
+          <p style="margin-top: 8px; line-height: 1.7; color: var(--text-secondary); font-size: 14px;">
+            <strong>Examples:</strong> Sprint intervals, cycling intervals, rowing intervals<br>
+            <strong>Benefits:</strong> VO2max improvement, time-efficient, EPOC (afterburn)
+          </p>
+        </div>
+        <div style="padding: 20px; background: var(--bg-secondary); border-left: 4px solid #84cc16; border-radius: 8px;">
+          <strong style="color: #84cc16; font-size: 16px;">4. SIT (Sprint Interval Training)</strong>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary);">
+            Very short (8-30 seconds), all-out maximal efforts with longer recovery (2-4 minutes). Most intense form of interval training.
+          </p>
+          <p style="margin-top: 8px; line-height: 1.7; color: var(--text-secondary); font-size: 14px;">
+            <strong>Examples:</strong> Tabata protocol, Wingate test, all-out sprints<br>
+            <strong>Benefits:</strong> Maximum anaerobic capacity, power, extreme time efficiency
           </p>
         </div>
       </div>
 
-      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-layer-group"></i> Training Zones</h3>
-      <div style="overflow-x: auto; margin-top: 12px;">
-        <table style="width: 100%; border-collapse: collapse;">
-          <tr style="background: var(--light);">
-            <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border);">Zone</th>
-            <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border);">Intensity (% HRmax)</th>
-            <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border);">Duration</th>
-            <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border);">Primary Benefit</th>
-          </tr>
-          <tr>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Zone 1 (Recovery)</strong></td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);">50-60%</td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);">20-40 min</td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">Active recovery, base building</td>
-          </tr>
-          <tr>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Zone 2 (Endurance)</strong></td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);">60-70%</td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);">30-90 min</td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">Fat oxidation, aerobic base</td>
-          </tr>
-          <tr>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Zone 3 (Tempo)</strong></td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);">70-80%</td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);">20-40 min</td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">Lactate threshold improvement</td>
-          </tr>
-          <tr>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Zone 4 (Threshold)</strong></td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);">80-90%</td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);">10-30 min</td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">VO2max improvement</td>
-          </tr>
-          <tr>
-            <td style="padding: 12px;"><strong>Zone 5 (Max)</strong></td>
-            <td style="padding: 12px;">90-100%</td>
-            <td style="padding: 12px;">1-5 min intervals</td>
-            <td style="padding: 12px; font-size: 13px;">Anaerobic capacity, speed</td>
-          </tr>
+      <h3 style="margin-top: 32px; color: var(--text-primary); font-size: 20px;"><i class="fas fa-heart"></i> Cardiovascular Adaptations</h3>
+      <p style="line-height: 1.8; color: var(--text-secondary); margin-top: 12px;">
+        Cardiovascular training triggers powerful central and peripheral adaptations:
+      </p>
+
+      <div style="display: grid; gap: 16px; margin-top: 16px;">
+        <div style="padding: 20px; background: var(--bg-secondary); border-left: 4px solid #f59e0b; border-radius: 8px;">
+          <strong style="color: #f59e0b; font-size: 17px;">1. Cardiac Hypertrophy & Increased Stroke Volume</strong>
+          <p style="margin-top: 12px; line-height: 1.7; color: var(--text-secondary);">
+            <strong>"Athlete's Heart":</strong> The left ventricle enlarges and walls thicken, increasing chamber size and contractility. This allows the heart to pump more blood per beat (stroke volume).
+          </p>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary);">
+            <strong>Result:</strong> Resting heart rate decreases (bradycardia) - elite endurance athletes often have RHR 35-45 bpm vs 70-80 bpm in untrained individuals. Same cardiac output achieved with fewer beats = more efficient.
+          </p>
+          <div style="margin-top: 12px; padding: 12px; background: rgba(245, 158, 11, 0.1); border-radius: 6px;">
+            <p style="margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-secondary);">
+              📚 <strong>Key Research:</strong>
+              <br>• <a href="https://pubmed.ncbi.nlm.nih.gov/18483213/" target="_blank" style="color: var(--warning);">Levine, 2008 - VO2max knowledge</a>
+              <br>• <a href="https://pubmed.ncbi.nlm.nih.gov/17075401/" target="_blank" style="color: var(--warning);">Mandsager et al., 2018 - Cardiorespiratory fitness and mortality</a>
+            </p>
+          </div>
+        </div>
+
+        <div style="padding: 20px; background: var(--bg-secondary); border-left: 4px solid #f59e0b; border-radius: 8px;">
+          <strong style="color: #f59e0b; font-size: 17px;">2. Enhanced VO2max (Maximal Oxygen Uptake)</strong>
+          <p style="margin-top: 12px; line-height: 1.7; color: var(--text-secondary);">
+            <strong>VO2max</strong> is the maximum rate your body can consume oxygen during exercise, measured in ml/kg/min. It's the gold standard measure of cardiovascular fitness and single strongest predictor of longevity.
+          </p>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary);">
+            <strong>Factors:</strong> Cardiac output (heart rate × stroke volume) × arteriovenous oxygen difference (a-vO2 diff). Training improves both delivery (central) and extraction (peripheral).
+          </p>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary); font-size: 14px;">
+            <strong>Reference values:</strong> Untrained males 35-40 ml/kg/min, females 30-35. Elite endurance athletes reach 70-85 ml/kg/min. Training can increase VO2max 15-30%.
+          </p>
+          <div style="margin-top: 12px; padding: 12px; background: rgba(245, 158, 11, 0.1); border-radius: 6px;">
+            <p style="margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-secondary);">
+              📚 <strong>Key Research:</strong>
+              <br>• <a href="https://pubmed.ncbi.nlm.nih.gov/10926927/" target="_blank" style="color: var(--warning);">Bassett & Howley, 2000 - Limiting factors for VO2max</a>
+              <br>• <a href="https://pubmed.ncbi.nlm.nih.gov/30125275/" target="_blank" style="color: var(--warning);">Mandsager et al., 2018 - VO2max and all-cause mortality</a>
+            </p>
+          </div>
+        </div>
+
+        <div style="padding: 20px; background: var(--bg-secondary); border-left: 4px solid #f59e0b; border-radius: 8px;">
+          <strong style="color: #f59e0b; font-size: 17px;">3. Increased Blood Volume & Hemoglobin</strong>
+          <p style="margin-top: 12px; line-height: 1.7; color: var(--text-secondary);">
+            Training increases plasma volume by 10-20% and total blood volume by 20-25%. More red blood cells and hemoglobin improve oxygen-carrying capacity.
+          </p>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary); font-size: 14px;">
+            <strong>Result:</strong> More oxygen delivered per heartbeat, enhanced endurance, better thermoregulation
+          </p>
+        </div>
+
+        <div style="padding: 20px; background: var(--bg-secondary); border-left: 4px solid #f59e0b; border-radius: 8px;">
+          <strong style="color: #f59e0b; font-size: 17px;">4. Improved Lactate Threshold</strong>
+          <p style="margin-top: 12px; line-height: 1.7; color: var(--text-secondary);">
+            <strong>Lactate threshold (LT)</strong> is the intensity where lactate production exceeds clearance, causing accumulation and fatigue. Training increases LT from ~50-60% VO2max to 75-85% in trained athletes.
+          </p>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary); font-size: 14px;">
+            <strong>Importance:</strong> Can sustain higher pace before "hitting the wall." Often better predictor of race performance than VO2max.
+          </p>
+        </div>
+
+        <div style="padding: 20px; background: var(--bg-secondary); border-left: 4px solid #f59e0b; border-radius: 8px;">
+          <strong style="color: #f59e0b; font-size: 17px;">5. Metabolic & Health Benefits</strong>
+          <ul style="margin: 12px 0 0 20px; line-height: 1.8; color: var(--text-secondary);">
+            <li><strong>Improved insulin sensitivity:</strong> Better glucose regulation, reduced diabetes risk</li>
+            <li><strong>Enhanced fat oxidation:</strong> Burns more fat at given intensities</li>
+            <li><strong>Reduced blood pressure:</strong> 5-7 mmHg reduction in hypertensive individuals</li>
+            <li><strong>Improved lipid profile:</strong> Higher HDL, lower LDL and triglycerides</li>
+            <li><strong>Reduced inflammation:</strong> Lower systemic inflammatory markers</li>
+          </ul>
+          <div style="margin-top: 12px; padding: 12px; background: rgba(245, 158, 11, 0.1); border-radius: 6px;">
+            <p style="margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-secondary);">
+              📚 <strong>Key Research:</strong>
+              <br>• <a href="https://pubmed.ncbi.nlm.nih.gov/17921630/" target="_blank" style="color: var(--warning);">Helgerud et al., 2007 - Aerobic high-intensity intervals</a>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <h3 style="margin-top: 32px; color: var(--text-primary); font-size: 20px;"><i class="fas fa-layer-group"></i> Heart Rate Training Zones</h3>
+      <p style="line-height: 1.8; color: var(--text-secondary); margin-top: 12px;">
+        Training zones based on percentage of maximum heart rate (HRmax = 220 - age). Each zone targets specific physiological adaptations:
+      </p>
+
+      <div style="overflow-x: auto; margin-top: 16px;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+          <thead>
+            <tr style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white;">
+              <th style="padding: 14px; text-align: left; border-bottom: 2px solid #f59e0b; font-weight: 700;">Zone</th>
+              <th style="padding: 14px; text-align: left; border-bottom: 2px solid #f59e0b; font-weight: 700;">% HRmax</th>
+              <th style="padding: 14px; text-align: left; border-bottom: 2px solid #f59e0b; font-weight: 700;">Feel/RPE</th>
+              <th style="padding: 14px; text-align: left; border-bottom: 2px solid #f59e0b; font-weight: 700;">Duration</th>
+              <th style="padding: 14px; text-align: left; border-bottom: 2px solid #f59e0b; font-weight: 700;">Primary Benefits</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="background: var(--bg-secondary);">
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);"><strong>Zone 1: Recovery</strong></td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);">50-60%</td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);">Very easy, RPE 3-4</td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);">20-60 min</td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border); line-height: 1.6;">Active recovery, promotes blood flow, mental health. Can hold conversation easily.</td>
+            </tr>
+            <tr>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);"><strong>Zone 2: Endurance</strong></td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);">60-70%</td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);">Comfortable, RPE 5-6</td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);">30-120 min</td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border); line-height: 1.6;"><strong>THE FOUNDATION ZONE.</strong> Fat oxidation, mitochondrial biogenesis, capillary density. 70-80% of training should be here.</td>
+            </tr>
+            <tr style="background: var(--bg-secondary);">
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);"><strong>Zone 3: Tempo</strong></td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);">70-80%</td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);">Moderate, RPE 7</td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);">20-60 min</td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border); line-height: 1.6;">Lactate threshold improvement. "Comfortably hard" - can speak in short sentences. Use sparingly.</td>
+            </tr>
+            <tr>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);"><strong>Zone 4: Threshold</strong></td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);">80-90%</td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);">Hard, RPE 8</td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);">10-40 min</td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border); line-height: 1.6;">VO2max improvement, lactate buffering. Intervals or sustained tempo. Talking difficult.</td>
+            </tr>
+            <tr style="background: var(--bg-secondary);">
+              <td style="padding: 14px;"><strong>Zone 5: Maximal</strong></td>
+              <td style="padding: 14px;">90-100%</td>
+              <td style="padding: 14px;">Very hard, RPE 9-10</td>
+              <td style="padding: 14px;">30s - 8 min intervals</td>
+              <td style="padding: 14px; line-height: 1.6;">Anaerobic capacity, neuromuscular power, peak VO2max. Sprint intervals. Cannot talk. Use sparingly.</td>
+            </tr>
+          </tbody>
         </table>
       </div>
 
-      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-clock"></i> Training Methods</h3>
-      <div style="display: grid; gap: 12px; margin-top: 12px;">
-        <div style="padding: 16px; background: var(--bg-secondary); border-radius: 8px;">
-          <strong style="color: var(--warning);">Steady State (LISS)</strong>
-          <p style="margin-top: 8px; line-height: 1.6; color: var(--text-secondary);">
-            Continuous moderate intensity (Zone 2-3) for 30-60 minutes. Best for building aerobic base and fat oxidation.
-          </p>
+      <div style="margin-top: 20px; padding: 16px; background: rgba(245, 158, 11, 0.1); border-left: 4px solid #f59e0b; border-radius: 8px;">
+        <p style="margin: 0; line-height: 1.7; color: var(--text-secondary);">
+          <strong style="color: #f59e0b;">💡 80/20 Rule:</strong> Elite endurance athletes spend ~80% of training time in Zones 1-2 (easy) and ~20% in Zones 4-5 (hard), avoiding Zone 3 "no man's land" which is too hard to recover from but too easy for quality adaptations.
+        </p>
+      </div>
+
+      <h3 style="margin-top: 32px; color: var(--text-primary); font-size: 20px;"><i class="fas fa-running"></i> Training Methods: LISS vs HIIT</h3>
+      <p style="line-height: 1.8; color: var(--text-secondary); margin-top: 12px;">
+        The two primary approaches with different benefits and applications:
+      </p>
+
+      <div style="display: grid; gap: 16px; margin-top: 16px;">
+        <div style="padding: 20px; background: var(--bg-secondary); border-radius: 8px; border: 2px solid #10b981;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <strong style="color: #10b981; font-size: 18px;">🚶 LISS (Low-Intensity Steady State)</strong>
+          </div>
+          <p style="margin-top: 12px; line-height: 1.7; color: var(--text-secondary);"><strong>Method:</strong> Continuous moderate intensity (Zone 2) for 30-120 minutes</p>
+          <p style="margin-top: 8px; line-height: 1.7; color: var(--text-secondary);"><strong>Pros:</strong> Sustainable, low injury risk, improves fat oxidation, builds aerobic base, promotes recovery, can be done daily, enjoyable</p>
+          <p style="margin-top: 8px; line-height: 1.7; color: var(--text-secondary);"><strong>Cons:</strong> Time-consuming, slower VO2max improvements, less metabolic stimulus</p>
+          <p style="margin-top: 8px; line-height: 1.7; color: var(--text-secondary);"><strong>Best for:</strong> Health/longevity, fat loss, aerobic base, active recovery, beginners, complement to resistance training</p>
         </div>
-        <div style="padding: 16px; background: var(--bg-secondary); border-radius: 8px;">
-          <strong style="color: var(--warning);">High-Intensity Interval Training (HIIT)</strong>
-          <p style="margin-top: 8px; line-height: 1.6; color: var(--text-secondary);">
-            Short bursts (20-90 sec) at 85-95% HRmax with recovery periods. Improves VO2max and metabolic rate efficiently.
-            <br><em style="font-size: 13px;">Source: Gibala, M.J. & McGee, S.L. (2008). Metabolic adaptations to short-term high-intensity interval training. Exercise and Sport Sciences Reviews.</em>
-          </p>
-        </div>
-        <div style="padding: 16px; background: var(--bg-secondary); border-radius: 8px;">
-          <strong style="color: var(--warning);">Fartlek Training</strong>
-          <p style="margin-top: 8px; line-height: 1.6; color: var(--text-secondary);">
-            Variable intensity "speed play" combining different zones. Excellent for sport-specific conditioning.
-          </p>
+
+        <div style="padding: 20px; background: var(--bg-secondary); border-radius: 8px; border: 2px solid #dc2626;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <strong style="color: #dc2626; font-size: 18px;">⚡ HIIT (High-Intensity Interval Training)</strong>
+          </div>
+          <p style="margin-top: 12px; line-height: 1.7; color: var(--text-secondary);"><strong>Method:</strong> Alternating high-intensity (Zone 4-5) with recovery periods</p>
+          <p style="margin-top: 8px; line-height: 1.7; color: var(--text-secondary);"><strong>Pros:</strong> Time-efficient (20-30 min), rapid VO2max gains, EPOC (afterburn effect), improves lactate threshold, mentally engaging</p>
+          <p style="margin-top: 8px; line-height: 1.7; color: var(--text-secondary);"><strong>Cons:</strong> High injury risk if overtrained, CNS fatigue, requires recovery, can't do daily, difficult/unenjoyable</p>
+          <p style="margin-top: 8px; line-height: 1.7; color: var(--text-secondary);"><strong>Best for:</strong> Time-crunched individuals, athletes, VO2max improvement, performance goals. Limit to 2-3x/week.</p>
+          <div style="margin-top: 12px; padding: 12px; background: rgba(220, 38, 38, 0.1); border-radius: 6px;">
+            <p style="margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-secondary);">
+              📚 <strong>Key Research:</strong>
+              <br>• <a href="https://pubmed.ncbi.nlm.nih.gov/18197184/" target="_blank" style="color: var(--warning);">Gibala et al., 2008 - Metabolic adaptations to HIIT</a>
+            </p>
+          </div>
         </div>
       </div>
 
-      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-user"></i> Best For</h3>
-      <ul style="margin-top: 12px; line-height: 2; color: var(--text-secondary);">
-        <li>Overall health and longevity</li>
-        <li>Weight loss and body composition</li>
-        <li>Endurance athletes (runners, cyclists, triathletes)</li>
-        <li>Heart health and disease prevention</li>
-      </ul>
+      <h3 style="margin-top: 32px; color: var(--text-primary); font-size: 20px;"><i class="fas fa-utensils"></i> Nutrition for Cardiovascular Training</h3>
+      <div style="display: grid; gap: 16px; margin-top: 16px;">
+        <div style="padding: 18px; background: var(--bg-secondary); border-radius: 8px;">
+          <strong style="color: #f59e0b; font-size: 16px;">🍚 Carbohydrates: Essential for Performance</strong>
+          <p style="margin: 12px 0 0 0; line-height: 1.7; color: var(--text-secondary);">
+            <strong>3-7 g/kg daily</strong> depending on volume. For sessions >90min: 30-60g carbs/hour during exercise improves performance. Post-exercise: 1.0-1.2 g/kg within 30-60 min to replenish glycogen.
+          </p>
+        </div>
+
+        <div style="padding: 18px; background: var(--bg-secondary); border-radius: 8px;">
+          <strong style="color: #f59e0b; font-size: 16px;">💧 Hydration: Critical</strong>
+          <p style="margin: 12px 0 0 0; line-height: 1.7; color: var(--text-secondary);">
+            Pre: Start hydrated. During: 400-800ml/hr (sweat rate dependent). Post: Drink 150% of fluid lost. For >60min sessions, add electrolytes (sodium 300-600mg/hr).
+          </p>
+        </div>
+
+        <div style="padding: 18px; background: var(--bg-secondary); border-radius: 8px;">
+          <strong style="color: #f59e0b; font-size: 16px;">💊 Ergogenic Aids</strong>
+          <ul style="margin: 12px 0 0 20px; line-height: 1.8; color: var(--text-secondary);">
+            <li><strong>Caffeine (3-6mg/kg):</strong> 2-5% performance improvement, reduced perceived effort</li>
+            <li><strong>Beetroot juice:</strong> Nitrates improve oxygen efficiency, 1-2% time improvement</li>
+            <li><strong>Beta-alanine:</strong> Buffers lactate for efforts 1-4 minutes</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3 style="margin-top: 32px; color: var(--text-primary); font-size: 20px;"><i class="fas fa-clock"></i> Timeline of Cardiovascular Adaptations</h3>
+      <div style="padding: 18px; background: var(--bg-secondary); border-radius: 8px; margin-top: 16px;">
+        <ul style="margin: 0; padding: 0 0 0 20px; line-height: 2; color: var(--text-secondary);">
+          <li><strong>Days 1-7:</strong> Increased plasma volume, reduced perceived effort</li>
+          <li><strong>Weeks 2-4:</strong> Stroke volume increases, resting HR begins dropping</li>
+          <li><strong>Weeks 4-8:</strong> Significant VO2max improvements (5-15%), lactate threshold gains</li>
+          <li><strong>Weeks 8-12:</strong> Continued cardiac adaptations, mitochondrial density peaks</li>
+          <li><strong>Months 3-6:</strong> Near-maximal VO2max gains (15-25% from baseline)</li>
+          <li><strong>6-12+ months:</strong> Refinement, approach genetic potential, focus on efficiency</li>
+        </ul>
+        <p style="margin: 16px 0 0 0; font-size: 14px; color: var(--text-secondary); line-height: 1.7;">
+          <strong>Important:</strong> Cardio adaptations occur quickly but also detrain rapidly - 2-3 weeks of inactivity causes 5-10% VO2max decline. Consistency is essential!
+        </p>
+      </div>
+
+      <h3 style="margin-top: 32px; color: var(--text-primary); font-size: 20px;"><i class="fas fa-user-check"></i> Who Should Focus on Cardiovascular Training?</h3>
+      <div style="display: grid; gap: 10px; margin-top: 16px;">
+        <div style="padding: 14px 18px; background: var(--bg-secondary); border-left: 3px solid #f59e0b; border-radius: 6px;">
+          <strong style="color: #f59e0b;">✓ EVERYONE for Health</strong> - Single most powerful health intervention
+        </div>
+        <div style="padding: 14px 18px; background: var(--bg-secondary); border-left: 3px solid #f59e0b; border-radius: 6px;">
+          <strong style="color: #f59e0b;">✓ Endurance Athletes</strong> - Runners, cyclists, swimmers, triathletes (primary focus)
+        </div>
+        <div style="padding: 14px 18px; background: var(--bg-secondary); border-left: 3px solid #f59e0b; border-radius: 6px;">
+          <strong style="color: #f59e0b;">✓ Weight Loss Goals</strong> - Creates caloric deficit, improves fat oxidation
+        </div>
+        <div style="padding: 14px 18px; background: var(--bg-secondary); border-left: 3px solid #f59e0b; border-radius: 6px;">
+          <strong style="color: #f59e0b;">✓ Cardiovascular Disease Risk</strong> - Reduces risk by 30-40%
+        </div>
+        <div style="padding: 14px 18px; background: var(--bg-secondary); border-left: 3px solid #f59e0b; border-radius: 6px;">
+          <strong style="color: #f59e0b;">✓ Longevity Focus</strong> - Each 1 MET increase in VO2max = 13% lower mortality
+        </div>
+        <div style="padding: 14px 18px; background: var(--bg-secondary); border-left: 3px solid #f59e0b; border-radius: 6px;">
+          <strong style="color: #f59e0b;">✓ Mental Health</strong> - Reduces anxiety, depression; improves cognition
+        </div>
+      </div>
+
+      <div style="margin-top: 24px; padding: 20px; background: linear-gradient(135deg, rgba(251, 191, 36, 0.15) 0%, rgba(245, 158, 11, 0.08) 100%); border-radius: 12px; border: 2px solid rgba(251, 191, 36, 0.3);">
+        <h4 style="margin: 0 0 12px 0; color: #f59e0b; font-size: 17px;"><i class="fas fa-book-open"></i> Further Reading & Resources</h4>
+        <div style="display: grid; gap: 8px;">
+          <a href="https://www.strongerbyscience.com/cardio-101/" target="_blank" style="color: var(--warning); text-decoration: none; line-height: 1.6;">📘 Stronger by Science - Cardio 101</a>
+          <a href="https://www.outsideonline.com/health/training-performance/endurance-training-intensity-80-20/" target="_blank" style="color: var(--warning); text-decoration: none; line-height: 1.6;">📘 80/20 Endurance Training Method</a>
+          <a href="https://uphill-athlete.com/" target="_blank" style="color: var(--warning); text-decoration: none; line-height: 1.6;">📘 Uphill Athlete - Endurance Training</a>
+          <a href="https://www.trainingpeaks.com/learn/" target="_blank" style="color: var(--warning); text-decoration: none; line-height: 1.6;">📘 TrainingPeaks - Heart Rate Training Zones</a>
+          <a href="https://pubmed.ncbi.nlm.nih.gov/30125275/" target="_blank" style="color: var(--warning); text-decoration: none; line-height: 1.6;">📄 PubMed - Mandsager et al., 2018 - VO2max and mortality</a>
+          <strong style="margin-top: 8px; display: block; color: #f59e0b;">Recommended Books:</strong>
+          <span style="color: var(--text-secondary); font-size: 14px; line-height: 1.7;">
+            • "80/20 Running" - Matt Fitzgerald<br>
+            • "The Big Book of Endurance Training and Racing" - Philip Maffetone<br>
+            • "Training for the Uphill Athlete" - House & Johnston<br>
+            • "The Cyclist's Training Bible" - Joe Friel
+          </span>
+        </div>
+      </div>
     </div>
 
     <!-- Comparison Section -->
