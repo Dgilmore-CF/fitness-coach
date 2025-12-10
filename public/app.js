@@ -4964,33 +4964,148 @@ function loadLearn() {
     <div id="strength-section" class="card">
       <h2 style="color: var(--danger);"><i class="fas fa-weight-hanging"></i> Strength Training (Maximal Force Production)</h2>
       
-      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-info-circle"></i> What is Strength Training?</h3>
-      <p style="line-height: 1.7; color: var(--text-secondary);">
-        <strong>Strength training</strong> focuses on maximizing the amount of force a muscle or muscle group can produce. It emphasizes neural adaptations, motor unit recruitment, and improving intermuscular coordination rather than muscle size alone.
+      <div style="padding: 16px; background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.05) 100%); border-radius: 12px; margin-bottom: 24px;">
+        <p style="font-size: 15px; line-height: 1.8; color: var(--text-primary); margin: 0;">
+          <strong>Strength training</strong> is the systematic practice of maximizing force production through neural, structural, and mechanical adaptations. This guide explores the science of getting stronger, from motor unit recruitment to elite powerlifting protocols.
+        </p>
+      </div>
+
+      <h3 style="margin-top: 32px; color: var(--text-primary); font-size: 20px;"><i class="fas fa-bolt"></i> What is Strength?</h3>
+      <p style="line-height: 1.8; color: var(--text-secondary); margin-top: 12px;">
+        <strong>Strength</strong> is the neuromuscular system's ability to produce force against external resistance. Unlike hypertrophy, strength improvements come primarily from <strong>neural adaptations</strong> that allow you to better utilize existing muscle mass. This is why strength athletes can lift significantly more than bodybuilders despite sometimes having less muscle - their nervous systems are highly trained to generate maximal force.
+        <br><a href="https://pubmed.ncbi.nlm.nih.gov/2796409/" target="_blank" style="color: var(--danger); text-decoration: none; font-weight: 600;">📖 Sale, 1988 - Neural adaptation to resistance training</a>
       </p>
 
-      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-brain"></i> Neural Adaptations</h3>
-      <div style="display: grid; gap: 12px; margin-top: 12px;">
-        <div style="padding: 16px; background: var(--bg-secondary); border-left: 4px solid var(--danger); border-radius: 8px;">
-          <strong style="color: var(--danger);">Motor Unit Recruitment</strong>
-          <p style="margin-top: 8px; line-height: 1.6; color: var(--text-secondary);">
-            Heavy loads (>85% 1RM) recruit high-threshold motor units more efficiently, increasing maximal force production without significant muscle growth.
-            <br><em style="font-size: 13px;">Source: Sale, D.G. (1988). Neural adaptation to resistance training. Medicine and Science in Sports and Exercise.</em>
+      <h4 style="margin-top: 24px; color: var(--text-primary); font-size: 17px;"><i class="fas fa-list"></i> Types of Strength</h4>
+      <div style="display: grid; gap: 16px; margin-top: 12px;">
+        <div style="padding: 20px; background: var(--bg-secondary); border-left: 4px solid #ef4444; border-radius: 8px;">
+          <strong style="color: #ef4444; font-size: 16px;">1. Maximal Strength (Absolute Strength)</strong>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary);">
+            Maximum force generated in a single voluntary contraction, regardless of time. This is your <strong>one-rep max (1RM)</strong> - the primary focus of powerlifting (squat, bench press, deadlift).
+          </p>
+          <p style="margin-top: 8px; line-height: 1.7; color: var(--text-secondary); font-size: 14px;">
+            <strong>Trained through:</strong> Heavy loads (>85% 1RM), low reps (1-5), long rest (3-5 min), high frequency
           </p>
         </div>
-        <div style="padding: 16px; background: var(--bg-secondary); border-left: 4px solid var(--danger); border-radius: 8px;">
-          <strong style="color: var(--danger);">Rate Coding</strong>
-          <p style="margin-top: 8px; line-height: 1.6; color: var(--text-secondary);">
-            Frequency at which motor units fire action potentials increases with training, allowing faster and more powerful contractions.
-            <br><em style="font-size: 13px;">Source: Van Cutsem, M., et al. (1998). Changes in single motor unit behavior. Journal of Physiology.</em>
+        <div style="padding: 20px; background: var(--bg-secondary); border-left: 4px solid #f97316; border-radius: 8px;">
+          <strong style="color: #f97316; font-size: 16px;">2. Explosive Strength (Power)</strong>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary);">
+            Ability to generate maximum force in minimum time. Power = Force × Velocity. Critical for Olympic weightlifting, jumping, throwing, and sprinting.
+          </p>
+          <p style="margin-top: 8px; line-height: 1.7; color: var(--text-secondary); font-size: 14px;">
+            <strong>Trained through:</strong> Moderate loads (30-80% 1RM), explosive intent, low reps (1-5), plyometrics
           </p>
         </div>
-        <div style="padding: 16px; background: var(--bg-secondary); border-left: 4px solid var(--danger); border-radius: 8px;">
-          <strong style="color: var(--danger);">Synchronization</strong>
-          <p style="margin-top: 8px; line-height: 1.6; color: var(--text-secondary);">
-            Improved coordination between muscle groups and reduction in antagonist muscle co-activation enhances force transfer.
-            <br><em style="font-size: 13px;">Source: Aagaard, P., et al. (2002). Neural adaptation to strength training. Scandinavian Journal of Medicine.</em>
+        <div style="padding: 20px; background: var(--bg-secondary); border-left: 4px solid #84cc16; border-radius: 8px;">
+          <strong style="color: #84cc16; font-size: 16px;">3. Strength-Endurance</strong>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary);">
+            Ability to maintain high force output over repeated contractions. Important for sports requiring sustained power (wrestling, rock climbing, rowing).
           </p>
+          <p style="margin-top: 8px; line-height: 1.7; color: var(--text-secondary); font-size: 14px;">
+            <strong>Trained through:</strong> Moderate loads (60-75% 1RM), higher reps (6-15), shorter rest (60-120s)
+          </p>
+        </div>
+        <div style="padding: 20px; background: var(--bg-secondary); border-left: 4px solid #3b82f6; border-radius: 8px;">
+          <strong style="color: #3b82f6; font-size: 16px;">4. Relative Strength</strong>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary);">
+            Strength relative to body weight (strength-to-weight ratio). Critical for gymnastics, rock climbing, and weight-class sports.
+          </p>
+          <p style="margin-top: 8px; line-height: 1.7; color: var(--text-secondary); font-size: 14px;">
+            <strong>Calculation:</strong> Relative Strength = Absolute Strength ÷ Body Weight<br>
+            Example: 150kg squat ÷ 75kg bodyweight = 2.0× bodyweight
+          </p>
+        </div>
+      </div>
+
+      <h3 style="margin-top: 32px; color: var(--text-primary); font-size: 20px;"><i class="fas fa-brain"></i> Neural Adaptations: Why Strength Increases</h3>
+      <p style="line-height: 1.8; color: var(--text-secondary); margin-top: 12px;">
+        Primary adaptations to strength training occur in the <strong>nervous system</strong>, not muscles. These neural changes explain why beginners can double their strength while gaining minimal muscle mass.
+      </p>
+
+      <div style="display: grid; gap: 16px; margin-top: 16px;">
+        <div style="padding: 20px; background: var(--bg-secondary); border-left: 4px solid #dc2626; border-radius: 8px;">
+          <strong style="color: #dc2626; font-size: 17px;">1. Motor Unit Recruitment</strong>
+          <p style="margin-top: 12px; line-height: 1.7; color: var(--text-secondary);">
+            <strong>Motor units</strong> (motor neuron + muscle fibers) are recruited in size order (Henneman's Size Principle):
+          </p>
+          <ul style="margin: 12px 0 0 20px; line-height: 1.8; color: var(--text-secondary);">
+            <li><strong>Type I (slow-twitch):</strong> Small, fatigue-resistant, recruited first</li>
+            <li><strong>Type IIa (fast-twitch):</strong> Medium size, moderate power</li>
+            <li><strong>Type IIx (fast-twitch):</strong> Large, high power, recruited only with heavy loads</li>
+          </ul>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary);">
+            <strong>Training effect:</strong> Improves ability to recruit high-threshold motor units more efficiently, accessing your most powerful muscle fibers more readily.
+          </p>
+          <div style="margin-top: 12px; padding: 12px; background: rgba(220, 38, 38, 0.1); border-radius: 6px;">
+            <p style="margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-secondary);">
+              📚 <strong>Key Research:</strong>
+              <br>• <a href="https://pubmed.ncbi.nlm.nih.gov/2796409/" target="_blank" style="color: var(--danger);">Sale, 1988 - Neural adaptation</a>
+              <br>• <a href="https://pubmed.ncbi.nlm.nih.gov/16095413/" target="_blank" style="color: var(--danger);">Folland & Williams, 2007 - Morphological contributions</a>
+            </p>
+          </div>
+        </div>
+
+        <div style="padding: 20px; background: var(--bg-secondary); border-left: 4px solid #dc2626; border-radius: 8px;">
+          <strong style="color: #dc2626; font-size: 17px;">2. Rate Coding (Firing Frequency)</strong>
+          <p style="margin-top: 12px; line-height: 1.7; color: var(--text-secondary);">
+            <strong>Rate coding</strong> is the frequency motor neurons send signals to muscles. Higher firing rates produce greater force.
+          </p>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary);">
+            <strong>Mechanism:</strong> Motor neurons fire 8-50+ times per second. Strength training increases firing rate during maximal efforts, allowing muscles to contract harder and faster. Primary mechanism behind <strong>rate of force development (RFD)</strong>.
+          </p>
+          <div style="margin-top: 12px; padding: 12px; background: rgba(220, 38, 38, 0.1); border-radius: 6px;">
+            <p style="margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-secondary);">
+              📚 <strong>Key Research:</strong>
+              <br>• <a href="https://pubmed.ncbi.nlm.nih.gov/9694422/" target="_blank" style="color: var(--danger);">Van Cutsem et al., 1998 - Motor unit behavior</a>
+              <br>• <a href="https://pubmed.ncbi.nlm.nih.gov/11904689/" target="_blank" style="color: var(--danger);">Aagaard, 2003 - Neural function changes</a>
+            </p>
+          </div>
+        </div>
+
+        <div style="padding: 20px; background: var(--bg-secondary); border-left: 4px solid #dc2626; border-radius: 8px;">
+          <strong style="color: #dc2626; font-size: 17px;">3. Intermuscular Coordination</strong>
+          <p style="margin-top: 12px; line-height: 1.7; color: var(--text-secondary);">
+            <strong>Coordination</strong> between multiple muscles improves dramatically with strength training.
+          </p>
+          <ul style="margin: 8px 0 0 20px; line-height: 1.8; color: var(--text-secondary);">
+            <li><strong>Agonist activation:</strong> Better recruitment of prime movers</li>
+            <li><strong>Antagonist inhibition:</strong> Reduced co-contraction of opposing muscles</li>
+            <li><strong>Synergist coordination:</strong> Improved timing of supporting muscles</li>
+            <li><strong>Stabilizer efficiency:</strong> Better core and joint stabilization</li>
+          </ul>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary); font-size: 14px;">
+            <strong>Example:</strong> Deadlift coordination of lats, core, glutes, hamstrings, and grip takes months - this is skill acquisition, not just muscle building.
+          </p>
+          <div style="margin-top: 12px; padding: 12px; background: rgba(220, 38, 38, 0.1); border-radius: 6px;">
+            <p style="margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-secondary);">
+              📚 <strong>Key Research:</strong>
+              <br>• <a href="https://pubmed.ncbi.nlm.nih.gov/11991778/" target="_blank" style="color: var(--danger);">Aagaard et al., 2002 - Neural adaptations</a>
+              <br>• <a href="https://pubmed.ncbi.nlm.nih.gov/10694116/" target="_blank" style="color: var(--danger);">Carroll et al., 2001 - Neural adaptations to training</a>
+            </p>
+          </div>
+        </div>
+
+        <div style="padding: 20px; background: var(--bg-secondary); border-left: 4px solid #dc2626; border-radius: 8px;">
+          <strong style="color: #dc2626; font-size: 17px;">4. Intramuscular Coordination</strong>
+          <p style="margin-top: 12px; line-height: 1.7; color: var(--text-secondary);">
+            <strong>Synchronization</strong> of motor unit firing within a single muscle improves force production efficiency. Instead of firing randomly, motor units fire more simultaneously (in-phase), creating stronger contractions. Think of rowers synchronizing strokes.
+          </p>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary); font-size: 14px;">
+            <strong>Note:</strong> Degree of improvement is debated in research. Some studies suggest it's less important than recruitment and rate coding, but it likely contributes to overall neural efficiency.
+          </p>
+        </div>
+
+        <div style="padding: 20px; background: var(--bg-secondary); border-left: 4px solid #dc2626; border-radius: 8px;">
+          <strong style="color: #dc2626; font-size: 17px;">5. Tendon Stiffness & Elastic Energy</strong>
+          <p style="margin-top: 12px; line-height: 1.7; color: var(--text-secondary);">
+            <strong>Tendon stiffness</strong> increases with training, allowing better force transmission and improved utilization of the <strong>stretch-shortening cycle</strong>. Stiffer tendons act like better springs, storing and releasing elastic energy more efficiently. Crucial for explosive movements.
+          </p>
+          <div style="margin-top: 12px; padding: 12px; background: rgba(220, 38, 38, 0.1); border-radius: 6px;">
+            <p style="margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-secondary);">
+              📚 <strong>Key Research:</strong>
+              <br>• <a href="https://pubmed.ncbi.nlm.nih.gov/20847705/" target="_blank" style="color: var(--danger);">Bojsen-Møller et al., 2005 - Muscle performance</a>
+            </p>
+          </div>
         </div>
       </div>
 
