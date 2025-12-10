@@ -4566,87 +4566,399 @@ function loadLearn() {
     <div id="hypertrophy-section" class="card">
       <h2 style="color: var(--primary);"><i class="fas fa-dumbbell"></i> Hypertrophy Training (Muscle Building)</h2>
       
-      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-info-circle"></i> What is Hypertrophy?</h3>
-      <p style="line-height: 1.7; color: var(--text-secondary);">
-        <strong>Hypertrophy</strong> refers to the increase in muscle size through the enlargement of muscle fibers. It occurs when muscle protein synthesis exceeds muscle protein breakdown, typically achieved through resistance training combined with adequate nutrition and recovery.
-      </p>
-
-      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-chart-line"></i> Scientific Principles</h3>
-      <div style="display: grid; gap: 12px; margin-top: 12px;">
-        <div style="padding: 16px; background: var(--bg-secondary); border-left: 4px solid var(--primary); border-radius: 8px;">
-          <strong style="color: var(--primary);">Mechanical Tension</strong>
-          <p style="margin-top: 8px; line-height: 1.6; color: var(--text-secondary);">
-            The primary driver of muscle growth. Progressive overload through increasing weight, reps, or sets creates mechanical stress that signals muscle adaptation.
-            <br><em style="font-size: 13px;">Source: Schoenfeld, B.J. (2010). The mechanisms of muscle hypertrophy. Journal of Strength and Conditioning Research.</em>
-          </p>
-        </div>
-        <div style="padding: 16px; background: var(--bg-secondary); border-left: 4px solid var(--secondary); border-radius: 8px;">
-          <strong style="color: var(--secondary);">Metabolic Stress</strong>
-          <p style="margin-top: 8px; line-height: 1.6; color: var(--text-secondary);">
-            The "pump" feeling from higher rep ranges (8-15 reps) creates cellular swelling and metabolite accumulation, contributing to muscle growth.
-            <br><em style="font-size: 13px;">Source: Schoenfeld, B.J. (2013). Potential mechanisms for a role of metabolic stress. Sports Medicine.</em>
-          </p>
-        </div>
-        <div style="padding: 16px; background: var(--bg-secondary); border-left: 4px solid var(--warning); border-radius: 8px;">
-          <strong style="color: var(--warning);">Muscle Damage</strong>
-          <p style="margin-top: 8px; line-height: 1.6; color: var(--text-secondary);">
-            Controlled muscle damage from eccentric (lowering) phases triggers repair and growth. Recovery is crucial for this adaptation.
-            <br><em style="font-size: 13px;">Source: Clarkson, P.M. & Hubal, M.J. (2002). Exercise-induced muscle damage in humans. American Journal of Physical Medicine.</em>
-          </p>
-        </div>
+      <div style="padding: 16px; background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.05) 100%); border-radius: 12px; margin-bottom: 24px;">
+        <p style="font-size: 15px; line-height: 1.8; color: var(--text-primary); margin: 0;">
+          <strong>Hypertrophy training</strong> is the science and practice of increasing muscle size through strategic resistance training. This comprehensive guide covers everything from cellular mechanisms to practical program design, backed by peer-reviewed research.
+        </p>
       </div>
 
-      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-cogs"></i> Optimal Training Parameters</h3>
-      <div style="overflow-x: auto; margin-top: 12px;">
-        <table style="width: 100%; border-collapse: collapse;">
-          <tr style="background: var(--light);">
-            <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border);">Variable</th>
-            <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border);">Recommendation</th>
-            <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border);">Rationale</th>
-          </tr>
-          <tr>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Rep Range</strong></td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);">6-15 reps</td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">Optimal balance of mechanical tension and metabolic stress</td>
-          </tr>
-          <tr>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Sets per Muscle</strong></td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);">10-20 sets/week</td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">Dose-response relationship for muscle growth</td>
-          </tr>
-          <tr>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Frequency</strong></td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);">2-3x per muscle/week</td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">Maximizes protein synthesis opportunities</td>
-          </tr>
-          <tr>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Intensity</strong></td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);">60-85% 1RM</td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">Sufficient load for mechanical tension</td>
-          </tr>
-          <tr>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>Rest Between Sets</strong></td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border);">60-120 seconds</td>
-            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px;">Balances recovery and metabolic stress</td>
-          </tr>
-          <tr>
-            <td style="padding: 12px;"><strong>Tempo</strong></td>
-            <td style="padding: 12px;">2-3 sec eccentric, 1 sec concentric</td>
-            <td style="padding: 12px; font-size: 13px;">Controlled movement maximizes time under tension</td>
-          </tr>
-        </table>
+      <h3 style="margin-top: 32px; color: var(--text-primary); font-size: 20px;"><i class="fas fa-microscope"></i> What is Muscle Hypertrophy?</h3>
+      <p style="line-height: 1.8; color: var(--text-secondary); margin-top: 12px;">
+        <strong>Hypertrophy</strong> refers to the increase in muscle cross-sectional area through the enlargement of individual muscle fibers. At the cellular level, hypertrophy occurs when the rate of <strong>muscle protein synthesis (MPS)</strong> exceeds the rate of <strong>muscle protein breakdown (MPB)</strong> over extended periods, resulting in a net positive protein balance and subsequent muscle growth.
+      </p>
+      <p style="line-height: 1.8; color: var(--text-secondary); margin-top: 12px;">
+        This adaptation is primarily achieved through progressive resistance training combined with adequate nutrition (especially protein intake), sufficient recovery, and appropriate hormonal milieu. Research shows that properly programmed resistance training can increase muscle size by 0.5-2.0% per week in trained individuals, with greater rates possible in beginners.
+        <br><a href="https://pubmed.ncbi.nlm.nih.gov/27433992/" target="_blank" style="color: var(--primary); text-decoration: none; font-weight: 600;">📖 Schoenfeld et al., 2016 - Effects of resistance training frequency</a>
+      </p>
+
+      <h4 style="margin-top: 24px; color: var(--text-primary); font-size: 17px;"><i class="fas fa-dna"></i> Types of Hypertrophy</h4>
+      <div style="display: grid; gap: 16px; margin-top: 12px;">
+        <div style="padding: 20px; background: var(--bg-secondary); border-left: 4px solid var(--primary); border-radius: 8px;">
+          <strong style="color: var(--primary); font-size: 16px;">1. Myofibrillar Hypertrophy</strong>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary);">
+            Increase in the number and size of myofibrils (contractile proteins: actin and myosin) within the muscle fiber. This type of hypertrophy results in both <strong>increased muscle size AND increased strength</strong>. Myofibrillar hypertrophy is primarily stimulated by heavier loads (>75% 1RM) and lower rep ranges (3-8 reps) that create high mechanical tension.
+          </p>
+          <p style="margin-top: 8px; line-height: 1.7; color: var(--text-secondary); font-size: 14px;">
+            <strong>Key Benefits:</strong> Denser, harder muscle appearance; significant strength gains; improved power output
+          </p>
+        </div>
+        <div style="padding: 20px; background: var(--bg-secondary); border-left: 4px solid var(--secondary); border-radius: 8px;">
+          <strong style="color: var(--secondary); font-size: 16px;">2. Sarcoplasmic Hypertrophy</strong>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary);">
+            Increase in the volume of sarcoplasm (fluid and energy substrates like glycogen, creatine phosphate, water) within the muscle cell without a proportional increase in contractile proteins. This type is primarily stimulated by moderate loads (60-75% 1RM) with higher rep ranges (8-15 reps) and shorter rest periods that create metabolic stress.
+          </p>
+          <p style="margin-top: 8px; line-height: 1.7; color: var(--text-secondary); font-size: 14px;">
+            <strong>Key Benefits:</strong> Fuller, more "pumped" muscle appearance; enhanced glycogen storage capacity; improved muscular endurance
+          </p>
+        </div>
       </div>
       <p style="margin-top: 12px; font-size: 13px; font-style: italic; color: var(--text-secondary);">
-        Source: Schoenfeld, B.J., et al. (2017). Dose-response relationship between weekly resistance training volume and increases in muscle mass. Journal of Sports Sciences.
+        Note: While these hypertrophy types exist on a spectrum, optimal programs incorporate both mechanisms through varied loading schemes.
+        <br><a href="https://pubmed.ncbi.nlm.nih.gov/20847704/" target="_blank" style="color: var(--primary);">📖 Schoenfeld, 2010 - The mechanisms of muscle hypertrophy</a>
       </p>
 
-      <h3 style="margin-top: 24px; color: var(--text-primary);"><i class="fas fa-user"></i> Best For</h3>
-      <ul style="margin-top: 12px; line-height: 2; color: var(--text-secondary);">
-        <li>Bodybuilders and physique athletes</li>
-        <li>Individuals seeking aesthetic improvements</li>
-        <li>Athletes needing muscle mass for their sport</li>
-        <li>General fitness enthusiasts wanting to build muscle</li>
-      </ul>
+      <h3 style="margin-top: 32px; color: var(--text-primary); font-size: 20px;"><i class="fas fa-chart-line"></i> The Three Mechanisms of Hypertrophy</h3>
+      <p style="line-height: 1.8; color: var(--text-secondary); margin-top: 12px;">
+        Modern research identifies three primary mechanisms that stimulate muscle hypertrophy. Effective training programs strategically manipulate all three for maximal results:
+      </p>
+      
+      <div style="display: grid; gap: 16px; margin-top: 16px;">
+        <div style="padding: 20px; background: var(--bg-secondary); border-left: 4px solid #3b82f6; border-radius: 8px;">
+          <strong style="color: #3b82f6; font-size: 17px;">1. Mechanical Tension</strong>
+          <p style="margin-top: 12px; line-height: 1.7; color: var(--text-secondary);">
+            <strong>The Primary Driver:</strong> Mechanical tension refers to the force generated within muscle fibers during contraction against resistance. This is widely considered the most important factor for hypertrophy.
+          </p>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary);">
+            <strong>Mechanism:</strong> When muscles contract against significant resistance, mechanoreceptors within the muscle fibers detect the mechanical stress and activate signaling pathways (particularly mTOR - mechanistic target of rapamycin) that increase protein synthesis. The tension must be sufficient to create a stimulus greater than the muscle's current capacity.
+          </p>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary);">
+            <strong>Progressive Overload:</strong> To continuously stimulate growth, mechanical tension must progressively increase over time through:
+          </p>
+          <ul style="margin: 8px 0 0 20px; line-height: 1.8; color: var(--text-secondary);">
+            <li><strong>Increasing load:</strong> Adding weight to exercises (most direct method)</li>
+            <li><strong>Increasing volume:</strong> More reps, sets, or exercises per muscle group</li>
+            <li><strong>Improving technique:</strong> Better form creates more effective tension</li>
+            <li><strong>Increasing time under tension:</strong> Slower eccentrics, pauses, tempo manipulation</li>
+            <li><strong>Increasing range of motion:</strong> Greater stretch and contraction</li>
+          </ul>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary); font-size: 14px;">
+            <strong>Research Finding:</strong> Studies show that muscles can be effectively trained across a wide loading spectrum (30-85% 1RM) as long as sets are taken close to failure, suggesting that tension created through maximal effort is more important than absolute load for hypertrophy.
+          </p>
+          <div style="margin-top: 12px; padding: 12px; background: rgba(59, 130, 246, 0.1); border-radius: 6px;">
+            <p style="margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-secondary);">
+              📚 <strong>Key Research:</strong>
+              <br>• <a href="https://pubmed.ncbi.nlm.nih.gov/20847704/" target="_blank" style="color: var(--primary);">Schoenfeld, 2010 - Mechanisms of muscle hypertrophy</a>
+              <br>• <a href="https://pubmed.ncbi.nlm.nih.gov/28834797/" target="_blank" style="color: var(--primary);">Schoenfeld et al., 2017 - Strength vs hypertrophy training</a>
+              <br>• <a href="https://pubmed.ncbi.nlm.nih.gov/26605807/" target="_blank" style="color: var(--primary);">Wackerhage et al., 2019 - Molecular response to resistance training</a>
+            </p>
+          </div>
+        </div>
+
+        <div style="padding: 20px; background: var(--bg-secondary); border-left: 4px solid #10b981; border-radius: 8px;">
+          <strong style="color: #10b981; font-size: 17px;">2. Metabolic Stress</strong>
+          <p style="margin-top: 12px; line-height: 1.7; color: var(--text-secondary);">
+            <strong>The "Pump" Factor:</strong> Metabolic stress refers to the accumulation of metabolic byproducts (lactate, hydrogen ions, inorganic phosphate, creatine) during resistance exercise, particularly with moderate loads and shorter rest periods.
+          </p>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary);">
+            <strong>Mechanism:</strong> Metabolic stress triggers several growth-promoting effects:
+          </p>
+          <ul style="margin: 8px 0 0 20px; line-height: 1.8; color: var(--text-secondary);">
+            <li><strong>Cell swelling:</strong> Accumulation of metabolites draws water into the muscle cell, creating cellular swelling that may trigger anabolic signaling</li>
+            <li><strong>Hormonal response:</strong> Increases acute growth hormone and IGF-1 release</li>
+            <li><strong>Reactive oxygen species:</strong> Controlled oxidative stress stimulates adaptation</li>
+            <li><strong>Fiber recruitment:</strong> Fatigue of lower-threshold motor units forces recruitment of higher-threshold units</li>
+          </ul>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary);">
+            <strong>Training Methods to Maximize Metabolic Stress:</strong>
+          </p>
+          <ul style="margin: 8px 0 0 20px; line-height: 1.8; color: var(--text-secondary);">
+            <li>Higher rep ranges (8-15+ reps)</li>
+            <li>Shorter rest periods (30-90 seconds)</li>
+            <li>Drop sets, supersets, and giant sets</li>
+            <li>Blood flow restriction (BFR) training</li>
+            <li>Slow tempo training with continuous tension</li>
+          </ul>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary); font-size: 14px;">
+            <strong>Important Note:</strong> While metabolic stress contributes to hypertrophy, it appears to be less potent than mechanical tension alone. However, combining both mechanisms (moderate-heavy loads with some metabolic stress) may optimize muscle growth.
+          </p>
+          <div style="margin-top: 12px; padding: 12px; background: rgba(16, 185, 129, 0.1); border-radius: 6px;">
+            <p style="margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-secondary);">
+              📚 <strong>Key Research:</strong>
+              <br>• <a href="https://pubmed.ncbi.nlm.nih.gov/25853914/" target="_blank" style="color: var(--primary);">Schoenfeld, 2013 - Potential mechanisms for metabolic stress</a>
+              <br>• <a href="https://pubmed.ncbi.nlm.nih.gov/22344059/" target="_blank" style="color: var(--primary);">Goto et al., 2005 - Metabolic stress and muscle hypertrophy</a>
+            </p>
+          </div>
+        </div>
+
+        <div style="padding: 20px; background: var(--bg-secondary); border-left: 4px solid #f59e0b; border-radius: 8px;">
+          <strong style="color: #f59e0b; font-size: 17px;">3. Muscle Damage</strong>
+          <p style="margin-top: 12px; line-height: 1.7; color: var(--text-secondary);">
+            <strong>Controlled Disruption:</strong> Exercise-induced muscle damage refers to microscopic tears in muscle fibers and surrounding connective tissue, primarily occurring during eccentric (lengthening) contractions.
+          </p>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary);">
+            <strong>Mechanism:</strong> The repair process involves:
+          </p>
+          <ul style="margin: 8px 0 0 20px; line-height: 1.8; color: var(--text-secondary);">
+            <li><strong>Inflammation:</strong> Immune cells infiltrate damaged tissue and release growth factors</li>
+            <li><strong>Satellite cell activation:</strong> Muscle stem cells proliferate and donate nuclei to existing fibers</li>
+            <li><strong>Protein remodeling:</strong> Damaged proteins are broken down and rebuilt stronger</li>
+            <li><strong>Connective tissue strengthening:</strong> Supporting structures adapt to handle greater forces</li>
+          </ul>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary);">
+            <strong>⚠️ The Controversy:</strong> While muscle damage clearly occurs with training, its role as a primary hypertrophy mechanism is debated. Current evidence suggests:
+          </p>
+          <ul style="margin: 8px 0 0 20px; line-height: 1.8; color: var(--text-secondary);">
+            <li><strong>Not necessary:</strong> Significant hypertrophy can occur without substantial muscle damage</li>
+            <li><strong>Diminishing returns:</strong> The repeated bout effect means muscles adapt and experience less damage over time</li>
+            <li><strong>Recovery cost:</strong> Excessive damage requires more recovery and may impair training frequency</li>
+            <li><strong>Supportive role:</strong> Some damage may facilitate adaptation but shouldn't be the primary goal</li>
+          </ul>
+          <p style="margin-top: 10px; line-height: 1.7; color: var(--text-secondary); font-size: 14px;">
+            <strong>Practical Takeaway:</strong> Don't chase extreme soreness (DOMS). Focus on progressive overload and mechanical tension while allowing some natural muscle damage to occur through proper eccentric control.
+          </p>
+          <div style="margin-top: 12px; padding: 12px; background: rgba(245, 158, 11, 0.1); border-radius: 6px;">
+            <p style="margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-secondary);">
+              📚 <strong>Key Research:</strong>
+              <br>• <a href="https://pubmed.ncbi.nlm.nih.gov/11828249/" target="_blank" style="color: var(--primary);">Clarkson & Hubal, 2002 - Exercise-induced muscle damage</a>
+              <br>• <a href="https://pubmed.ncbi.nlm.nih.gov/26666744/" target="_blank" style="color: var(--primary);">Damas et al., 2016 - Muscle damage and hypertrophy</a>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <h3 style="margin-top: 32px; color: var(--text-primary); font-size: 20px;"><i class="fas fa-cogs"></i> Evidence-Based Training Parameters</h3>
+      <p style="line-height: 1.8; color: var(--text-secondary); margin-top: 12px;">
+        Based on systematic reviews and meta-analyses, here are the optimal parameters for hypertrophy training:
+      </p>
+      
+      <div style="overflow-x: auto; margin-top: 16px;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+          <thead>
+            <tr style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white;">
+              <th style="padding: 14px; text-align: left; border-bottom: 2px solid var(--primary); font-weight: 700;">Variable</th>
+              <th style="padding: 14px; text-align: left; border-bottom: 2px solid var(--primary); font-weight: 700;">Optimal Range</th>
+              <th style="padding: 14px; text-align: left; border-bottom: 2px solid var(--primary); font-weight: 700;">Scientific Rationale</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="background: var(--bg-secondary);">
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);"><strong>Rep Range</strong></td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);">6-30 reps (taken near failure)</td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border); line-height: 1.6;">
+                Research shows hypertrophy occurs across a wide rep spectrum when sets are taken close to failure. 6-12 reps is most time-efficient, but 12-30 reps also works well. Lower reps (<6) favor strength more than size.
+                <br><a href="https://pubmed.ncbi.nlm.nih.gov/28834797/" target="_blank" style="color: var(--primary); font-size: 12px;">Schoenfeld et al., 2017</a>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);"><strong>Weekly Volume</strong></td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);">10-20 sets per muscle group</td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border); line-height: 1.6;">
+                Meta-analyses show dose-response relationship: more volume = more growth, up to ~10-20 sets/week per muscle. Beyond this, returns diminish and recovery becomes challenging. Advanced lifters may tolerate more.
+                <br><a href="https://pubmed.ncbi.nlm.nih.gov/28834797/" target="_blank" style="color: var(--primary); font-size: 12px;">Schoenfeld et al., 2017 - Dose-response analysis</a>
+              </td>
+            </tr>
+            <tr style="background: var(--bg-secondary);">
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);"><strong>Training Frequency</strong></td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);">2-3x per muscle per week</td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border); line-height: 1.6;">
+                Protein synthesis remains elevated for 24-48 hours post-training. Training each muscle 2-3x/week allows multiple growth signals while distributing volume for better recovery and performance. Higher frequencies work if volume per session is managed.
+                <br><a href="https://pubmed.ncbi.nlm.nih.gov/27102172/" target="_blank" style="color: var(--primary); font-size: 12px;">Schoenfeld et al., 2016 - Training frequency</a>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);"><strong>Intensity (Load)</strong></td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);">30-85% 1RM (near failure)</td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border); line-height: 1.6;">
+                Loads as light as 30% 1RM can build muscle when taken to failure, but 60-85% 1RM is more time-efficient. The key is achieving high motor unit recruitment through heavy loads OR training near failure with lighter loads.
+                <br><a href="https://pubmed.ncbi.nlm.nih.gov/27174923/" target="_blank" style="color: var(--primary); font-size: 12px;">Morton et al., 2016 - Load and muscle hypertrophy</a>
+              </td>
+            </tr>
+            <tr style="background: var(--bg-secondary);">
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);"><strong>Rest Between Sets</strong></td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);">2-3 minutes (compounds)<br>1-2 minutes (isolation)</td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border); line-height: 1.6;">
+                Longer rest (2-5 min) allows better performance maintenance across sets, leading to greater total volume. However, shorter rest (60-90s) may enhance metabolic stress. A mixed approach optimizes both factors.
+                <br><a href="https://pubmed.ncbi.nlm.nih.gov/26605807/" target="_blank" style="color: var(--primary); font-size: 12px;">Schoenfeld et al., 2016 - Rest intervals</a>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);"><strong>Tempo</strong></td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);">2-4 sec eccentric<br>0-2 sec pause<br>1-2 sec concentric</td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border); line-height: 1.6;">
+                Controlled eccentrics maximize time under tension and mechanical tension. Explosive concentrics develop power. Very slow tempos (>10s) may compromise total volume. Aim for controlled but not excessively slow movement.
+                <br><a href="https://pubmed.ncbi.nlm.nih.gov/25601394/" target="_blank" style="color: var(--primary); font-size: 12px;">Schoenfeld et al., 2015 - Tempo effects</a>
+              </td>
+            </tr>
+            <tr style="background: var(--bg-secondary);">
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);"><strong>Proximity to Failure</strong></td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);">0-3 RIR (reps in reserve)</td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border); line-height: 1.6;">
+                Training close to muscular failure (0-3 reps from failure) ensures adequate stimulation. Going to absolute failure every set may accumulate excessive fatigue. Save failure training for final sets or isolation exercises.
+                <br><a href="https://pubmed.ncbi.nlm.nih.gov/33572412/" target="_blank" style="color: var(--primary); font-size: 12px;">Grgic et al., 2021 - Training to failure</a>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);"><strong>Range of Motion</strong></td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border);">Full ROM (or at least lengthened partials)</td>
+              <td style="padding: 14px; border-bottom: 1px solid var(--border); line-height: 1.6;">
+                Training with full range of motion, particularly emphasizing the stretched position, appears superior for hypertrophy. Partial reps can supplement but shouldn't replace full ROM training.
+                <br><a href="https://pubmed.ncbi.nlm.nih.gov/30558333/" target="_blank" style="color: var(--primary); font-size: 12px;">Pallarés et al., 2020 - ROM and hypertrophy</a>
+              </td>
+            </tr>
+            <tr style="background: var(--bg-secondary);">
+              <td style="padding: 14px;"><strong>Exercise Selection</strong></td>
+              <td style="padding: 14px;">Mix of compound & isolation</td>
+              <td style="padding: 14px; line-height: 1.6;">
+                Compound movements (squats, deadlifts, presses) allow heavy loading and work multiple muscles. Isolation exercises (curls, extensions, raises) target specific muscles through full ROM. Both are valuable for complete development.
+                <br><a href="https://pubmed.ncbi.nlm.nih.gov/29564973/" target="_blank" style="color: var(--primary); font-size: 12px;">Paoli et al., 2017 - Exercise selection</a>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="margin-top: 20px; padding: 16px; background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); border-radius: 8px;">
+        <p style="margin: 0; line-height: 1.7; color: var(--text-secondary);">
+          <strong style="color: var(--primary);">💡 Key Takeaway:</strong> Hypertrophy is remarkably adaptable to various training approaches as long as you achieve sufficient volume, mechanical tension (through load or proximity to failure), and progressive overload over time. The "perfect" program is the one you can consistently execute and progressively advance.
+        </p>
+      </div>
+
+      <h3 style="margin-top: 32px; color: var(--text-primary); font-size: 20px;"><i class="fas fa-utensils"></i> Nutritional Requirements for Hypertrophy</h3>
+      <p style="line-height: 1.8; color: var(--text-secondary); margin-top: 12px;">
+        Training provides the stimulus, but nutrition provides the building blocks. Optimal hypertrophy requires careful attention to caloric intake, macronutrient distribution, and nutrient timing.
+      </p>
+
+      <div style="display: grid; gap: 16px; margin-top: 16px;">
+        <div style="padding: 18px; background: var(--bg-secondary); border-radius: 8px;">
+          <strong style="color: var(--primary); font-size: 16px;">🥩 Protein Intake</strong>
+          <ul style="margin: 12px 0 0 20px; line-height: 1.8; color: var(--text-secondary);">
+            <li><strong>Daily Target:</strong> 1.6-2.2 g/kg bodyweight (0.7-1.0 g/lb)
+              <br><a href="https://pubmed.ncbi.nlm.nih.gov/28698222/" target="_blank" style="color: var(--primary); font-size: 13px;">Morton et al., 2018 - Systematic review of protein needs</a>
+            </li>
+            <li><strong>Distribution:</strong> Spread across 3-5 meals, each containing 20-40g protein</li>
+            <li><strong>Quality:</strong> Complete proteins with all essential amino acids (especially leucine ~2.5-3g per meal)</li>
+            <li><strong>Timing:</strong> Consume protein within ~2 hours post-workout; total daily intake matters more than precise timing</li>
+            <li><strong>Higher needs for:</strong> Caloric deficits, older individuals (>40 years), vegetarians/vegans</li>
+          </ul>
+        </div>
+
+        <div style="padding: 18px; background: var(--bg-secondary); border-radius: 8px;">
+          <strong style="color: var(--primary); font-size: 16px;">🍚 Carbohydrate Intake</strong>
+          <ul style="margin: 12px 0 0 20px; line-height: 1.8; color: var(--text-secondary);">
+            <li><strong>Daily Target:</strong> 3-7 g/kg bodyweight depending on training volume and goals</li>
+            <li><strong>Role:</strong> Fuels high-intensity training, spares protein from being used for energy, replenishes muscle glycogen</li>
+            <li><strong>Pre-workout:</strong> 1-4g/kg consumed 1-4 hours before training enhances performance</li>
+            <li><strong>Post-workout:</strong> 1.0-1.5 g/kg within 2 hours optimizes glycogen resynthesis</li>
+            <li><strong>Types:</strong> Emphasize complex carbs (oats, rice, potatoes) for sustained energy; simple carbs around workouts for quick fuel</li>
+          </ul>
+        </div>
+
+        <div style="padding: 18px; background: var(--bg-secondary); border-radius: 8px;">
+          <strong style="color: var(--primary); font-size: 16px;">🥑 Fat Intake</strong>
+          <ul style="margin: 12px 0 0 20px; line-height: 1.8; color: var(--text-secondary);">
+            <li><strong>Daily Target:</strong> 0.5-1.5 g/kg bodyweight (minimum 20-30% of total calories)</li>
+            <li><strong>Essential for:</strong> Hormone production (testosterone, growth hormone), vitamin absorption, inflammation management</li>
+            <li><strong>Sources:</strong> Mix of saturated (meat, dairy), monounsaturated (olive oil, avocados), and polyunsaturated (fish, nuts) fats</li>
+            <li><strong>Omega-3s:</strong> 2-4g EPA+DHA daily for anti-inflammatory effects and recovery
+              <br><a href="https://pubmed.ncbi.nlm.nih.gov/29133823/" target="_blank" style="color: var(--primary); font-size: 13px;">McGlory et al., 2019 - Omega-3 and muscle protein synthesis</a>
+            </li>
+          </ul>
+        </div>
+
+        <div style="padding: 18px; background: var(--bg-secondary); border-radius: 8px;">
+          <strong style="color: var(--primary); font-size: 16px;">📊 Caloric Surplus</strong>
+          <ul style="margin: 12px 0 0 20px; line-height: 1.8; color: var(--text-secondary);">
+            <li><strong>Recommended surplus:</strong> 200-500 calories above maintenance (smaller for advanced lifters to minimize fat gain)</li>
+            <li><strong>Rate of gain:</strong> 0.25-0.5% bodyweight per week (0.5-1 lb/week for most people)</li>
+            <li><strong>Lean bulking:</strong> Slower gains with minimal fat accumulation vs aggressive bulking with faster muscle gain but more fat</li>
+            <li><strong>Recomposition:</strong> Advanced technique of building muscle at maintenance/slight deficit; works best for beginners and returning trainers</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3 style="margin-top: 32px; color: var(--text-primary); font-size: 20px;"><i class="fas fa-calendar-alt"></i> Sample Training Split Options</h3>
+      <p style="line-height: 1.8; color: var(--text-secondary); margin-top: 12px;">
+        Different training splits can all build muscle effectively when volume and intensity are equated:
+      </p>
+
+      <div style="display: grid; gap: 12px; margin-top: 16px;">
+        <details style="padding: 16px; background: var(--bg-secondary); border-radius: 8px; cursor: pointer;">
+          <summary style="font-weight: 700; font-size: 15px; color: var(--primary); cursor: pointer;">Full Body Training (3-4x/week)</summary>
+          <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Best for:</strong> Beginners, time-limited individuals, those prioritizing strength</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Pros:</strong> High frequency allows skill practice; flexible scheduling; efficient</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Cons:</strong> Longer sessions; may be fatiguing; less volume per muscle per session</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Example (3x/week):</strong> Each session includes 1-2 exercises for chest, back, legs, shoulders, arms</p>
+          </div>
+        </details>
+
+        <details style="padding: 16px; background: var(--bg-secondary); border-radius: 8px; cursor: pointer;">
+          <summary style="font-weight: 700; font-size: 15px; color: var(--primary); cursor: pointer;">Upper/Lower Split (4x/week)</summary>
+          <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Best for:</strong> Intermediate lifters, general muscle building</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Pros:</strong> Balanced frequency (2x/week per muscle); manageable sessions; clear organization</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Cons:</strong> Requires 4 days commitment; leg days can be very demanding</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Example:</strong> Mon-Upper, Tue-Lower, Thu-Upper, Fri-Lower</p>
+          </div>
+        </details>
+
+        <details style="padding: 16px; background: var(--bg-secondary); border-radius: 8px; cursor: pointer;">
+          <summary style="font-weight: 700; font-size: 15px; color: var(--primary); cursor: pointer;">Push/Pull/Legs (6x/week or 3x/week)</summary>
+          <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Best for:</strong> Advanced lifters, bodybuilders, high-volume training</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Pros:</strong> Synergistic muscle grouping; high frequency if done 6x/week; excellent for hypertrophy</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Cons:</strong> Time commitment; requires good recovery; may be excessive for beginners</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Example (6x/week):</strong> Push-Pull-Legs-Push-Pull-Legs-Rest</p>
+          </div>
+        </details>
+
+        <details style="padding: 16px; background: var(--bg-secondary); border-radius: 8px; cursor: pointer;">
+          <summary style="font-weight: 700; font-size: 15px; color: var(--primary); cursor: pointer;">Body Part Split (5-6x/week)</summary>
+          <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Best for:</strong> Advanced bodybuilders, those with recovery capacity for high volume</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Pros:</strong> Maximum volume per muscle; great "pump"; complete focus per session</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Cons:</strong> Lower frequency (1x/week per muscle); requires 5-6 days; not optimal for strength</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Example:</strong> Chest-Back-Shoulders-Arms-Legs-Rest</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0; font-size: 13px;"><em>Note: Research suggests 2x frequency is superior to 1x/week, so modern adaptations often use 2x/week variations</em></p>
+          </div>
+        </details>
+      </div>
+
+      <h3 style="margin-top: 32px; color: var(--text-primary); font-size: 20px;"><i class="fas fa-clock"></i> Time Course of Adaptations</h3>
+      <div style="padding: 18px; background: var(--bg-secondary); border-radius: 8px; margin-top: 16px;">
+        <ul style="margin: 0; padding: 0 0 0 20px; line-height: 2; color: var(--text-secondary);">
+          <li><strong>Weeks 1-4:</strong> Rapid strength gains primarily from neural adaptations (improved coordination, motor learning)</li>
+          <li><strong>Weeks 4-8:</strong> First measurable hypertrophy becomes apparent; continued neural improvements</li>
+          <li><strong>Weeks 8-12:</strong> Noticeable muscle growth; protein synthesis rates optimize</li>
+          <li><strong>Months 3-6:</strong> Significant visual changes; beginning intermediate phase</li>
+          <li><strong>6-12 months:</strong> Approaching genetic muscular potential rate limits; progress slows</li>
+          <li><strong>1-2 years:</strong> Advanced trainee; gains require precision programming and patience</li>
+          <li><strong>2-4 years:</strong> Approaching natural muscular potential in trained muscle groups</li>
+        </ul>
+        <p style="margin: 12px 0 0 0; font-size: 13px; font-style: italic; color: var(--text-secondary);">
+          <a href="https://pubmed.ncbi.nlm.nih.gov/28546505/" target="_blank" style="color: var(--primary);">📖 Seynnes et al., 2007 - Early vs late hypertrophy adaptations</a>
+        </p>
+      </div>
+
+      <h3 style="margin-top: 32px; color: var(--text-primary); font-size: 20px;"><i class="fas fa-user-check"></i> Who Should Focus on Hypertrophy?</h3>
+      <div style="display: grid; gap: 10px; margin-top: 16px;">
+        <div style="padding: 14px 18px; background: var(--bg-secondary); border-left: 3px solid var(--primary); border-radius: 6px;">
+          <strong style="color: var(--primary);">✓ Bodybuilders & Physique Competitors</strong> - Primary training goal
+        </div>
+        <div style="padding: 14px 18px; background: var(--bg-secondary); border-left: 3px solid var(--primary); border-radius: 6px;">
+          <strong style="color: var(--primary);">✓ Athletes Requiring Muscle Mass</strong> - Rugby, football, combat sports
+        </div>
+        <div style="padding: 14px 18px; background: var(--bg-secondary); border-left: 3px solid var(--primary); border-radius: 6px;">
+          <strong style="color: var(--primary);">✓ General Fitness Enthusiasts</strong> - Aesthetic improvements, metabolism boost
+        </div>
+        <div style="padding: 14px 18px; background: var(--bg-secondary); border-left: 3px solid var(--primary); border-radius: 6px;">
+          <strong style="color: var(--primary);">✓ Older Adults</strong> - Combat sarcopenia (age-related muscle loss)
+          <br><a href="https://pubmed.ncbi.nlm.nih.gov/30153194/" target="_blank" style="color: var(--primary); font-size: 12px;">Fragala et al., 2019 - Resistance training for older adults</a>
+        </div>
+        <div style="padding: 14px 18px; background: var(--bg-secondary); border-left: 3px solid var(--primary); border-radius: 6px;">
+          <strong style="color: var(--primary);">✓ Rehabilitation & Injury Prevention</strong> - Strengthening supporting musculature
+        </div>
+      </div>
+
+      <div style="margin-top: 24px; padding: 20px; background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(37, 99, 235, 0.08) 100%); border-radius: 12px; border: 2px solid rgba(59, 130, 246, 0.3);">
+        <h4 style="margin: 0 0 12px 0; color: var(--primary); font-size: 17px;"><i class="fas fa-book-open"></i> Further Reading & Resources</h4>
+        <div style="display: grid; gap: 8px;">
+          <a href="https://www.strongerbyscience.com/hypertrophy-range/" target="_blank" style="color: var(--primary); text-decoration: none; line-height: 1.6;">📘 Stronger by Science - The "Hypertrophy Rep Range" Myth</a>
+          <a href="https://mennohenselmans.com/optimal-program-design/" target="_blank" style="color: var(--primary); text-decoration: none; line-height: 1.6;">📘 Menno Henselmans - Optimal Program Design</a>
+          <a href="https://rpstrength.com/hypertrophy-training-guide-central-hub/" target="_blank" style="color: var(--primary); text-decoration: none; line-height: 1.6;">📘 Renaissance Periodization - Hypertrophy Training Guide</a>
+          <a href="https://pubmed.ncbi.nlm.nih.gov/31102253/" target="_blank" style="color: var(--primary); text-decoration: none; line-height: 1.6;">📄 PubMed - Schoenfeld et al., 2019 - Science and Development of Muscle Hypertrophy (Textbook)</a>
+        </div>
+      </div>
     </div>
 
     <!-- Strength Training -->
