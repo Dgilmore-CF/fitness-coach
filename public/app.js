@@ -5291,6 +5291,128 @@ function loadLearn() {
           <strong style="color: #dc2626;">✓ Anyone Seeking Performance</strong> - Strength transfers to all activities
         </div>
       </div>
+
+      <h3 style="margin-top: 32px; color: var(--text-primary); font-size: 20px;"><i class="fas fa-dumbbell"></i> The Powerlifting "Big 3"</h3>
+      <p style="line-height: 1.8; color: var(--text-secondary); margin-top: 12px;">
+        Competitive powerlifting revolves around three lifts that test total-body strength and form the foundation of any strength program:
+      </p>
+
+      <div style="display: grid; gap: 12px; margin-top: 16px;">
+        <details style="padding: 16px; background: var(--bg-secondary); border-radius: 8px; cursor: pointer; border-left: 3px solid #dc2626;">
+          <summary style="font-weight: 700; font-size: 15px; color: #dc2626; cursor: pointer;">🦵 Back Squat - King of Lower Body</summary>
+          <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Primary muscles:</strong> Quadriceps, glutes, hamstrings, core, erectors</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Why it matters:</strong> Highest load potential of any lower body exercise; builds total-body strength and resilience</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Variants:</strong> High-bar (upright, quad-dominant), Low-bar (forward lean, hip-dominant), Front squat, Safety bar</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Elite standards:</strong> Advanced males: 2.0-2.5× bodyweight; Females: 1.5-2.0× bodyweight</p>
+          </div>
+        </details>
+
+        <details style="padding: 16px; background: var(--bg-secondary); border-radius: 8px; cursor: pointer; border-left: 3px solid #dc2626;">
+          <summary style="font-weight: 700; font-size: 15px; color: #dc2626; cursor: pointer;">💪 Bench Press - Upper Body Power</summary>
+          <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Primary muscles:</strong> Pectorals, anterior deltoids, triceps</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Why it matters:</strong> Best measure of upper body pressing strength; highly technical requiring leg drive and lat engagement</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Variants:</strong> Competition (pause on chest), Touch-and-go, Close-grip, Incline, Floor press</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Elite standards:</strong> Advanced males: 1.5-2.0× bodyweight; Females: 0.75-1.0× bodyweight</p>
+          </div>
+        </details>
+
+        <details style="padding: 16px; background: var(--bg-secondary); border-radius: 8px; cursor: pointer; border-left: 3px solid #dc2626;">
+          <summary style="font-weight: 700; font-size: 15px; color: #dc2626; cursor: pointer;">🏋️ Deadlift - Pure Pulling Strength</summary>
+          <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Primary muscles:</strong> Entire posterior chain (glutes, hamstrings, erectors), lats, traps, grip</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Why it matters:</strong> Highest absolute load of any lift; tests total-body strength from floor to lockout</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Variants:</strong> Conventional (narrow stance), Sumo (wide stance, upright), Romanian, Trap bar, Deficit</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0;"><strong>Elite standards:</strong> Advanced males: 2.5-3.0× bodyweight; Females: 2.0-2.5× bodyweight</p>
+            <p style="line-height: 1.7; color: var(--text-secondary); margin: 8px 0; font-size: 13px;"><em>Note: Deadlift typically highest 1RM due to favorable biomechanics and full-body involvement</em></p>
+          </div>
+        </details>
+      </div>
+
+      <h3 style="margin-top: 32px; color: var(--text-primary); font-size: 20px;"><i class="fas fa-utensils"></i> Nutrition for Strength</h3>
+      <p style="line-height: 1.8; color: var(--text-secondary); margin-top: 12px;">
+        Nutritional needs differ from hypertrophy due to higher intensity and CNS demands:
+      </p>
+
+      <div style="display: grid; gap: 16px; margin-top: 16px;">
+        <div style="padding: 18px; background: var(--bg-secondary); border-radius: 8px;">
+          <strong style="color: #dc2626; font-size: 16px;">🥩 Protein: 1.6-2.0 g/kg (0.7-0.9 g/lb)</strong>
+          <p style="margin: 12px 0 0 0; line-height: 1.7; color: var(--text-secondary);">
+            Slightly lower than hypertrophy because strength training causes less muscle damage. Focus on protein around training and distribute evenly across meals. Quality matters more than quantity.
+          </p>
+        </div>
+
+        <div style="padding: 18px; background: var(--bg-secondary); border-radius: 8px;">
+          <strong style="color: #dc2626; font-size: 16px;">🍚 Carbohydrates: 4-7 g/kg (Higher for training days)</strong>
+          <p style="margin: 12px 0 0 0; line-height: 1.7; color: var(--text-secondary);">
+            <strong>Critical for strength!</strong> Heavy lifting relies on ATP-PC and glycolytic systems requiring carbs. Pre-workout carbs enhance performance; post-workout restores glycogen. Low-carb significantly impairs maximal strength.
+            <br><a href="https://pubmed.ncbi.nlm.nih.gov/30982439/" target="_blank" style="color: var(--danger); font-size: 13px;">Escobar et al., 2016 - Carbohydrate and strength performance</a>
+          </p>
+        </div>
+
+        <div style="padding: 18px; background: var(--bg-secondary); border-radius: 8px;">
+          <strong style="color: #dc2626; font-size: 16px;">🥑 Fats: 0.8-1.5 g/kg (25-30% of calories)</strong>
+          <p style="margin: 12px 0 0 0; line-height: 1.7; color: var(--text-secondary);">
+            Adequate fats support testosterone production (critical for strength), reduce inflammation, provide concentrated energy. Don't go too low during intense training.
+          </p>
+        </div>
+
+        <div style="padding: 18px; background: var(--bg-secondary); border-radius: 8px;">
+          <strong style="color: #dc2626; font-size: 16px;">⚖️ Caloric Strategy</strong>
+          <ul style="margin: 12px 0 0 20px; line-height: 1.8; color: var(--text-secondary);">
+            <li><strong>Weight class athletes:</strong> Maintain bodyweight or strategic cuts near competition</li>
+            <li><strong>Non-weight class:</strong> Slight surplus (200-300 cal) optimizes recovery</li>
+            <li><strong>Bulking for strength:</strong> Gaining weight often increases leverages and absolute strength</li>
+            <li><strong>Cutting for strength:</strong> Possible to maintain in moderate deficit with high protein</li>
+          </ul>
+        </div>
+
+        <div style="padding: 18px; background: var(--bg-secondary); border-radius: 8px;">
+          <strong style="color: #dc2626; font-size: 16px;">💊 Effective Supplements</strong>
+          <ul style="margin: 12px 0 0 20px; line-height: 1.8; color: var(--text-secondary);">
+            <li><strong>Creatine monohydrate (5g/day):</strong> +5-15% strength gains, most researched
+              <br><a href="https://pubmed.ncbi.nlm.nih.gov/12945830/" target="_blank" style="color: var(--danger); font-size: 13px;">Kreider et al., 2003 - Creatine supplementation</a>
+            </li>
+            <li><strong>Caffeine (3-6mg/kg pre-workout):</strong> Enhances power output, reduces perceived exertion</li>
+            <li><strong>Beta-alanine (3-6g/day):</strong> Buffers lactate, helps with volume work</li>
+            <li><strong>Citrulline malate (6-8g):</strong> May reduce fatigue between sets</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3 style="margin-top: 32px; color: var(--text-primary); font-size: 20px;"><i class="fas fa-clock"></i> Time Course of Strength Gains</h3>
+      <div style="padding: 18px; background: var(--bg-secondary); border-radius: 8px; margin-top: 16px;">
+        <ul style="margin: 0; padding: 0 0 0 20px; line-height: 2; color: var(--text-secondary);">
+          <li><strong>Weeks 1-4:</strong> Rapid neural adaptations - 10-30% strength gains from motor learning</li>
+          <li><strong>Weeks 4-12:</strong> Continued neural improvements plus structural - 5-15% additional gains</li>
+          <li><strong>Months 3-12:</strong> Steady progress - 2-5% monthly gains typical for intermediates</li>
+          <li><strong>Years 1-2:</strong> Slower gains - 0.5-2% monthly; advanced programming required</li>
+          <li><strong>Years 2-5:</strong> Elite level - 1-2% annually; perfecting technique and peaking</li>
+          <li><strong>Years 5-10+:</strong> World-class - micro-gains; maintaining peak, preventing injury</li>
+        </ul>
+        <p style="margin: 16px 0 0 0; font-size: 14px; color: var(--text-secondary); line-height: 1.7;">
+          <strong>Important:</strong> Absolute beginners can often double lifts in 6-12 months. Advanced lifters may take years to add 5-10kg. This is normal - strength gains follow a logarithmic curve.
+        </p>
+      </div>
+
+      <div style="margin-top: 24px; padding: 20px; background: linear-gradient(135deg, rgba(220, 38, 38, 0.15) 0%, rgba(153, 27, 27, 0.08) 100%); border-radius: 12px; border: 2px solid rgba(220, 38, 38, 0.3);">
+        <h4 style="margin: 0 0 12px 0; color: #dc2626; font-size: 17px;"><i class="fas fa-book-open"></i> Further Reading & Resources</h4>
+        <div style="display: grid; gap: 8px;">
+          <a href="https://www.strongerbyscience.com/complete-strength-training-guide/" target="_blank" style="color: var(--danger); text-decoration: none; line-height: 1.6;">📘 Stronger by Science - Complete Strength Training Guide</a>
+          <a href="https://www.jtsstrength.com/pillars-of-squat-technique/" target="_blank" style="color: var(--danger); text-decoration: none; line-height: 1.6;">📘 Juggernaut Training Systems - Squat, Bench, Deadlift Pillars</a>
+          <a href="https://startingstrength.com/article/prescription_of_exercise_intensity" target="_blank" style="color: var(--danger); text-decoration: none; line-height: 1.6;">📘 Starting Strength - Programming Fundamentals</a>
+          <a href="https://www.strongerbyscience.com/powerlifting-programs/" target="_blank" style="color: var(--danger); text-decoration: none; line-height: 1.6;">📘 Powerlifting Program Reviews & Comparisons</a>
+          <a href="https://pubmed.ncbi.nlm.nih.gov/22344059/" target="_blank" style="color: var(--danger); text-decoration: none; line-height: 1.6;">📄 PubMed - Schoenfeld et al., 2017 - Strength & Hypertrophy Training</a>
+          <strong style="margin-top: 8px; display: block; color: #dc2626;">Recommended Books:</strong>
+          <span style="color: var(--text-secondary); font-size: 14px; line-height: 1.7;">
+            • "Starting Strength" - Mark Rippetoe<br>
+            • "The Science and Practice of Strength Training" - Zatsiorsky & Kraemer<br>
+            • "Practical Programming for Strength Training" - Rippetoe & Baker<br>
+            • "Periodization Training for Sports" - Bompa & Buzzichelli
+          </span>
+        </div>
+      </div>
     </div>
 
     <!-- Endurance Training -->
