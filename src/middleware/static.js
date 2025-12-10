@@ -29,6 +29,7 @@ function getIndexHTML() {
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
         :root {
+            /* Light Mode Colors */
             --primary: #2563eb;
             --primary-dark: #1d4ed8;
             --primary-light: #dbeafe;
@@ -42,35 +43,124 @@ function getIndexHTML() {
             --light: #f9fafb;
             --border: #e5e7eb;
             --white: #ffffff;
+            
+            /* Semantic Colors */
+            --bg-primary: #ffffff;
+            --bg-secondary: #f9fafb;
+            --text-primary: #111827;
+            --text-secondary: #6b7280;
+            --shadow: rgba(0,0,0,0.08);
+            --shadow-lg: rgba(0,0,0,0.15);
+        }
+        
+        /* Dark Mode Colors */
+        [data-theme="dark"] {
+            --primary: #3b82f6;
+            --primary-dark: #2563eb;
+            --primary-light: #1e3a8a;
+            --secondary: #10b981;
+            --secondary-light: #064e3b;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --dark: #f9fafb;
+            --gray: #9ca3af;
+            --gray-light: #6b7280;
+            --light: #1f2937;
+            --border: #374151;
+            --white: #111827;
+            
+            /* Semantic Colors */
+            --bg-primary: #111827;
+            --bg-secondary: #1f2937;
+            --text-primary: #f9fafb;
+            --text-secondary: #9ca3af;
+            --shadow: rgba(0,0,0,0.3);
+            --shadow-lg: rgba(0,0,0,0.5);
+        }
+        
+        /* Auto Dark Mode based on system preference */
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                --primary: #3b82f6;
+                --primary-dark: #2563eb;
+                --primary-light: #1e3a8a;
+                --secondary: #10b981;
+                --secondary-light: #064e3b;
+                --danger: #ef4444;
+                --warning: #f59e0b;
+                --dark: #f9fafb;
+                --gray: #9ca3af;
+                --gray-light: #6b7280;
+                --light: #1f2937;
+                --border: #374151;
+                --white: #111827;
+                
+                --bg-primary: #111827;
+                --bg-secondary: #1f2937;
+                --text-primary: #f9fafb;
+                --text-secondary: #9ca3af;
+                --shadow: rgba(0,0,0,0.3);
+                --shadow-lg: rgba(0,0,0,0.5);
+            }
         }
         
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: var(--light);
+            background: var(--bg-secondary);
             min-height: 100vh;
-            color: var(--dark);
+            color: var(--text-primary);
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
         
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             padding: 20px;
         }
         
         .header {
-            background: var(--white);
+            background: var(--bg-primary);
             padding: 24px 32px;
             border-radius: 16px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            box-shadow: 0 1px 3px var(--shadow);
             border: 1px solid var(--border);
             margin-bottom: 24px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 16px;
+        }
+        
+        /* Theme Toggle Button */
+        .theme-toggle {
+            background: var(--light);
+            border: 1.5px solid var(--border);
+            color: var(--text-primary);
+            padding: 10px 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .theme-toggle:hover {
+            background: var(--border);
+            transform: scale(1.05);
+        }
+        
+        .theme-toggle i {
+            transition: transform 0.3s ease;
+        }
+        
+        .theme-toggle:active i {
+            transform: rotate(180deg);
         }
         
         .header h1 {
-            color: var(--dark);
+            color: var(--text-primary);
             font-size: 24px;
             font-weight: 700;
             display: flex;
@@ -87,6 +177,12 @@ function getIndexHTML() {
             display: flex;
             align-items: center;
             gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        #userName {
+            color: var(--text-primary);
+            font-weight: 600;
         }
         
         .btn {
@@ -137,17 +233,18 @@ function getIndexHTML() {
         }
         
         .card {
-            background: var(--white);
+            background: var(--bg-primary);
             padding: 28px;
             border-radius: 16px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            box-shadow: 0 1px 3px var(--shadow);
             border: 1px solid var(--border);
             margin-bottom: 24px;
+            transition: all 0.3s ease;
         }
         
         .card h2 {
             margin-bottom: 20px;
-            color: var(--dark);
+            color: var(--text-primary);
             font-size: 18px;
             font-weight: 700;
             display: flex;
@@ -165,10 +262,26 @@ function getIndexHTML() {
             gap: 8px;
             margin-bottom: 24px;
             border-bottom: 1px solid var(--border);
-            background: var(--white);
+            background: var(--bg-primary);
             border-radius: 16px 16px 0 0;
             padding: 0 16px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            box-shadow: 0 1px 3px var(--shadow);
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .tabs::-webkit-scrollbar {
+            height: 4px;
+        }
+        
+        .tabs::-webkit-scrollbar-track {
+            background: var(--light);
+        }
+        
+        .tabs::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 2px;
         }
         
         .tab {
@@ -222,7 +335,8 @@ function getIndexHTML() {
             font-size: 14px;
             transition: all 0.2s;
             font-family: inherit;
-            background: var(--white);
+            background: var(--bg-primary);
+            color: var(--text-primary);
         }
         
         .form-group input:focus,
@@ -260,7 +374,7 @@ function getIndexHTML() {
             border-radius: 12px;
             cursor: pointer;
             transition: all 0.2s;
-            background: var(--white);
+            background: var(--bg-primary);
         }
         
         .exercise-item:hover {
@@ -289,8 +403,9 @@ function getIndexHTML() {
             text-align: center;
             cursor: pointer;
             transition: all 0.2s;
-            background: var(--white);
+            background: var(--bg-primary);
             font-size: 13px;
+            color: var(--text-primary);
         }
         
         .set-item.completed {
@@ -394,14 +509,14 @@ function getIndexHTML() {
         }
         
         .modal-content {
-            background: var(--white);
+            background: var(--bg-primary);
             padding: 32px;
             border-radius: 20px;
             max-width: 500px;
             width: 90%;
             max-height: 85vh;
             overflow-y: auto;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+            box-shadow: 0 20px 50px var(--shadow-lg);
             border: 1px solid var(--border);
         }
         
@@ -427,9 +542,9 @@ function getIndexHTML() {
             top: 24px;
             right: 24px;
             padding: 16px 24px;
-            background: var(--white);
+            background: var(--bg-primary);
             border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            box-shadow: 0 10px 25px var(--shadow-lg);
             border: 1px solid var(--border);
             z-index: 2000;
             display: none;
@@ -438,6 +553,7 @@ function getIndexHTML() {
             animation: slideIn 0.3s ease-out;
             font-size: 14px;
             font-weight: 500;
+            color: var(--text-primary);
         }
         
         .notification.active {
@@ -520,8 +636,8 @@ function getIndexHTML() {
             overflow-x: auto;
             border-radius: 12px;
             border: 1px solid var(--border);
-            background: var(--white);
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            background: var(--bg-primary);
+            box-shadow: 0 1px 3px var(--shadow);
         }
         
         .data-table {
@@ -540,7 +656,7 @@ function getIndexHTML() {
             padding: 16px 20px;
             text-align: left;
             font-weight: 600;
-            color: var(--dark);
+            color: var(--text-primary);
             border-bottom: 2px solid var(--border);
             white-space: nowrap;
             font-size: 13px;
@@ -571,7 +687,7 @@ function getIndexHTML() {
         
         .data-table td {
             padding: 16px 20px;
-            color: var(--dark);
+            color: var(--text-primary);
             vertical-align: middle;
             border-bottom: 1px solid var(--border);
         }
@@ -598,23 +714,95 @@ function getIndexHTML() {
             background-color: var(--light);
         }
         
+        /* Comprehensive Responsive Design */
+        
+        /* Large Tablets and below (1024px) */
+        @media (max-width: 1024px) {
+            .container {
+                max-width: 100%;
+                padding: 16px;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            }
+        }
+        
+        /* Tablets (768px) */
         @media (max-width: 768px) {
             .container {
-                padding: 10px;
+                padding: 12px;
             }
             
             .header {
                 flex-direction: column;
-                gap: 15px;
+                gap: 12px;
+                padding: 20px;
+                text-align: center;
+            }
+            
+            .header h1 {
+                font-size: 20px;
+                justify-content: center;
+            }
+            
+            .user-info {
+                justify-content: center;
+                width: 100%;
+            }
+            
+            .tabs {
+                padding: 0 8px;
+                gap: 4px;
+                white-space: nowrap;
+            }
+            
+            .tab {
+                padding: 12px 16px;
+                font-size: 14px;
+                flex-shrink: 0;
+            }
+            
+            .card {
+                padding: 20px;
+            }
+            
+            .card h2 {
+                font-size: 16px;
             }
             
             .stats-grid {
                 grid-template-columns: 1fr;
+                gap: 12px;
+            }
+            
+            .stat-card {
+                padding: 20px;
+            }
+            
+            .stat-value {
+                font-size: 28px;
+            }
+            
+            .modal-content {
+                padding: 24px;
+                width: 95%;
+                max-height: 90vh;
+            }
+            
+            .modal-content.wide {
+                max-width: 95%;
+            }
+            
+            .btn {
+                padding: 10px 16px;
+                font-size: 13px;
             }
             
             .data-table th,
             .data-table td {
                 padding: 12px 16px;
+                font-size: 13px;
             }
             
             .data-table th:first-child,
@@ -626,6 +814,165 @@ function getIndexHTML() {
             .data-table td:last-child {
                 padding-right: 16px;
             }
+            
+            .set-tracker {
+                grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+            }
+        }
+        
+        /* Mobile (480px) */
+        @media (max-width: 480px) {
+            .container {
+                padding: 8px;
+            }
+            
+            .header {
+                padding: 16px;
+                border-radius: 12px;
+                margin-bottom: 16px;
+            }
+            
+            .header h1 {
+                font-size: 18px;
+                gap: 8px;
+            }
+            
+            .user-info {
+                gap: 8px;
+                flex-direction: column;
+            }
+            
+            .theme-toggle {
+                padding: 8px 12px;
+                font-size: 16px;
+            }
+            
+            .tabs {
+                border-radius: 12px 12px 0 0;
+                margin-bottom: 16px;
+            }
+            
+            .tab {
+                padding: 10px 12px;
+                font-size: 13px;
+            }
+            
+            .card {
+                padding: 16px;
+                border-radius: 12px;
+                margin-bottom: 16px;
+            }
+            
+            .card h2 {
+                font-size: 15px;
+                gap: 8px;
+            }
+            
+            .btn {
+                padding: 8px 12px;
+                font-size: 12px;
+                gap: 4px;
+            }
+            
+            .form-group input,
+            .form-group select,
+            .form-group textarea {
+                padding: 10px;
+                font-size: 13px;
+            }
+            
+            .modal-content {
+                padding: 20px;
+                border-radius: 16px;
+            }
+            
+            .notification {
+                top: 12px;
+                right: 12px;
+                left: 12px;
+                padding: 12px 16px;
+                font-size: 13px;
+            }
+            
+            .exercise-item {
+                padding: 16px;
+            }
+            
+            .set-tracker {
+                grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+                gap: 8px;
+            }
+            
+            .set-item {
+                padding: 8px;
+                font-size: 12px;
+            }
+            
+            .timer-display {
+                font-size: 36px;
+            }
+            
+            .stat-value {
+                font-size: 24px;
+            }
+            
+            .stat-label {
+                font-size: 11px;
+            }
+            
+            /* Make tables scrollable on mobile */
+            .table-container {
+                overflow-x: scroll;
+                -webkit-overflow-scrolling: touch;
+            }
+            
+            .data-table {
+                min-width: 600px;
+            }
+        }
+        
+        /* Extra Small Mobile (360px) */
+        @media (max-width: 360px) {
+            .header h1 {
+                font-size: 16px;
+            }
+            
+            .tab {
+                padding: 8px 10px;
+                font-size: 12px;
+            }
+            
+            .btn {
+                padding: 6px 10px;
+                font-size: 11px;
+            }
+            
+            .stat-value {
+                font-size: 20px;
+            }
+        }
+        
+        /* Print Styles */
+        @media print {
+            .header,
+            .tabs,
+            .btn,
+            .modal,
+            .notification,
+            .theme-toggle {
+                display: none !important;
+            }
+            
+            .container {
+                max-width: 100%;
+                padding: 0;
+            }
+            
+            .card {
+                page-break-inside: avoid;
+                box-shadow: none;
+                border: 1px solid #000;
+            }
         }
     </style>
 </head>
@@ -634,6 +981,9 @@ function getIndexHTML() {
         <div class="header">
             <h1><i class="fas fa-dumbbell"></i> AI Fitness Coach</h1>
             <div class="user-info">
+                <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark/Light Mode">
+                    <i class="fas fa-moon" id="themeIcon"></i>
+                </button>
                 <span id="userName">Loading...</span>
                 <button class="btn btn-outline" onclick="showProfile()">
                     <i class="fas fa-user"></i> Profile

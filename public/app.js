@@ -14,8 +14,58 @@ const state = {
   workoutTimer: null,
   workoutNotes: '',
   audioContext: null,
-  keyboardShortcutsEnabled: false
+  keyboardShortcutsEnabled: false,
+  theme: null
 };
+
+// Theme Management
+function initTheme() {
+  // Check for saved theme preference or default to system preference
+  const savedTheme = localStorage.getItem('theme');
+  const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  
+  if (savedTheme) {
+    state.theme = savedTheme;
+  } else {
+    state.theme = systemPrefersDark ? 'dark' : 'light';
+  }
+  
+  applyTheme(state.theme);
+  
+  // Listen for system theme changes
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+    if (!localStorage.getItem('theme')) {
+      state.theme = e.matches ? 'dark' : 'light';
+      applyTheme(state.theme);
+    }
+  });
+}
+
+function toggleTheme() {
+  state.theme = state.theme === 'light' ? 'dark' : 'light';
+  applyTheme(state.theme);
+  localStorage.setItem('theme', state.theme);
+  
+  // Show notification
+  showNotification(`Switched to ${state.theme} mode`, 'success');
+}
+
+function applyTheme(theme) {
+  const root = document.documentElement;
+  const themeIcon = document.getElementById('themeIcon');
+  
+  if (theme === 'dark') {
+    root.setAttribute('data-theme', 'dark');
+    if (themeIcon) {
+      themeIcon.className = 'fas fa-sun';
+    }
+  } else {
+    root.setAttribute('data-theme', 'light');
+    if (themeIcon) {
+      themeIcon.className = 'fas fa-moon';
+    }
+  }
+}
 
 // Measurement conversion utilities
 function kgToLbs(kg) {
@@ -66,6 +116,7 @@ function formatHeight(cm, system) {
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', async () => {
+  initTheme();
   await loadUser();
   loadDashboard();
 });
