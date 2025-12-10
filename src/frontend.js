@@ -10,8 +10,12 @@ const state = {
   currentProgram: null,
   activeTimer: null,
   restTimer: null,
+  restTimerInterval: null,
+  restTimeRemaining: 0,
   workoutTimer: null,
-  audioContext: null
+  workoutNotes: '',
+  audioContext: null,
+  keyboardShortcutsEnabled: false
 };
 
 // Measurement conversion utilities
@@ -3161,10 +3165,15 @@ function renderWorkoutExerciseTabs() {
       
       <!-- Footer Actions -->
       <div style="background: white; border-top: 2px solid var(--border); padding: 16px 20px; flex-shrink: 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.05);">
-        <div style="max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
-          <button class="btn btn-outline" onclick="previousExercise()" \${currentIdx === 0 ? 'disabled style="opacity: 0.5;"' : ''}>
-            <i class="fas fa-arrow-left"></i> Previous
-          </button>
+        <div style="max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-outline" onclick="previousExercise()" \${currentIdx === 0 ? 'disabled style="opacity: 0.5;"' : ''}>
+              <i class="fas fa-arrow-left"></i> Previous
+            </button>
+            <button class="btn btn-outline" onclick="showWorkoutNotesModal()" title="Add workout notes">
+              <i class="fas fa-note-sticky"></i> Notes
+            </button>
+          </div>
           <button class="btn btn-danger" onclick="endWorkoutEarly()">
             <i class="fas fa-stop"></i> End Workout
           </button>
@@ -3549,9 +3558,554 @@ function finishWorkoutSummary() {
   // Clear workout state
   state.currentWorkout = null;
   state.workoutExercise = null;
+  state.workoutNotes = '';
+  state.keyboardShortcutsEnabled = false;
+  
+  // Stop any active rest timer
+  if (state.restTimerInterval) {
+    clearInterval(state.restTimerInterval);
+    state.restTimerInterval = null;
+  }
   
   // Return to dashboard
   switchTab('dashboard');
   showNotification('Great workout! 💪', 'success');
+}
+
+// ========== PHASE 4: POLISH & REFINEMENTS ==========
+
+// Rest Timer System
+function startRestTimer(seconds = 90) {
+  // Clear any existing timer
+  if (state.restTimerInterval) {
+    clearInterval(state.restTimerInterval);
+  }
+  
+  state.restTimeRemaining = seconds;
+  
+  // Create or update rest timer display
+  let timerDisplay = document.getElementById('rest-timer-display');
+  if (!timerDisplay) {
+    timerDisplay = document.createElement('div');
+    timerDisplay.id = 'rest-timer-display';
+    timerDisplay.style.cssText = \`
+      position: fixed;
+      top: 80px;
+      right: 20px;
+      background: linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%);
+      color: white;
+      padding: 20px 30px;
+      border-radius: 16px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+      z-index: 10001;
+      min-width: 200px;
+      text-align: center;
+      animation: slideInRight 0.3s ease-out;
+    \`;
+    document.body.appendChild(timerDisplay);
+  }
+  
+  // Start countdown
+  state.restTimerInterval = setInterval(() => {
+    state.restTimeRemaining--;
+    
+    if (state.restTimeRemaining <= 0) {
+      clearInterval(state.restTimerInterval);
+      state.restTimerInterval = null;
+      
+      // Show notification
+      showNotification('Rest complete! Ready for next set 💪', 'success');
+      
+      // Remove timer display with animation
+      if (timerDisplay) {
+        timerDisplay.style.animation = 'slideOutRight 0.3s ease-out';
+        setTimeout(() => timerDisplay.remove(), 300);
+      }
+      
+      // Play sound if available
+      playRestCompleteSound();
+    } else {
+      // Update display
+      const mins = Math.floor(state.restTimeRemaining / 60);
+      const secs = state.restTimeRemaining % 60;
+      timerDisplay.innerHTML = \`
+        <div style="font-size: 14px; opacity: 0.9; margin-bottom: 8px;">Rest Timer</div>
+        <div style="font-size: 48px; font-weight: bold; font-family: monospace; line-height: 1;">
+          \${mins}:\${secs.toString().padStart(2, '0')}
+        </div>
+        <button class="btn btn-outline" onclick="skipRestTimer()" style="margin-top: 12px; background: white; color: var(--primary); border: none; padding: 8px 16px; font-size: 12px;">
+          Skip Rest
+        </button>
+      \`;
+    }
+  }, 1000);
+}
+
+function skipRestTimer() {
+  if (state.restTimerInterval) {
+    clearInterval(state.restTimerInterval);
+    state.restTimerInterval = null;
+  }
+  
+  const timerDisplay = document.getElementById('rest-timer-display');
+  if (timerDisplay) {
+    timerDisplay.style.animation = 'slideOutRight 0.3s ease-out';
+    setTimeout(() => timerDisplay.remove(), 300);
+  }
+  
+  showNotification('Rest skipped', 'info');
+}
+
+function playRestCompleteSound() {
+  try {
+    // Simple beep using Web Audio API
+    if (!state.audioContext) {
+      state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    
+    const oscillator = state.audioContext.createOscillator();
+    const gainNode = state.audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(state.audioContext.destination);
+    
+    oscillator.frequency.value = 800;
+    oscillator.type = 'sine';
+    
+    gainNode.gain.setValueAtTime(0.3, state.audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, state.audioContext.currentTime + 0.3);
+    
+    oscillator.start(state.audioContext.currentTime);
+    oscillator.stop(state.audioContext.currentTime + 0.3);
+  } catch (error) {
+    console.log('Audio not available:', error);
+  }
+}
+
+// Keyboard Shortcuts
+function enableKeyboardShortcuts() {
+  if (state.keyboardShortcutsEnabled) return;
+  
+  state.keyboardShortcutsEnabled = true;
+  
+  document.addEventListener('keydown', handleKeyboardShortcut);
+}
+
+function disableKeyboardShortcuts() {
+  state.keyboardShortcutsEnabled = false;
+  document.removeEventListener('keydown', handleKeyboardShortcut);
+}
+
+function handleKeyboardShortcut(e) {
+  if (!state.keyboardShortcutsEnabled) return;
+  
+  // Ignore if typing in input field
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  
+  const modal = document.getElementById('workout-modal');
+  if (!modal) return;
+  
+  switch(e.key) {
+    case 'ArrowLeft':
+      e.preventDefault();
+      previousExercise();
+      break;
+    case 'ArrowRight':
+      e.preventDefault();
+      nextExercise();
+      break;
+    case 'Enter':
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const logButton = document.querySelector('.btn-primary[onclick^="addExerciseSet"]');
+        if (logButton) logButton.click();
+      }
+      break;
+    case 'Escape':
+      e.preventDefault();
+      endWorkoutEarly();
+      break;
+    case 'r':
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        startRestTimer();
+      }
+      break;
+    case '?':
+      e.preventDefault();
+      showKeyboardShortcutsHelp();
+      break;
+  }
+}
+
+function showKeyboardShortcutsHelp() {
+  const helpModal = document.createElement('div');
+  helpModal.style.cssText = \`
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.8);
+    z-index: 10002;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.2s ease-out;
+  \`;
+  
+  helpModal.innerHTML = \`
+    <div style="background: white; border-radius: 16px; padding: 32px; max-width: 500px; animation: scaleIn 0.3s ease-out;">
+      <h2 style="margin: 0 0 24px 0;"><i class="fas fa-keyboard"></i> Keyboard Shortcuts</h2>
+      <div style="display: grid; gap: 12px;">
+        <div style="display: flex; justify-content: space-between; padding: 12px; background: var(--light); border-radius: 8px;">
+          <span><strong>← →</strong></span>
+          <span>Previous/Next Exercise</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; padding: 12px; background: var(--light); border-radius: 8px;">
+          <span><strong>Cmd/Ctrl + Enter</strong></span>
+          <span>Log Set</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; padding: 12px; background: var(--light); border-radius: 8px;">
+          <span><strong>Cmd/Ctrl + R</strong></span>
+          <span>Start Rest Timer</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; padding: 12px; background: var(--light); border-radius: 8px;">
+          <span><strong>Escape</strong></span>
+          <span>End Workout</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; padding: 12px; background: var(--light); border-radius: 8px;">
+          <span><strong>?</strong></span>
+          <span>Show This Help</span>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="this.closest('div[style*=fixed]').remove()" style="width: 100%; margin-top: 24px;">
+        Got it!
+      </button>
+    </div>
+  \`;
+  
+  helpModal.onclick = (e) => {
+    if (e.target === helpModal) helpModal.remove();
+  };
+  
+  document.body.appendChild(helpModal);
+}
+
+// Workout Notes
+function showWorkoutNotesModal() {
+  const notesModal = document.createElement('div');
+  notesModal.style.cssText = \`
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.8);
+    z-index: 10002;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.2s ease-out;
+  \`;
+  
+  notesModal.innerHTML = \`
+    <div style="background: white; border-radius: 16px; padding: 32px; max-width: 600px; width: 90%; animation: scaleIn 0.3s ease-out;">
+      <h2 style="margin: 0 0 16px 0;"><i class="fas fa-note-sticky"></i> Workout Notes</h2>
+      <p style="color: var(--gray); margin-bottom: 16px;">Add notes about today's workout (form, energy levels, etc.)</p>
+      <textarea id="workout-notes-input" 
+        style="width: 100%; min-height: 150px; padding: 12px; border: 2px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 14px; resize: vertical;"
+        placeholder="e.g., Felt strong today, increased weight on bench press...">\${state.workoutNotes}</textarea>
+      <div style="display: flex; gap: 12px; margin-top: 20px;">
+        <button class="btn btn-outline" onclick="this.closest('div[style*=fixed]').remove()" style="flex: 1;">
+          Cancel
+        </button>
+        <button class="btn btn-primary" onclick="saveWorkoutNotes()" style="flex: 1;">
+          <i class="fas fa-save"></i> Save Notes
+        </button>
+      </div>
+    </div>
+  \`;
+  
+  notesModal.onclick = (e) => {
+    if (e.target === notesModal) notesModal.remove();
+  };
+  
+  document.body.appendChild(notesModal);
+  
+  // Focus textarea
+  setTimeout(() => document.getElementById('workout-notes-input')?.focus(), 100);
+}
+
+async function saveWorkoutNotes() {
+  const textarea = document.getElementById('workout-notes-input');
+  if (!textarea) return;
+  
+  state.workoutNotes = textarea.value;
+  
+  // Save to workout
+  if (state.currentWorkout) {
+    try {
+      await api(\`/workouts/\${state.currentWorkout.id}\`, {
+        method: 'PATCH',
+        body: JSON.stringify({ notes: state.workoutNotes })
+      });
+      showNotification('Notes saved!', 'success');
+    } catch (error) {
+      showNotification('Error saving notes: ' + error.message, 'error');
+    }
+  }
+  
+  // Close modal
+  const modal = textarea.closest('div[style*="fixed"]');
+  if (modal) modal.remove();
+}
+
+// Confetti Animation
+function triggerConfetti() {
+  const confettiCount = 100;
+  const colors = ['#4F46E5', '#7C3AED', '#EC4899', '#F59E0B', '#10B981', '#3B82F6'];
+  
+  for (let i = 0; i < confettiCount; i++) {
+    setTimeout(() => {
+      const confetti = document.createElement('div');
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      const left = Math.random() * 100;
+      const animationDuration = 2 + Math.random() * 2;
+      const size = 5 + Math.random() * 5;
+      
+      confetti.style.cssText = \`
+        position: fixed;
+        left: \${left}%;
+        top: -20px;
+        width: \${size}px;
+        height: \${size}px;
+        background: \${color};
+        z-index: 10003;
+        pointer-events: none;
+        animation: confettiFall \${animationDuration}s ease-out forwards;
+        opacity: 1;
+      \`;
+      
+      document.body.appendChild(confetti);
+      
+      setTimeout(() => confetti.remove(), animationDuration * 1000);
+    }, i * 10);
+  }
+}
+
+// Loading States
+function showLoadingOverlay(message = 'Loading...') {
+  let overlay = document.getElementById('loading-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'loading-overlay';
+    document.body.appendChild(overlay);
+  }
+  
+  overlay.style.cssText = \`
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255,255,255,0.95);
+    z-index: 10004;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.2s ease-out;
+  \`;
+  
+  overlay.innerHTML = \`
+    <div style="text-align: center;">
+      <div class="spinner" style="margin: 0 auto 20px;"></div>
+      <div style="font-size: 18px; color: var(--gray);">\${message}</div>
+    </div>
+  \`;
+}
+
+function hideLoadingOverlay() {
+  const overlay = document.getElementById('loading-overlay');
+  if (overlay) {
+    overlay.style.animation = 'fadeOut 0.2s ease-out';
+    setTimeout(() => overlay.remove(), 200);
+  }
+}
+
+// Add CSS animations to document
+function injectPhase4Styles() {
+  const styleEl = document.createElement('style');
+  styleEl.textContent = \`
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    @keyframes fadeOut {
+      from { opacity: 1; }
+      to { opacity: 0; }
+    }
+    
+    @keyframes slideInRight {
+      from {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+    
+    @keyframes slideOutRight {
+      from {
+        transform: translateX(0);
+        opacity: 1;
+      }
+      to {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+    }
+    
+    @keyframes scaleIn {
+      from {
+        transform: scale(0.8);
+        opacity: 0;
+      }
+      to {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+    
+    @keyframes confettiFall {
+      0% {
+        transform: translateY(0) rotate(0deg);
+        opacity: 1;
+      }
+      100% {
+        transform: translateY(100vh) rotate(720deg);
+        opacity: 0;
+      }
+    }
+    
+    @keyframes pulse {
+      0%, 100% {
+        transform: scale(1);
+      }
+      50% {
+        transform: scale(1.05);
+      }
+    }
+    
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    
+    .spinner {
+      border: 3px solid var(--light);
+      border-top: 3px solid var(--primary);
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 0.8s linear infinite;
+    }
+    
+    /* Smooth transitions for all interactive elements */
+    button, .card, .tab {
+      transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+    }
+    
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    button:active {
+      transform: translateY(0);
+    }
+    
+    .card:hover {
+      box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+    }
+    
+    /* Loading skeleton for empty states */
+    .skeleton {
+      background: linear-gradient(90deg, var(--light) 25%, #f0f0f0 50%, var(--light) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 8px;
+    }
+    
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    
+    /* Success animation */
+    @keyframes successPulse {
+      0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+      }
+      50% {
+        transform: scale(1.1);
+        opacity: 0.8;
+      }
+    }
+    
+    .success-animation {
+      animation: successPulse 0.6s ease-out;
+    }
+  \`;
+  
+  document.head.appendChild(styleEl);
+}
+
+// Initialize Phase 4 features
+document.addEventListener('DOMContentLoaded', () => {
+  injectPhase4Styles();
+});
+
+// Enhanced addExerciseSet with rest timer
+const originalAddExerciseSet = addExerciseSet;
+async function addExerciseSet(exerciseId) {
+  await originalAddExerciseSet(exerciseId);
+  
+  // Start rest timer after logging set (unless it's the last set)
+  const currentExercise = state.currentWorkout.exercises[state.workoutExercise.currentIndex];
+  const completedSets = (currentExercise.sets || []).length;
+  const targetSets = currentExercise.target_sets || 3;
+  
+  if (completedSets < targetSets) {
+    // Start 90 second rest timer
+    startRestTimer(90);
+  }
+}
+
+// Enhanced startWorkoutExercises with keyboard shortcuts
+const originalStartWorkoutExercises = startWorkoutExercises;
+async function startWorkoutExercises() {
+  await originalStartWorkoutExercises();
+  enableKeyboardShortcuts();
+  
+  // Show keyboard shortcuts hint
+  setTimeout(() => {
+    showNotification('💡 Press ? for keyboard shortcuts', 'info');
+  }, 2000);
+}
+
+// Enhanced showWorkoutSummary with confetti
+const originalShowWorkoutSummary = showWorkoutSummary;
+async function showWorkoutSummary() {
+  await originalShowWorkoutSummary();
+  
+  // Trigger confetti animation
+  setTimeout(() => triggerConfetti(), 500);
+  
+  disableKeyboardShortcuts();
 }
 `;
