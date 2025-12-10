@@ -4113,7 +4113,7 @@ async function addExerciseSet(exerciseId) {
 
 // Enhanced startWorkoutExercises with keyboard shortcuts
 const originalStartWorkoutExercises = startWorkoutExercises;
-async function startWorkoutExercises() {
+startWorkoutExercises = async function() {
   await originalStartWorkoutExercises();
   enableKeyboardShortcuts();
   
@@ -4121,15 +4121,15 @@ async function startWorkoutExercises() {
   setTimeout(() => {
     showNotification('💡 Press ? for keyboard shortcuts', 'info');
   }, 2000);
-}
+};
 
 // Enhanced showWorkoutSummary with confetti
 const originalShowWorkoutSummary = showWorkoutSummary;
-async function showWorkoutSummary() {
+showWorkoutSummary = async function() {
   await originalShowWorkoutSummary();
   
   // Trigger confetti animation
   setTimeout(() => triggerConfetti(), 500);
   
   disableKeyboardShortcuts();
-}
+};
