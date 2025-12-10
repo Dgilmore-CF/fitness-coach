@@ -337,33 +337,35 @@ workouts.delete('/:id', async (c) => {
   const workoutId = c.req.param('id');
   const db = c.env.DB;
 
-  // Verify workout belongs to user
-  const workout = await db.prepare(
-    'SELECT * FROM workouts WHERE id = ? AND user_id = ?'
-  ).bind(workoutId, user.id).first();
+  try {
+    // Verify workout belongs to user
+    const workout = await db.prepare(
+      'SELECT * FROM workouts WHERE id = ? AND user_id = ?'
+    ).bind(workoutId, user.id).first();
 
-  if (!workout) {
-    return c.json({ error: 'Workout not found' }, 404);
+    if (!workout) {
+      return c.json({ error: 'Workout not found' }, 404);
+    }
+
+    // Delete all related data that might not have CASCADE
+    // Health data (ON DELETE SET NULL, but we'll clean it up)
+    await db.prepare('DELETE FROM health_data WHERE workout_id = ?').bind(workoutId).run();
+    
+    // Personal records (will be SET NULL after migration, but delete explicitly for safety)
+    await db.prepare('UPDATE personal_records SET workout_id = NULL WHERE workout_id = ?').bind(workoutId).run();
+    
+    // Delete the workout itself
+    // CASCADE will handle: workout_exercises -> sets automatically
+    await db.prepare('DELETE FROM workouts WHERE id = ?').bind(workoutId).run();
+
+    return c.json({ message: 'Workout deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting workout:', error);
+    return c.json({ 
+      error: 'Failed to delete workout', 
+      details: error.message 
+    }, 500);
   }
-
-  // Delete all related data
-  // First, get all workout_exercise IDs for this workout
-  const workoutExercises = await db.prepare(
-    'SELECT id FROM workout_exercises WHERE workout_id = ?'
-  ).bind(workoutId).all();
-
-  // Delete sets for each workout_exercise
-  for (const we of workoutExercises.results || []) {
-    await db.prepare('DELETE FROM sets WHERE workout_exercise_id = ?').bind(we.id).run();
-  }
-
-  // Delete workout_exercises
-  await db.prepare('DELETE FROM workout_exercises WHERE workout_id = ?').bind(workoutId).run();
-  
-  // Delete the workout itself
-  await db.prepare('DELETE FROM workouts WHERE id = ?').bind(workoutId).run();
-
-  return c.json({ message: 'Workout deleted successfully' });
 });
 
 // Mark workout as cardio
