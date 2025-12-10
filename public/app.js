@@ -890,7 +890,7 @@ async function startWorkoutFromProgram(programId) {
   }
 }
 
-// Start workout from program day
+// Start workout from program day - Phase 3 New Flow
 async function startWorkoutDay(programId, programDayId) {
   try {
     const data = await api('/workouts', {
@@ -903,9 +903,10 @@ async function startWorkoutDay(programId, programDayId) {
 
     state.currentWorkout = data.workout;
     closeModal();
-    switchTab('workout');
-    loadWorkoutInterface();
-    showNotification('Workout started!', 'success');
+    
+    // Phase 3: Show warmup screen first, then exercise tabs
+    showWorkoutWarmupScreen(data.workout);
+    
   } catch (error) {
     showNotification('Error starting workout: ' + error.message, 'error');
   }
@@ -2953,4 +2954,602 @@ async function deleteAnalyticsWorkout(workoutId) {
   } catch (error) {
     showNotification('Error deleting workout: ' + error.message, 'error');
   }
+}
+
+// ========== PHASE 3: NEW WORKOUT FLOW ==========
+
+// Warmup Database (simplified version)
+const warmupDatabase = {
+  'Chest': ['Arm Circles', 'Wall Chest Stretch', 'Dynamic Push-ups'],
+  'Back': ['Cat-Cow Stretch', 'Scapular Pull-ups', 'Thoracic Rotations'],
+  'Shoulders': ['Shoulder Circles', 'Band Pull-Aparts', 'Cross-Body Stretch'],
+  'Legs': ['Leg Swings', 'Walking Lunges', 'Bodyweight Squats'],
+  'Quads': ['Standing Quad Stretch', 'Light Leg Extensions', 'High Knees'],
+  'Hamstrings': ['Standing Hamstring Stretch', 'Light Leg Curls', 'Inchworms'],
+  'Glutes': ['Glute Bridges', 'Fire Hydrants', 'Donkey Kicks'],
+  'Biceps': ['Arm Swings', 'Wall Bicep Stretch', 'Light Band Curls'],
+  'Triceps': ['Overhead Tricep Stretch', 'Light Bench Dips', 'Arm Extensions'],
+  'Abs': ['Standing Torso Twists', 'Dead Bug', 'Plank Hold'],
+  'Core': ['Bird Dogs', 'Side Plank Hold', 'Mountain Climbers'],
+  'Calves': ['Calf Raises', 'Ankle Circles', 'Wall Calf Stretch']
+};
+
+// Show warmup screen before workout
+function showWorkoutWarmupScreen(workout) {
+  // Create full-screen modal
+  const modal = document.createElement('div');
+  modal.id = 'workout-modal';
+  modal.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: white;
+    z-index: 10000;
+    overflow-y: auto;
+  `;
+  
+  // Get muscle groups from exercises
+  const muscleGroups = [...new Set(workout.exercises.map(ex => ex.muscle_group).filter(Boolean))];
+  const warmups = [];
+  
+  // Get warmups for each muscle group
+  for (const muscle of muscleGroups) {
+    const exercises = warmupDatabase[muscle] || [];
+    warmups.push(...exercises.map(name => ({ name, muscle })));
+  }
+  
+  // If no specific warmups, use general ones
+  if (warmups.length === 0) {
+    warmups.push(
+      { name: 'Jumping Jacks', muscle: 'Full Body' },
+      { name: 'Dynamic Stretching', muscle: 'Full Body' },
+      { name: 'Light Cardio', muscle: 'Full Body' }
+    );
+  }
+  
+  modal.innerHTML = `
+    <div style="max-width: 800px; margin: 0 auto; padding: 40px 20px;">
+      <!-- Header -->
+      <div style="text-align: center; margin-bottom: 40px;">
+        <div style="width: 80px; height: 80px; background: linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%); border-radius: 50%; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center;">
+          <i class="fas fa-running" style="font-size: 40px; color: white;"></i>
+        </div>
+        <h1 style="font-size: 32px; margin: 0 0 12px 0;">Warm-Up & Stretch</h1>
+        <p style="font-size: 18px; color: var(--gray); margin: 0;">Prepare your body for ${workout.day_name || 'your workout'}</p>
+      </div>
+      
+      <!-- Warmup Exercises -->
+      <div style="background: var(--light); border-radius: 16px; padding: 24px; margin-bottom: 32px;">
+        <h3 style="margin: 0 0 20px 0; display: flex; align-items: center; gap: 10px;">
+          <i class="fas fa-list-check"></i> Recommended Warm-ups
+        </h3>
+        <div style="display: grid; gap: 12px;">
+          ${warmups.slice(0, 6).map((warmup, idx) => `
+            <div style="background: white; border-radius: 12px; padding: 16px; display: flex; align-items: center; gap: 16px;">
+              <div style="background: var(--primary); color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0;">
+                ${idx + 1}
+              </div>
+              <div style="flex: 1;">
+                <strong style="display: block; margin-bottom: 4px;">${warmup.name}</strong>
+                <span style="color: var(--gray); font-size: 13px;"><i class="fas fa-bullseye"></i> ${warmup.muscle}</span>
+              </div>
+              <span style="color: var(--gray); font-size: 13px;">30-60 sec</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      
+      <!-- Tips -->
+      <div style="background: var(--primary-light); border-left: 4px solid var(--primary); border-radius: 8px; padding: 16px; margin-bottom: 32px;">
+        <strong style="display: block; margin-bottom: 8px; color: var(--primary);"><i class="fas fa-lightbulb"></i> Pro Tips</strong>
+        <ul style="margin: 0; padding-left: 20px; line-height: 1.8;">
+          <li>Start with light cardio to raise your heart rate</li>
+          <li>Focus on the muscles you'll be training today</li>
+          <li>Perform dynamic stretches (movement-based)</li>
+          <li>Take 5-10 minutes to properly warm up</li>
+        </ul>
+      </div>
+      
+      <!-- Actions -->
+      <div style="display: flex; gap: 12px; justify-content: center;">
+        <button class="btn btn-outline" onclick="cancelWorkoutStart()" style="min-width: 150px;">
+          <i class="fas fa-times"></i> Cancel
+        </button>
+        <button class="btn btn-primary" onclick="startWorkoutExercises()" style="min-width: 200px; font-size: 16px;">
+          <i class="fas fa-check"></i> Ready - Start Workout
+        </button>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+}
+
+// Cancel workout start
+function cancelWorkoutStart() {
+  const modal = document.getElementById('workout-modal');
+  if (modal) modal.remove();
+  
+  // Delete the workout that was created
+  if (state.currentWorkout) {
+    api(`/workouts/${state.currentWorkout.id}`, { method: 'DELETE' });
+    state.currentWorkout = null;
+  }
+}
+
+// Start workout exercises (after warmup)
+async function startWorkoutExercises() {
+  const modal = document.getElementById('workout-modal');
+  if (!modal) return;
+  
+  // Initialize workout state
+  if (!state.workoutExercise) {
+    state.workoutExercise = {
+      currentIndex: 0,
+      completed: []
+    };
+  }
+  
+  // Start workout timer
+  if (!state.workoutTimer) {
+    startWorkoutTimer();
+  }
+  
+  // Fetch full workout data
+  try {
+    const data = await api(`/workouts/${state.currentWorkout.id}`);
+    state.currentWorkout = data.workout;
+    
+    // Render tabbed exercise interface
+    renderWorkoutExerciseTabs();
+    
+  } catch (error) {
+    showNotification('Error loading workout: ' + error.message, 'error');
+  }
+}
+
+// Render tabbed exercise interface
+function renderWorkoutExerciseTabs() {
+  const modal = document.getElementById('workout-modal');
+  if (!modal) return;
+  
+  const workout = state.currentWorkout;
+  const currentIdx = state.workoutExercise.currentIndex;
+  const currentExercise = workout.exercises[currentIdx];
+  
+  if (!currentExercise) {
+    // All exercises complete - show summary
+    showWorkoutSummary();
+    return;
+  }
+  
+  modal.innerHTML = `
+    <div style="display: flex; flex-direction: column; height: 100vh;">
+      <!-- Header -->
+      <div style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white; padding: 20px; flex-shrink: 0;">
+        <div style="max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h2 style="margin: 0 0 8px 0; color: white;">${workout.day_name || 'Workout'}</h2>
+            <div style="font-size: 14px; opacity: 0.9;">Exercise ${currentIdx + 1} of ${workout.exercises.length}</div>
+          </div>
+          <div id="workoutTimer" style="font-size: 24px; font-weight: bold; font-family: monospace;">00:00:00</div>
+        </div>
+      </div>
+      
+      <!-- Exercise Tabs -->
+      <div style="background: var(--light); border-bottom: 2px solid var(--border); padding: 8px 0; overflow-x: auto; flex-shrink: 0;">
+        <div style="max-width: 1200px; margin: 0 auto; padding: 0 20px; display: flex; gap: 8px;">
+          ${workout.exercises.map((ex, idx) => `
+            <button 
+              onclick="switchToExercise(${idx})"
+              style="padding: 12px 20px; border: none; background: ${idx === currentIdx ? 'var(--primary)' : idx < currentIdx ? 'var(--secondary)' : 'white'}; color: ${idx === currentIdx || idx < currentIdx ? 'white' : 'var(--gray)'}; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap; ${idx > currentIdx ? 'opacity: 0.5;' : ''}">
+              ${idx < currentIdx ? '<i class="fas fa-check"></i>' : ''} ${ex.name.length > 20 ? ex.name.substring(0, 20) + '...' : ex.name}
+            </button>
+          `).join('')}
+        </div>
+      </div>
+      
+      <!-- Exercise Content -->
+      <div style="flex: 1; overflow-y: auto; background: var(--light);">
+        <div style="max-width: 1200px; margin: 0 auto; padding: 24px 20px;">
+          ${renderExerciseContent(currentExercise, currentIdx)}
+        </div>
+      </div>
+      
+      <!-- Footer Actions -->
+      <div style="background: white; border-top: 2px solid var(--border); padding: 16px 20px; flex-shrink: 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.05);">
+        <div style="max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+          <button class="btn btn-outline" onclick="previousExercise()" ${currentIdx === 0 ? 'disabled style="opacity: 0.5;"' : ''}>
+            <i class="fas fa-arrow-left"></i> Previous
+          </button>
+          <button class="btn btn-danger" onclick="endWorkoutEarly()">
+            <i class="fas fa-stop"></i> End Workout
+          </button>
+          <button class="btn btn-primary" onclick="nextExercise()" style="min-width: 150px;">
+            ${currentIdx === workout.exercises.length - 1 ? '<i class="fas fa-flag-checkered"></i> Finish' : '<i class="fas fa-arrow-right"></i> Next Exercise'}
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  updateWorkoutTimerDisplay();
+}
+
+// Render exercise content with set table
+function renderExerciseContent(exercise, index) {
+  const system = (state.user && state.user.measurement_system) || 'metric';
+  const weightUnit = system === 'imperial' ? 'lbs' : 'kg';
+  const completedSets = (exercise.sets || []).length;
+  const targetSets = exercise.target_sets || 3;
+  
+  return `
+    <!-- Exercise Header -->
+    <div class="card" style="margin-bottom: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 16px;">
+        <div style="flex: 1;">
+          <h2 style="margin: 0 0 12px 0;">${exercise.name}</h2>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <span style="background: var(--secondary-light); color: var(--secondary); padding: 6px 14px; border-radius: 20px; font-size: 14px; font-weight: 600;">
+              <i class="fas fa-bullseye"></i> ${exercise.muscle_group}
+            </span>
+            <span style="background: var(--primary-light); color: var(--primary); padding: 6px 14px; border-radius: 20px; font-size: 14px; font-weight: 600;">
+              <i class="fas fa-dumbbell"></i> ${exercise.equipment}
+            </span>
+            ${exercise.is_unilateral ? '<span style="background: var(--warning); color: white; padding: 6px 14px; border-radius: 20px; font-size: 14px; font-weight: 600;"><i class="fas fa-balance-scale"></i> Unilateral</span>' : ''}
+          </div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size: 36px; font-weight: bold; color: var(--primary);">${completedSets}/${targetSets}</div>
+          <div style="font-size: 12px; color: var(--gray); text-transform: uppercase;">Sets Complete</div>
+        </div>
+      </div>
+      
+      <!-- Progress Bar -->
+      <div style="background: var(--light); height: 8px; border-radius: 4px; overflow: hidden;">
+        <div style="background: linear-gradient(90deg, var(--secondary) 0%, var(--primary) 100%); height: 100%; width: ${Math.min((completedSets / targetSets) * 100, 100)}%; transition: width 0.3s;"></div>
+      </div>
+    </div>
+    
+    <!-- Exercise Tips -->
+    ${exercise.tips ? `
+      <div class="card" style="margin-bottom: 20px;">
+        <details open>
+          <summary style="cursor: pointer; font-weight: 600; color: var(--primary); user-select: none; font-size: 16px;">
+            <i class="fas fa-lightbulb"></i> Form & Technique Tips
+          </summary>
+          <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); line-height: 1.6; color: var(--dark);">
+            ${exercise.tips}
+          </div>
+        </details>
+      </div>
+    ` : ''}
+    
+    <!-- Set Table -->
+    <div class="card">
+      <h3 style="margin: 0 0 16px 0;"><i class="fas fa-table"></i> Set Tracker</h3>
+      
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width: 80px;">Set</th>
+              <th>Weight (${weightUnit})</th>
+              <th>Reps</th>
+              <th style="width: 120px;">1RM</th>
+              <th style="width: 100px;">Complete</th>
+              <th style="width: 80px;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="set-table-body">
+            ${(exercise.sets || []).map((set, idx) => `
+              <tr style="background: var(--secondary-light);">
+                <td><strong>${set.set_number}</strong></td>
+                <td><strong>${formatWeight(set.weight_kg, system)}</strong></td>
+                <td><strong>${set.reps}</strong></td>
+                <td>${formatWeight(set.one_rep_max_kg, system)}</td>
+                <td><span style="color: var(--secondary); font-size: 20px;"><i class="fas fa-check-circle"></i></span></td>
+                <td>
+                  <button class="btn btn-danger" onclick="deleteExerciseSet(${exercise.id}, ${set.id})" style="padding: 4px 8px; font-size: 12px;">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </td>
+              </tr>
+            `).join('')}
+            ${completedSets < 10 ? `
+              <tr id="new-set-row">
+                <td><strong>${completedSets + 1}</strong></td>
+                <td>
+                  <input type="number" id="newSetWeight" placeholder="0" step="${system === 'imperial' ? '5' : '2.5'}" 
+                    style="width: 100%; padding: 8px; border: 2px solid var(--border); border-radius: 6px; font-size: 14px;">
+                </td>
+                <td>
+                  <input type="number" id="newSetReps" placeholder="0" min="1"
+                    style="width: 100%; padding: 8px; border: 2px solid var(--border); border-radius: 6px; font-size: 14px;">
+                </td>
+                <td colspan="2">
+                  <button class="btn btn-primary" onclick="addExerciseSet(${exercise.id})" style="width: 100%;">
+                    <i class="fas fa-plus"></i> Log Set
+                  </button>
+                </td>
+                <td></td>
+              </tr>
+            ` : ''}
+          </tbody>
+        </table>
+      </div>
+      
+      ${completedSets >= targetSets ? `
+        <div style="margin-top: 16px; padding: 16px; background: var(--secondary-light); border-radius: 8px; text-align: center;">
+          <i class="fas fa-check-circle" style="font-size: 24px; color: var(--secondary); margin-bottom: 8px;"></i>
+          <div style="font-weight: 600; color: var(--secondary);">Target Sets Complete! Ready to move on.</div>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+// Add set to exercise
+async function addExerciseSet(exerciseId) {
+  const weightInput = document.getElementById('newSetWeight');
+  const repsInput = document.getElementById('newSetReps');
+  
+  let weight = parseFloat(weightInput.value);
+  const reps = parseInt(repsInput.value);
+  
+  if (!weight || !reps) {
+    showNotification('Please enter weight and reps', 'warning');
+    return;
+  }
+  
+  // Convert to kg if imperial
+  const system = (state.user && state.user.measurement_system) || 'metric';
+  if (system === 'imperial') {
+    weight = weight * 0.453592;
+  }
+  
+  try {
+    await api(`/workouts/${state.currentWorkout.id}/exercises/${exerciseId}/sets`, {
+      method: 'POST',
+      body: JSON.stringify({ weight_kg: weight, reps, rest_seconds: 90 })
+    });
+    
+    // Refresh workout data
+    const data = await api(`/workouts/${state.currentWorkout.id}`);
+    state.currentWorkout = data.workout;
+    
+    // Re-render current exercise
+    renderWorkoutExerciseTabs();
+    
+    showNotification('Set logged!', 'success');
+    
+    // Auto-advance if target sets reached
+    const currentExercise = state.currentWorkout.exercises[state.workoutExercise.currentIndex];
+    const completedSets = (currentExercise.sets || []).length;
+    const targetSets = currentExercise.target_sets || 3;
+    
+    if (completedSets >= targetSets) {
+      setTimeout(() => {
+        if (confirm('Target sets complete! Move to next exercise?')) {
+          nextExercise();
+        }
+      }, 500);
+    }
+    
+  } catch (error) {
+    showNotification('Error logging set: ' + error.message, 'error');
+  }
+}
+
+// Delete set from exercise
+async function deleteExerciseSet(exerciseId, setId) {
+  if (!confirm('Delete this set?')) return;
+  
+  try {
+    await api(`/workouts/${state.currentWorkout.id}/exercises/${exerciseId}/sets/${setId}`, {
+      method: 'DELETE'
+    });
+    
+    // Refresh workout data
+    const data = await api(`/workouts/${state.currentWorkout.id}`);
+    state.currentWorkout = data.workout;
+    
+    // Re-render
+    renderWorkoutExerciseTabs();
+    
+    showNotification('Set deleted', 'success');
+    
+  } catch (error) {
+    showNotification('Error deleting set: ' + error.message, 'error');
+  }
+}
+
+// Switch to specific exercise
+function switchToExercise(index) {
+  state.workoutExercise.currentIndex = index;
+  renderWorkoutExerciseTabs();
+}
+
+// Next exercise
+function nextExercise() {
+  const nextIndex = state.workoutExercise.currentIndex + 1;
+  if (nextIndex >= state.currentWorkout.exercises.length) {
+    // Workout complete
+    showWorkoutSummary();
+  } else {
+    state.workoutExercise.currentIndex = nextIndex;
+    renderWorkoutExerciseTabs();
+  }
+}
+
+// Previous exercise
+function previousExercise() {
+  if (state.workoutExercise.currentIndex > 0) {
+    state.workoutExercise.currentIndex--;
+    renderWorkoutExerciseTabs();
+  }
+}
+
+// End workout early
+function endWorkoutEarly() {
+  if (confirm('Are you sure you want to end this workout? Your progress will be saved.')) {
+    showWorkoutSummary();
+  }
+}
+
+// Show workout summary
+async function showWorkoutSummary() {
+  const modal = document.getElementById('workout-modal');
+  if (!modal) return;
+  
+  // Stop timers
+  if (state.workoutTimer) {
+    clearInterval(state.workoutTimer);
+    state.workoutTimer = null;
+  }
+  
+  // Complete the workout
+  try {
+    await api(`/workouts/${state.currentWorkout.id}/complete`, {
+      method: 'POST'
+    });
+    
+    // Get final workout data
+    const data = await api(`/workouts/${state.currentWorkout.id}`);
+    const workout = data.workout;
+    
+    // Calculate stats
+    const totalSets = workout.exercises.reduce((sum, ex) => sum + (ex.sets?.length || 0), 0);
+    const totalVolume = workout.exercises.reduce((sum, ex) => {
+      return sum + (ex.sets || []).reduce((exSum, set) => exSum + (set.weight_kg * set.reps), 0);
+    }, 0);
+    const duration = workout.total_duration_seconds || 0;
+    
+    // Fun comparisons
+    const comparison = getFunWeightComparison(totalVolume);
+    
+    modal.innerHTML = `
+      <div style="max-width: 900px; margin: 0 auto; padding: 40px 20px;">
+        <!-- Success Icon -->
+        <div style="text-align: center; margin-bottom: 32px;">
+          <div style="width: 100px; height: 100px; background: linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%); border-radius: 50%; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; animation: scaleIn 0.5s ease-out;">
+            <i class="fas fa-trophy" style="font-size: 50px; color: white;"></i>
+          </div>
+          <h1 style="font-size: 36px; margin: 0 0 12px 0;">Workout Complete!</h1>
+          <p style="font-size: 18px; color: var(--gray); margin: 0;">Outstanding work today 💪</p>
+        </div>
+        
+        <!-- Stats Grid -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 32px;">
+          <div class="card" style="text-align: center;">
+            <div style="font-size: 14px; color: var(--gray); text-transform: uppercase; margin-bottom: 8px;">Duration</div>
+            <div style="font-size: 32px; font-weight: bold; color: var(--primary);">${formatDuration(duration)}</div>
+          </div>
+          <div class="card" style="text-align: center;">
+            <div style="font-size: 14px; color: var(--gray); text-transform: uppercase; margin-bottom: 8px;">Total Sets</div>
+            <div style="font-size: 32px; font-weight: bold; color: var(--primary);">${totalSets}</div>
+          </div>
+          <div class="card" style="text-align: center;">
+            <div style="font-size: 14px; color: var(--gray); text-transform: uppercase; margin-bottom: 8px;">Total Volume</div>
+            <div style="font-size: 32px; font-weight: bold; color: var(--primary);">${Math.round(totalVolume)} kg</div>
+          </div>
+        </div>
+        
+        <!-- Fun Comparison -->
+        <div class="card" style="background: linear-gradient(135deg, var(--primary-light) 0%, var(--secondary-light) 100%); border: none; margin-bottom: 32px;">
+          <div style="display: flex; align-items: center; gap: 20px;">
+            <div style="font-size: 60px;">${comparison.emoji}</div>
+            <div>
+              <div style="font-size: 20px; font-weight: 600; margin-bottom: 8px;">${comparison.title}</div>
+              <div style="font-size: 16px; color: var(--gray);">${comparison.description}</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Exercise Summary -->
+        <div class="card" style="margin-bottom: 32px;">
+          <h3 style="margin: 0 0 16px 0;"><i class="fas fa-list-check"></i> Exercise Summary</h3>
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            ${workout.exercises.map((ex, idx) => `
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--light); border-radius: 8px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <div style="background: var(--primary); color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">
+                    ${idx + 1}
+                  </div>
+                  <strong>${ex.name}</strong>
+                </div>
+                <span style="color: var(--gray);">${(ex.sets || []).length} sets completed</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        
+        <!-- Actions -->
+        <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+          <button class="btn btn-outline" onclick="deleteCompletedWorkout()" style="min-width: 180px;">
+            <i class="fas fa-trash"></i> Delete Workout
+          </button>
+          <button class="btn btn-primary" onclick="finishWorkoutSummary()" style="min-width: 200px; font-size: 16px;">
+            <i class="fas fa-check"></i> Done
+          </button>
+        </div>
+      </div>
+    `;
+    
+  } catch (error) {
+    showNotification('Error completing workout: ' + error.message, 'error');
+  }
+}
+
+// Get fun weight comparison
+function getFunWeightComparison(totalKg) {
+  const comparisons = [
+    { threshold: 0, emoji: '🎈', title: 'Great Start!', description: `You lifted the equivalent of ${Math.round(totalKg / 0.45)} basketballs!` },
+    { threshold: 500, emoji: '🦁', title: 'Beast Mode!', description: `You lifted the equivalent of ${Math.round(totalKg / 190)} adult lions!` },
+    { threshold: 1000, emoji: '🐻', title: 'Incredible Power!', description: `You lifted more than ${Math.round(totalKg / 200)} grizzly bears!` },
+    { threshold: 2000, emoji: '🚗', title: 'Superhuman Strength!', description: `You lifted the equivalent of ${(totalKg / 1500).toFixed(1)} compact cars!` },
+    { threshold: 3000, emoji: '🦏', title: 'Absolutely Insane!', description: `You lifted ${(totalKg / 2000).toFixed(1)} rhinoceroses worth of weight!` },
+    { threshold: 5000, emoji: '🐘', title: 'Legendary Performance!', description: `You lifted ${(totalKg / 5000).toFixed(1)} elephants! That's phenomenal!` }
+  ];
+  
+  for (let i = comparisons.length - 1; i >= 0; i--) {
+    if (totalKg >= comparisons[i].threshold) {
+      return comparisons[i];
+    }
+  }
+  
+  return comparisons[0];
+}
+
+// Delete completed workout from summary
+async function deleteCompletedWorkout() {
+  if (!confirm('Are you sure you want to delete this workout? This cannot be undone.')) return;
+  
+  try {
+    await api(`/workouts/${state.currentWorkout.id}`, {
+      method: 'DELETE'
+    });
+    
+    showNotification('Workout deleted', 'success');
+    finishWorkoutSummary();
+    
+  } catch (error) {
+    showNotification('Error deleting workout: ' + error.message, 'error');
+  }
+}
+
+// Finish workout summary and return to dashboard
+function finishWorkoutSummary() {
+  const modal = document.getElementById('workout-modal');
+  if (modal) modal.remove();
+  
+  // Clear workout state
+  state.currentWorkout = null;
+  state.workoutExercise = null;
+  
+  // Return to dashboard
+  switchTab('dashboard');
+  showNotification('Great workout! 💪', 'success');
 }
