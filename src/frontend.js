@@ -912,11 +912,11 @@ async function startWorkoutDay(programId, programDayId) {
   }
 }
 
-// Workout interface
+// Workout interface - Phase 2 Redesign
 async function loadWorkout() {
   const container = document.getElementById('workout');
 
-  // Check for active workout
+  // Check for active workout first
   if (!state.currentWorkout) {
     const workouts = await api('/workouts?limit=1');
     const activeWorkout = workouts.workouts.find(w => !w.completed);
@@ -926,19 +926,362 @@ async function loadWorkout() {
     }
   }
 
+  // If there's an active workout, show the workout recording interface
   if (state.currentWorkout) {
     loadWorkoutInterface();
+    return;
+  }
+
+  // Otherwise, show the program overview interface
+  try {
+    const programsData = await api('/programs');
+    const activeProgram = programsData.programs.find(p => p.active);
+
+    if (!activeProgram) {
+      container.innerHTML = \`
+        <div class="card">
+          <h2><i class="fas fa-dumbbell"></i> No Active Program</h2>
+          <p>Create or activate a program to start training.</p>
+          <button class="btn btn-primary" onclick="showGenerateProgram()">
+            <i class="fas fa-magic"></i> Generate New Program
+          </button>
+          <button class="btn btn-secondary" onclick="switchTab('program')">
+            <i class="fas fa-list"></i> View Programs
+          </button>
+        </div>
+      \`;
+      return;
+    }
+
+    // Get full program details
+    const programData = await api(\`/programs/\${activeProgram.id}\`);
+    const program = programData.program;
+
+    // Initialize workout tab state
+    if (!state.workoutTab) {
+      state.workoutTab = { currentSubTab: 'overview', selectedDay: null };
+    }
+
+    // Render the workout tab with hero and sub-tabs
+    renderWorkoutTab(program);
+
+  } catch (error) {
+    container.innerHTML = \`<div class="card"><p>Error loading workout tab: \${error.message}</p></div>\`;
+  }
+}
+
+// Render workout tab with hero section and sub-tabs
+function renderWorkoutTab(program) {
+  const container = document.getElementById('workout');
+  
+  container.innerHTML = \`
+    <!-- Hero Section -->
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 16px; padding: 40px 32px; color: white; margin-bottom: 24px; position: relative; overflow: hidden;">
+      <!-- Background Pattern -->
+      <div style="position: absolute; top: 0; right: 0; width: 200px; height: 200px; opacity: 0.1;">
+        <i class="fas fa-dumbbell" style="font-size: 180px;"></i>
+      </div>
+      
+      <div style="position: relative; z-index: 1;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
+          <div>
+            <div style="font-size: 14px; opacity: 0.9; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Active Training Program</div>
+            <h1 style="font-size: 32px; font-weight: 700; margin: 0 0 12px 0; color: white;">\${program.name}</h1>
+            <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+              <span style="background: rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 20px; font-size: 14px;">
+                <i class="fas fa-calendar"></i> \${program.days?.length || 0} Days
+              </span>
+              <span style="background: rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 20px; font-size: 14px;">
+                <i class="fas fa-target"></i> \${program.goal || 'Fitness'}
+              </span>
+              <span style="background: rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 20px; font-size: 14px;">
+                <i class="fas fa-signal"></i> \${program.experience_level || 'Intermediate'}
+              </span>
+            </div>
+          </div>
+          <div>
+            <button class="btn btn-primary" onclick="startWorkout()" style="background: white; color: var(--primary); font-size: 16px; padding: 14px 28px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+              <i class="fas fa-play"></i> Start Workout
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sub-tabs -->
+    <div style="background: white; border-radius: 12px; padding: 8px; margin-bottom: 20px; display: flex; gap: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
+      <button 
+        class="workout-subtab \${state.workoutTab.currentSubTab === 'overview' ? 'active' : ''}" 
+        onclick="switchWorkoutSubTab('overview')"
+        style="flex: 1; padding: 12px 20px; border: none; background: \${state.workoutTab.currentSubTab === 'overview' ? 'var(--primary)' : 'transparent'}; color: \${state.workoutTab.currentSubTab === 'overview' ? 'white' : 'var(--gray)'}; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s;">
+        <i class="fas fa-th-large"></i> Overview
+      </button>
+      <button 
+        class="workout-subtab \${state.workoutTab.currentSubTab === 'details' ? 'active' : ''}" 
+        onclick="switchWorkoutSubTab('details')"
+        style="flex: 1; padding: 12px 20px; border: none; background: \${state.workoutTab.currentSubTab === 'details' ? 'var(--primary)' : 'transparent'}; color: \${state.workoutTab.currentSubTab === 'details' ? 'white' : 'var(--gray)'}; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s;">
+        <i class="fas fa-list"></i> Day Details
+      </button>
+    </div>
+
+    <!-- Sub-tab Content -->
+    <div id="workout-subtab-content"></div>
+  \`;
+
+  // Load the appropriate sub-tab content
+  if (state.workoutTab.currentSubTab === 'overview') {
+    renderWorkoutOverview(program);
   } else {
+    renderWorkoutDayDetails(program);
+  }
+}
+
+// Render workout overview sub-tab
+function renderWorkoutOverview(program) {
+  const container = document.getElementById('workout-subtab-content');
+  
+  // Get day of week for correlation
+  const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const today = new Date().getDay();
+  
+  container.innerHTML = \`
+    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px;">
+      <!-- Program Days List -->
+      <div class="card">
+        <h3><i class="fas fa-calendar-week"></i> Training Schedule</h3>
+        <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 16px;">
+          \${program.days && program.days.length > 0 ? program.days.map((day, idx) => {
+            const dayOfWeek = daysOfWeek[(today + idx) % 7];
+            return \`
+              <div class="workout-day-card" onclick="selectWorkoutDay(\${idx})" style="background: \${state.workoutTab.selectedDay === idx ? 'var(--primary-light)' : 'var(--light)'}; border: 2px solid \${state.workoutTab.selectedDay === idx ? 'var(--primary)' : 'var(--border)'}; border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.2s;">
+                <div style="display: flex; justify-content: between; align-items: center; gap: 16px;">
+                  <div style="background: var(--primary); color: white; width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; flex-shrink: 0;">
+                    \${day.day_number || idx + 1}
+                  </div>
+                  <div style="flex: 1;">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+                      <div>
+                        <strong style="font-size: 16px; display: block; margin-bottom: 4px;">\${day.name || \`Day \${day.day_number || idx + 1}\`}</strong>
+                        <div style="color: var(--gray); font-size: 13px;">
+                          <i class="fas fa-calendar"></i> Suggested: \${dayOfWeek}
+                        </div>
+                      </div>
+                    </div>
+                    <div style="display: flex; gap: 16px; flex-wrap: wrap; margin-top: 8px;">
+                      <span style="font-size: 13px; color: var(--gray);">
+                        <i class="fas fa-dumbbell"></i> \${(day.exercises && day.exercises.length) || 0} exercises
+                      </span>
+                      <span style="font-size: 13px; color: var(--gray);">
+                        <i class="fas fa-clock"></i> ~\${estimateDuration(day)} min
+                      </span>
+                      <span style="font-size: 13px; color: var(--gray);">
+                        <i class="fas fa-history"></i> Last: \${getLastPerformed(day.id) || 'Never'}
+                      </span>
+                    </div>
+                    \${day.focus ? \`<div style="margin-top: 8px; font-size: 13px; color: var(--gray);"><i class="fas fa-bullseye"></i> \${day.focus}</div>\` : ''}
+                  </div>
+                  <button class="btn btn-primary" onclick="event.stopPropagation(); startWorkoutFromDay(\${program.id}, \${day.id})" style="flex-shrink: 0;">
+                    <i class="fas fa-play"></i>
+                  </button>
+                </div>
+              </div>
+            \`;
+          }).join('') : '<p>No workout days in this program.</p>'}
+        </div>
+      </div>
+
+      <!-- Muscle Map & Info -->
+      <div>
+        <div class="card">
+          <h3><i class="fas fa-user-alt"></i> Targeted Muscles</h3>
+          <div id="muscle-map" style="margin-top: 16px;">
+            \${renderMuscleMap(program, state.workoutTab.selectedDay)}
+          </div>
+        </div>
+        
+        <div class="card" style="margin-top: 16px;">
+          <h3><i class="fas fa-info-circle"></i> Program Info</h3>
+          <div style="margin-top: 12px; font-size: 14px; line-height: 1.6;">
+            \${program.description || 'No description available.'}
+          </div>
+        </div>
+      </div>
+    </div>
+  \`;
+}
+
+// Render workout day details sub-tab
+function renderWorkoutDayDetails(program) {
+  const container = document.getElementById('workout-subtab-content');
+  
+  const selectedDayIndex = state.workoutTab.selectedDay !== null ? state.workoutTab.selectedDay : 0;
+  const day = program.days && program.days[selectedDayIndex];
+
+  if (!day) {
     container.innerHTML = \`
       <div class="card">
-        <h2><i class="fas fa-dumbbell"></i> No Active Workout</h2>
-        <p>Start a workout to begin tracking your session.</p>
-        <button class="btn btn-primary" onclick="startWorkout()">
-          <i class="fas fa-play"></i> Start Workout
+        <p>No workout day selected. Please select a day from the Overview tab.</p>
+        <button class="btn btn-primary" onclick="switchWorkoutSubTab('overview')">
+          <i class="fas fa-arrow-left"></i> Back to Overview
         </button>
       </div>
     \`;
+    return;
   }
+
+  container.innerHTML = \`
+    <div class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+        <div>
+          <h2 style="margin: 0 0 8px 0;">Day \${day.day_number || selectedDayIndex + 1}: \${day.name || 'Workout'}</h2>
+          <p style="color: var(--gray); margin: 0;">\${day.focus || 'Training Session'}</p>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-outline" onclick="switchWorkoutSubTab('overview')">
+            <i class="fas fa-arrow-left"></i> Overview
+          </button>
+          <button class="btn btn-primary" onclick="startWorkoutFromDay(\${program.id}, \${day.id})">
+            <i class="fas fa-play"></i> Start This Workout
+          </button>
+        </div>
+      </div>
+
+      <!-- Exercise List -->
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        \${day.exercises && day.exercises.length > 0 ? day.exercises.map((ex, idx) => \`
+          <div style="background: var(--light); border-radius: 12px; padding: 16px; border-left: 4px solid var(--primary);">
+            <div style="display: flex; justify-content: space-between; align-items: start;">
+              <div style="flex: 1;">
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                  <div style="background: var(--primary); color: white; width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: bold;">
+                    \${idx + 1}
+                  </div>
+                  <strong style="font-size: 16px;">\${ex.name}</strong>
+                </div>
+                <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-left: 44px;">
+                  <span style="background: var(--secondary-light); color: var(--secondary); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">
+                    <i class="fas fa-bullseye"></i> \${ex.muscle_group}
+                  </span>
+                  <span style="background: var(--primary-light); color: var(--primary); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">
+                    <i class="fas fa-dumbbell"></i> \${ex.equipment}
+                  </span>
+                  \${ex.is_unilateral ? '<span style="background: var(--warning); color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;"><i class="fas fa-balance-scale"></i> Unilateral</span>' : ''}
+                </div>
+              </div>
+              <div style="text-align: right;">
+                <div style="font-size: 14px; color: var(--gray);">Suggested:</div>
+                <div style="font-size: 18px; font-weight: 600; color: var(--primary);">
+                  \${ex.target_sets || 3} × \${ex.target_reps || '8-12'}
+                </div>
+              </div>
+            </div>
+            \${ex.tips ? \`
+              <details style="margin-top: 12px; margin-left: 44px;">
+                <summary style="cursor: pointer; color: var(--primary); font-weight: 600; user-select: none;">
+                  <i class="fas fa-info-circle"></i> Exercise Tips
+                </summary>
+                <div style="margin-top: 8px; font-size: 14px; line-height: 1.6; color: var(--gray);">
+                  \${ex.tips}
+                </div>
+              </details>
+            \` : ''}
+          </div>
+        \`).join('') : '<p>No exercises in this workout.</p>'}
+      </div>
+    </div>
+  \`;
+}
+
+// Helper: Estimate workout duration
+function estimateDuration(day) {
+  if (!day.exercises) return 0;
+  // Rough estimate: 3-4 minutes per set, 3 sets per exercise
+  const exerciseCount = day.exercises.length;
+  return Math.round(exerciseCount * 3 * 3.5);
+}
+
+// Helper: Get last performed date (placeholder)
+function getLastPerformed(dayId) {
+  // TODO: Implement actual tracking
+  return null;
+}
+
+// Helper: Render muscle map
+function renderMuscleMap(program, selectedDayIndex) {
+  const day = program.days && program.days[selectedDayIndex !== null ? selectedDayIndex : 0];
+  
+  if (!day || !day.exercises) {
+    return '<p style="color: var(--gray); font-size: 14px; text-align: center; padding: 20px;">Select a workout day to see targeted muscles</p>';
+  }
+
+  // Extract unique muscle groups
+  const muscleGroups = [...new Set(day.exercises.map(ex => ex.muscle_group).filter(Boolean))];
+  
+  // Muscle group colors
+  const muscleColors = {
+    'Chest': '#e74c3c',
+    'Back': '#3498db',
+    'Shoulders': '#f39c12',
+    'Biceps': '#9b59b6',
+    'Triceps': '#1abc9c',
+    'Legs': '#2ecc71',
+    'Quads': '#27ae60',
+    'Hamstrings': '#16a085',
+    'Glutes': '#d35400',
+    'Calves': '#8e44ad',
+    'Abs': '#e67e22',
+    'Core': '#c0392b'
+  };
+
+  return \`
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      \${muscleGroups.length > 0 ? muscleGroups.map(muscle => \`
+        <div style="display: flex; align-items: center; gap: 12px; padding: 8px; background: var(--light); border-radius: 8px;">
+          <div style="width: 12px; height: 12px; border-radius: 50%; background: \${muscleColors[muscle] || 'var(--primary)'};"></div>
+          <span style="font-size: 14px; font-weight: 600;">\${muscle}</span>
+        </div>
+      \`).join('') : '<p style="color: var(--gray); font-size: 14px; text-align: center; padding: 20px;">No muscle groups specified</p>'}
+    </div>
+    
+    <!-- Simple body diagram placeholder -->
+    <div style="margin-top: 20px; text-align: center; padding: 20px; background: var(--light); border-radius: 12px;">
+      <i class="fas fa-male" style="font-size: 80px; color: var(--primary); opacity: 0.3;"></i>
+      <div style="margin-top: 12px; font-size: 12px; color: var(--gray);">Muscle Map Visualization</div>
+    </div>
+  \`;
+}
+
+// Switch workout sub-tab
+function switchWorkoutSubTab(subtab) {
+  state.workoutTab.currentSubTab = subtab;
+  loadWorkout(); // Reload to reflect new sub-tab
+}
+
+// Select workout day
+function selectWorkoutDay(dayIndex) {
+  state.workoutTab.selectedDay = dayIndex;
+  renderMuscleMapUpdate();
+}
+
+// Update muscle map when day selected
+function renderMuscleMapUpdate() {
+  const mapContainer = document.getElementById('muscle-map');
+  if (!mapContainer) return;
+  
+  // Re-fetch program and render
+  api('/programs').then(data => {
+    const activeProgram = data.programs.find(p => p.active);
+    if (activeProgram) {
+      api(\`/programs/\${activeProgram.id}\`).then(programData => {
+        mapContainer.innerHTML = renderMuscleMap(programData.program, state.workoutTab.selectedDay);
+      });
+    }
+  });
+}
+
+// Start workout from specific day
+function startWorkoutFromDay(programId, dayId) {
+  startWorkoutDay(programId, dayId);
 }
 
 // Load workout interface
