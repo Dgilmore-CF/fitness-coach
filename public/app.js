@@ -1599,12 +1599,21 @@ function updateRestTimerDisplay() {
 }
 
 function stopRestTimer() {
+  // Stop old interface rest timer
   if (state.restTimer) {
     clearInterval(state.restTimer);
     state.restTimer = null;
     state.restEndTime = null;
     const display = document.getElementById('restTimer');
     if (display) display.textContent = '00:00';
+  }
+  
+  // Stop Phase 4 rest timer
+  if (state.restTimerInterval) {
+    clearInterval(state.restTimerInterval);
+    state.restTimerInterval = null;
+    const timerDisplay = document.getElementById('rest-timer-display');
+    if (timerDisplay) timerDisplay.remove();
   }
 }
 
@@ -2568,17 +2577,31 @@ function showNotification(message, type = 'success') {
   }, 3000);
 }
 
-// Save workout notes
+// Save workout notes (works with both old interface and Phase 4 modal)
 async function saveWorkoutNotes() {
-  const notes = document.getElementById('workoutNotes').value;
+  // Try Phase 4 modal textarea first
+  const textarea = document.getElementById('workout-notes-input');
+  const notes = textarea ? textarea.value : document.getElementById('workoutNotes')?.value;
+  
+  if (!state.currentWorkout) {
+    showNotification('No active workout', 'error');
+    return;
+  }
   
   try {
     await api(`/workouts/${state.currentWorkout.id}`, {
-      method: 'PUT',
+      method: 'PATCH',
       body: JSON.stringify({ notes })
     });
 
+    state.workoutNotes = notes;
     showNotification('Notes saved!', 'success');
+    
+    // Close modal if it's the Phase 4 version
+    if (textarea) {
+      const modal = textarea.closest('div[style*="fixed"]');
+      if (modal) modal.remove();
+    }
   } catch (error) {
     showNotification('Error saving notes: ' + error.message, 'error');
   }
@@ -2819,7 +2842,7 @@ async function deleteWorkout() {
     stopRestTimer();
     
     showNotification('Workout deleted successfully', 'success');
-    switchTab('workout');
+    loadWorkout();
   } catch (error) {
     showNotification('Error deleting workout: ' + error.message, 'error');
   }
@@ -3836,29 +3859,7 @@ function showWorkoutNotesModal() {
   setTimeout(() => document.getElementById('workout-notes-input')?.focus(), 100);
 }
 
-async function saveWorkoutNotes() {
-  const textarea = document.getElementById('workout-notes-input');
-  if (!textarea) return;
-  
-  state.workoutNotes = textarea.value;
-  
-  // Save to workout
-  if (state.currentWorkout) {
-    try {
-      await api(`/workouts/${state.currentWorkout.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ notes: state.workoutNotes })
-      });
-      showNotification('Notes saved!', 'success');
-    } catch (error) {
-      showNotification('Error saving notes: ' + error.message, 'error');
-    }
-  }
-  
-  // Close modal
-  const modal = textarea.closest('div[style*="fixed"]');
-  if (modal) modal.remove();
-}
+// Note: saveWorkoutNotes() is defined earlier in the file and works with both interfaces
 
 // Confetti Animation
 function triggerConfetti() {
