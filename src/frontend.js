@@ -798,6 +798,35 @@ async function startWorkout() {
   }
 }
 
+// Start workout from a specific program
+async function startWorkoutFromProgram(programId) {
+  try {
+    // Get program details
+    const programData = await api(\`/programs/\${programId}\`);
+    const program = programData.program;
+
+    // Show day selection
+    const modalBody = document.getElementById('modalBody');
+    modalBody.innerHTML = \`
+      <h3>Select Workout Day</h3>
+      <div class="exercise-list">
+        \${program.days.map(day => \`
+          <div class="exercise-item" onclick="startWorkoutDay(\${program.id}, \${day.id})">
+            <strong>Day \${day.day_number}: \${day.name}</strong>
+            <div style="color: var(--gray); font-size: 14px;">\${day.focus}</div>
+            <div style="font-size: 12px; margin-top: 4px;">\${day.exercises.length} exercises</div>
+          </div>
+        \`).join('')}
+      </div>
+    \`;
+
+    document.getElementById('modalTitle').textContent = 'Start Workout';
+    openModal();
+  } catch (error) {
+    showNotification('Error starting workout: ' + error.message, 'error');
+  }
+}
+
 // Start workout from program day
 async function startWorkoutDay(programId, programDayId) {
   try {
