@@ -182,20 +182,72 @@ async function loadDashboard() {
       <div class="card">
         <h2><i class="fas fa-history"></i> Recent Workouts</h2>
         ${recentWorkouts.workouts.length > 0 ? `
-          <div class="exercise-list">
+          <div style="display: flex; flex-direction: column; gap: 12px;">
             ${recentWorkouts.workouts.map(w => `
-              <div class="exercise-item" onclick="viewWorkout(${w.id})">
-                <div style="display: flex; justify-content: space-between;">
-                  <div>
-                    <strong>${w.day_name || 'Custom Workout'}</strong>
-                    <div style="color: var(--gray); font-size: 14px;">
-                      ${new Date(w.start_time).toLocaleDateString()} - 
-                      ${w.total_weight_kg ? formatWeight(w.total_weight_kg) : 'N/A'}
+              <div style="background: var(--white); border: 2px solid var(--border); border-radius: 12px; overflow: hidden; transition: all 0.3s;" id="workout-card-${w.id}">
+                <!-- Workout Header -->
+                <div style="padding: 16px; cursor: pointer;" onclick="toggleWorkoutDetails(${w.id})">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="flex: 1;">
+                      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                        <div style="background: ${w.completed ? 'var(--secondary)' : 'var(--warning)'}; color: white; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                          <i class="fas fa-${w.completed ? 'check' : 'clock'}"></i>
+                        </div>
+                        <div>
+                          <strong style="font-size: 16px;">${w.day_name || 'Custom Workout'}</strong>
+                          <div style="color: var(--gray); font-size: 13px;">
+                            ${new Date(w.start_time).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                          </div>
+                        </div>
+                      </div>
+                      <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+                        <span style="font-size: 13px; color: var(--gray);">
+                          <i class="fas fa-clock"></i> ${formatDuration(w.total_duration_seconds)}
+                        </span>
+                        <span style="font-size: 13px; color: var(--gray);">
+                          <i class="fas fa-weight-hanging"></i> ${w.total_weight_kg ? formatWeight(w.total_weight_kg) : 'N/A'}
+                        </span>
+                      </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                      ${w.completed ? '<span style="background: var(--secondary-light); color: var(--secondary); padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">✓ Complete</span>' : '<span style="background: var(--warning); color: white; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">In Progress</span>'}
+                      <i class="fas fa-chevron-down" id="workout-chevron-${w.id}" style="transition: transform 0.3s;"></i>
                     </div>
                   </div>
-                  <div style="text-align: right;">
-                    <div>${formatDuration(w.total_duration_seconds)}</div>
-                    ${w.completed ? '<span style="color: var(--secondary);">✓ Completed</span>' : '<span style="color: var(--warning);">In Progress</span>'}
+                </div>
+                <!-- Expandable Details -->
+                <div id="workout-details-${w.id}" style="display: none; border-top: 1px solid var(--border); background: var(--light); padding: 20px;">
+                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 16px;">
+                    <div>
+                      <div style="font-size: 12px; color: var(--gray); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Training Time</div>
+                      <div style="font-size: 18px; font-weight: 600;">${formatDuration(w.total_duration_seconds)}</div>
+                    </div>
+                    <div>
+                      <div style="font-size: 12px; color: var(--gray); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Exercises</div>
+                      <div style="font-size: 18px; font-weight: 600;">${w.exercise_count || 0}</div>
+                    </div>
+                    <div>
+                      <div style="font-size: 12px; color: var(--gray); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Total Sets</div>
+                      <div style="font-size: 18px; font-weight: 600;">${w.total_sets || 0}</div>
+                    </div>
+                    <div>
+                      <div style="font-size: 12px; color: var(--gray); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Total Volume</div>
+                      <div style="font-size: 18px; font-weight: 600;">${w.total_weight_kg ? formatWeight(w.total_weight_kg) : 'N/A'}</div>
+                    </div>
+                  </div>
+                  ${w.notes ? `
+                    <div style="background: var(--white); border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+                      <div style="font-size: 12px; color: var(--gray); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Session Notes</div>
+                      <div style="font-size: 14px; line-height: 1.5;">${w.notes}</div>
+                    </div>
+                  ` : ''}
+                  <div style="display: flex; gap: 8px; margin-top: 12px;">
+                    <button class="btn btn-outline" onclick="event.stopPropagation(); viewWorkout(${w.id})" style="flex: 1;">
+                      <i class="fas fa-eye"></i> View Details
+                    </button>
+                    <button class="btn btn-danger" onclick="event.stopPropagation(); deleteDashboardWorkout(${w.id})">
+                      <i class="fas fa-trash"></i> Delete
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1378,8 +1430,70 @@ async function loadAnalytics() {
         ` : '<p>No exercise data yet.</p>'}
       </div>
     `;
+
+    // Load and display workout history
+    await loadWorkoutHistory(container);
+
   } catch (error) {
     container.innerHTML = `<div class="card"><p>Error loading analytics: ${error.message}</p></div>`;
+  }
+}
+
+// Load workout history for analytics
+async function loadWorkoutHistory(container) {
+  try {
+    const workoutsData = await api('/workouts?limit=20');
+    
+    const historyHTML = `
+      <div class="card">
+        <h2><i class="fas fa-history"></i> Workout History</h2>
+        ${workoutsData.workouts.length > 0 ? `
+          <div style="overflow-x: auto;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Workout</th>
+                  <th>Duration</th>
+                  <th>Volume</th>
+                  <th>Sets</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${workoutsData.workouts.map(w => `
+                  <tr>
+                    <td>${new Date(w.start_time).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
+                    <td><strong>${w.day_name || 'Custom Workout'}</strong></td>
+                    <td>${formatDuration(w.total_duration_seconds)}</td>
+                    <td>${w.total_weight_kg ? formatWeight(w.total_weight_kg) : 'N/A'}</td>
+                    <td>${w.total_sets || 0}</td>
+                    <td>
+                      ${w.completed 
+                        ? '<span style="background: var(--secondary-light); color: var(--secondary); padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600;">✓ Complete</span>' 
+                        : '<span style="background: var(--warning); color: white; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600;">In Progress</span>'}
+                    </td>
+                    <td>
+                      <button class="btn btn-outline" onclick="viewWorkout(${w.id})" style="padding: 6px 12px; font-size: 12px; margin-right: 4px;">
+                        <i class="fas fa-eye"></i>
+                      </button>
+                      <button class="btn btn-danger" onclick="deleteAnalyticsWorkout(${w.id})" style="padding: 6px 12px; font-size: 12px;">
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        ` : '<p>No workout history yet.</p>'}
+      </div>
+    `;
+    
+    container.insertAdjacentHTML('beforeend', historyHTML);
+  } catch (error) {
+    console.error('Error loading workout history:', error);
   }
 }
 
@@ -2449,5 +2563,51 @@ async function confirmCardioSwitch() {
     switchTab('analytics');
   } catch (error) {
     showNotification('Error recording cardio: ' + error.message, 'error');
+  }
+}
+
+// Toggle workout details on dashboard
+function toggleWorkoutDetails(workoutId) {
+  const details = document.getElementById(`workout-details-${workoutId}`);
+  const chevron = document.getElementById(`workout-chevron-${workoutId}`);
+  
+  if (details.style.display === 'none') {
+    details.style.display = 'block';
+    if (chevron) chevron.style.transform = 'rotate(180deg)';
+  } else {
+    details.style.display = 'none';
+    if (chevron) chevron.style.transform = 'rotate(0deg)';
+  }
+}
+
+// Delete workout from dashboard
+async function deleteDashboardWorkout(workoutId) {
+  if (!confirm('Are you sure you want to delete this workout? This cannot be undone.')) return;
+  
+  try {
+    await api(`/workouts/${workoutId}`, {
+      method: 'DELETE'
+    });
+    
+    showNotification('Workout deleted successfully', 'success');
+    loadDashboard();
+  } catch (error) {
+    showNotification('Error deleting workout: ' + error.message, 'error');
+  }
+}
+
+// Delete workout from analytics
+async function deleteAnalyticsWorkout(workoutId) {
+  if (!confirm('Are you sure you want to delete this workout? This cannot be undone.')) return;
+  
+  try {
+    await api(`/workouts/${workoutId}`, {
+      method: 'DELETE'
+    });
+    
+    showNotification('Workout deleted successfully', 'success');
+    loadAnalytics();
+  } catch (error) {
+    showNotification('Error deleting workout: ' + error.message, 'error');
   }
 }
