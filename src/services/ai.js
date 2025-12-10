@@ -289,8 +289,11 @@ ${JSON.stringify(exampleProgram, null, 2)}
 
 Now create a similar ${days_per_week}-day ${goal} program structure for this user:
 - Age: ${user.age || 'Not specified'}
+- Gender: ${user.gender === 'male' ? 'Male' : user.gender === 'female' ? 'Female' : 'Not specified'}
 - Weight: ${user.weight_kg ? user.weight_kg + ' kg' : 'Not specified'}
 - Goal: ${goal}
+
+${user.gender === 'female' ? 'Note: Consider typical female training preferences - may benefit from higher rep ranges, emphasis on glutes/legs, and appropriate exercise selection.' : user.gender === 'male' ? 'Note: Consider typical male training preferences - balanced upper/lower split, compound movements, progressive overload focus.' : ''}
 
 IMPORTANT: Return ONLY the structure (name and days array WITHOUT exercises). Follow this exact format:
 {

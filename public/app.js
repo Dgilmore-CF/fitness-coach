@@ -2450,6 +2450,18 @@ function showProfile() {
     </div>
 
     <div class="form-group">
+      <label>Gender:</label>
+      <select id="profileGender" class="form-control">
+        <option value="not_specified" ${!state.user.gender || state.user.gender === 'not_specified' ? 'selected' : ''}>Prefer not to say</option>
+        <option value="male" ${state.user.gender === 'male' ? 'selected' : ''}>Male</option>
+        <option value="female" ${state.user.gender === 'female' ? 'selected' : ''}>Female</option>
+      </select>
+      <small style="color: var(--gray); font-size: 12px; display: block; margin-top: 4px;">
+        <i class="fas fa-info-circle"></i> Used by AI to personalize program recommendations
+      </small>
+    </div>
+
+    <div class="form-group">
       <label>Measurement System:</label>
       <select id="profileSystem" class="form-control" onchange="toggleMeasurementInputs()">
         <option value="metric" ${!isImperial ? 'selected' : ''}>Metric (kg, cm)</option>
@@ -2508,6 +2520,7 @@ function toggleMeasurementInputs() {
 async function saveProfile() {
   const name = document.getElementById('profileName').value;
   const age = parseInt(document.getElementById('profileAge').value);
+  const gender = document.getElementById('profileGender').value;
   const measurement_system = document.getElementById('profileSystem').value;
   
   let height_cm, weight_kg;
@@ -2527,7 +2540,7 @@ async function saveProfile() {
   try {
     const data = await api('/auth/user', {
       method: 'PUT',
-      body: JSON.stringify({ name, age, height_cm, weight_kg, measurement_system })
+      body: JSON.stringify({ name, age, gender, height_cm, weight_kg, measurement_system })
     });
 
     state.user = data.user;
