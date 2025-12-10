@@ -898,6 +898,9 @@ async function startWorkoutFromProgram(programId) {
 // Start workout from program day - Phase 3 New Flow
 async function startWorkoutDay(programId, programDayId) {
   try {
+    showLoadingOverlay('Starting your workout...');
+    
+    // Create the workout
     const data = await api('/workouts', {
       method: 'POST',
       body: JSON.stringify({
@@ -906,14 +909,20 @@ async function startWorkoutDay(programId, programDayId) {
       })
     });
 
-    state.currentWorkout = data.workout;
+    // Fetch the full workout details with exercises
+    const fullWorkout = await api(\`/workouts/\${data.workout.id}\`);
+    
+    state.currentWorkout = fullWorkout.workout;
+    hideLoadingOverlay();
     closeModal();
     
     // Phase 3: Show warmup screen first, then exercise tabs
-    showWorkoutWarmupScreen(data.workout);
+    showWorkoutWarmupScreen(fullWorkout.workout);
     
   } catch (error) {
+    hideLoadingOverlay();
     showNotification('Error starting workout: ' + error.message, 'error');
+    console.error('Start workout error:', error);
   }
 }
 
@@ -1265,7 +1274,16 @@ function switchWorkoutSubTab(subtab) {
 // Select workout day
 function selectWorkoutDay(dayIndex) {
   state.workoutTab.selectedDay = dayIndex;
-  renderMuscleMapUpdate();
+  
+  // Re-render the entire overview to update highlighting
+  api('/programs').then(data => {
+    const activeProgram = data.programs.find(p => p.active);
+    if (activeProgram) {
+      api(\`/programs/\${activeProgram.id}\`).then(programData => {
+        renderWorkoutOverview(programData.program);
+      });
+    }
+  });
 }
 
 // Update muscle map when day selected
@@ -3004,6 +3022,13 @@ const warmupDatabase = {
 
 // Show warmup screen before workout
 function showWorkoutWarmupScreen(workout) {
+  // Validate workout has exercises
+  if (!workout || !workout.exercises || workout.exercises.length === 0) {
+    showNotification('Error: Workout has no exercises', 'error');
+    console.error('Invalid workout data:', workout);
+    return;
+  }
+  
   // Create full-screen modal
   const modal = document.createElement('div');
   modal.id = 'workout-modal';
