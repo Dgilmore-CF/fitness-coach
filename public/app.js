@@ -468,6 +468,157 @@ async function viewProgram(programId) {
   }
 }
 
+// View workout details
+async function viewWorkout(workoutId) {
+  try {
+    const data = await api(`/workouts/${workoutId}`);
+    const workout = data.workout;
+    
+    // Calculate total volume
+    let totalVolume = 0;
+    let totalSets = 0;
+    let totalReps = 0;
+    
+    workout.exercises.forEach(ex => {
+      if (ex.sets) {
+        ex.sets.forEach(set => {
+          totalVolume += (set.weight_kg * set.reps);
+          totalSets += 1;
+          totalReps += set.reps;
+        });
+      }
+    });
+    
+    const modalBody = document.getElementById('modalBody');
+    modalBody.innerHTML = `
+      <div style="margin-bottom: 24px;">
+        <h3 style="margin-bottom: 8px;">${workout.program_day_name || 'Workout'}</h3>
+        <div style="display: flex; gap: 16px; flex-wrap: wrap; font-size: 14px; color: var(--gray);">
+          <span><i class="fas fa-calendar"></i> ${new Date(workout.start_time).toLocaleDateString()}</span>
+          <span><i class="fas fa-clock"></i> ${formatDuration(workout.total_duration_seconds)}</span>
+          <span><i class="fas fa-check-circle" style="color: var(--secondary);"></i> Completed</span>
+        </div>
+      </div>
+
+      <!-- Summary Stats -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 24px;">
+        <div style="padding: 16px; background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white; border-radius: 12px; text-align: center;">
+          <div style="font-size: 24px; font-weight: bold;">${formatWeight(totalVolume)}</div>
+          <div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">Total Volume</div>
+        </div>
+        <div style="padding: 16px; background: linear-gradient(135deg, var(--secondary) 0%, #047857 100%); color: white; border-radius: 12px; text-align: center;">
+          <div style="font-size: 24px; font-weight: bold;">${totalSets}</div>
+          <div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">Total Sets</div>
+        </div>
+        <div style="padding: 16px; background: linear-gradient(135deg, var(--warning) 0%, #d97706 100%); color: white; border-radius: 12px; text-align: center;">
+          <div style="font-size: 24px; font-weight: bold;">${totalReps}</div>
+          <div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">Total Reps</div>
+        </div>
+        <div style="padding: 16px; background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); color: white; border-radius: 12px; text-align: center;">
+          <div style="font-size: 24px; font-weight: bold;">${workout.exercises?.length || 0}</div>
+          <div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">Exercises</div>
+        </div>
+      </div>
+
+      ${workout.notes ? `
+        <div style="padding: 16px; background: var(--light); border-radius: 12px; margin-bottom: 24px; border-left: 4px solid var(--primary);">
+          <strong style="display: block; margin-bottom: 8px; color: var(--primary);">
+            <i class="fas fa-sticky-note"></i> Workout Notes
+          </strong>
+          <p style="margin: 0; line-height: 1.6; white-space: pre-wrap;">${workout.notes}</p>
+        </div>
+      ` : ''}
+
+      <!-- Exercise Details -->
+      <div style="margin-top: 24px;">
+        <h4 style="margin-bottom: 16px; color: var(--text-primary);">
+          <i class="fas fa-dumbbell"></i> Exercises Performed
+        </h4>
+        ${workout.exercises && workout.exercises.length > 0 ? workout.exercises.map((ex, idx) => {
+          const exerciseVolume = ex.sets?.reduce((sum, set) => sum + (set.weight_kg * set.reps), 0) || 0;
+          const exerciseSets = ex.sets?.length || 0;
+          const exerciseReps = ex.sets?.reduce((sum, set) => sum + set.reps, 0) || 0;
+          
+          return `
+            <div style="margin-bottom: 20px; padding: 20px; background: var(--bg-secondary); border-radius: 12px; border: 1px solid var(--border);">
+              <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px; flex-wrap: wrap; gap: 12px;">
+                <div>
+                  <strong style="font-size: 16px; color: var(--text-primary);">
+                    ${idx + 1}. ${ex.name}
+                  </strong>
+                  <div style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">
+                    <span style="margin-right: 12px;"><i class="fas fa-bullseye"></i> ${ex.muscle_group}</span>
+                    ${ex.equipment ? `<span><i class="fas fa-tools"></i> ${ex.equipment}</span>` : ''}
+                  </div>
+                </div>
+                <div style="text-align: right;">
+                  <div style="font-size: 12px; color: var(--text-secondary);">Volume</div>
+                  <div style="font-size: 18px; font-weight: bold; color: var(--primary);">
+                    ${formatWeight(exerciseVolume)}
+                  </div>
+                </div>
+              </div>
+
+              ${ex.sets && ex.sets.length > 0 ? `
+                <div style="overflow-x: auto;">
+                  <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                    <thead>
+                      <tr style="background: var(--light); border-bottom: 2px solid var(--border);">
+                        <th style="padding: 8px; text-align: center; font-weight: 600;">Set</th>
+                        <th style="padding: 8px; text-align: center; font-weight: 600;">Weight</th>
+                        <th style="padding: 8px; text-align: center; font-weight: 600;">Reps</th>
+                        <th style="padding: 8px; text-align: center; font-weight: 600;">1RM Est.</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${ex.sets.map((set, setIdx) => `
+                        <tr style="border-bottom: 1px solid var(--border);">
+                          <td style="padding: 10px; text-align: center; font-weight: 600;">${setIdx + 1}</td>
+                          <td style="padding: 10px; text-align: center;">${formatWeight(set.weight_kg)}</td>
+                          <td style="padding: 10px; text-align: center;">${set.reps}</td>
+                          <td style="padding: 10px; text-align: center; color: var(--primary); font-weight: 600;">
+                            ${set.one_rep_max_kg ? formatWeight(set.one_rep_max_kg) : '-'}
+                          </td>
+                        </tr>
+                      `).join('')}
+                      <tr style="background: var(--light); font-weight: 600;">
+                        <td style="padding: 10px; text-align: center;">Total</td>
+                        <td style="padding: 10px; text-align: center;">-</td>
+                        <td style="padding: 10px; text-align: center;">${exerciseReps}</td>
+                        <td style="padding: 10px; text-align: center;">${exerciseSets} sets</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              ` : '<p style="color: var(--gray); font-style: italic; margin-top: 8px;">No sets recorded</p>'}
+
+              ${ex.notes ? `
+                <div style="margin-top: 12px; padding: 12px; background: var(--bg-primary); border-radius: 8px; border-left: 3px solid var(--primary);">
+                  <strong style="font-size: 12px; color: var(--primary); display: block; margin-bottom: 4px;">
+                    <i class="fas fa-comment"></i> Exercise Notes:
+                  </strong>
+                  <p style="margin: 0; font-size: 13px; line-height: 1.5; color: var(--text-secondary);">${ex.notes}</p>
+                </div>
+              ` : ''}
+            </div>
+          `;
+        }).join('') : '<p style="color: var(--gray); font-style: italic;">No exercises recorded</p>'}
+      </div>
+
+      <div style="margin-top: 24px; padding-top: 24px; border-top: 2px solid var(--border); display: flex; gap: 12px; justify-content: flex-end;">
+        <button class="btn btn-outline" onclick="closeModal()">
+          <i class="fas fa-times"></i> Close
+        </button>
+      </div>
+    `;
+    
+    document.getElementById('modalTitle').textContent = 'Workout Details';
+    openModal(true); // Pass true for wide modal
+  } catch (error) {
+    showNotification('Error loading workout: ' + error.message, 'error');
+  }
+}
+
 // Manual program creation state
 const manualProgramState = {
   name: '',
