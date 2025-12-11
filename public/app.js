@@ -156,7 +156,16 @@ async function loadUser() {
 function switchTab(tabName) {
   // Update tab buttons
   document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-  event.target.classList.add('active');
+  
+  // Find and activate the correct tab button by matching onclick attribute
+  const targetTab = Array.from(document.querySelectorAll('.tab')).find(tab => {
+    const onclick = tab.getAttribute('onclick');
+    return onclick && onclick.includes(`'${tabName}'`) || onclick && onclick.includes(`"${tabName}"`);
+  });
+  
+  if (targetTab) {
+    targetTab.classList.add('active');
+  }
 
   // Update tab content
   document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
