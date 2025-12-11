@@ -5092,21 +5092,8 @@ document.addEventListener('DOMContentLoaded', () => {
   injectPhase4Styles();
 });
 
-// Enhanced addExerciseSet with rest timer
-const originalAddExerciseSet = addExerciseSet;
-async function addExerciseSet(exerciseId) {
-  await originalAddExerciseSet(exerciseId);
-  
-  // Start rest timer after logging set (unless it's the last set)
-  const currentExercise = state.currentWorkout.exercises[state.workoutExercise.currentIndex];
-  const completedSets = (currentExercise.sets || []).length;
-  const targetSets = currentExercise.target_sets || 3;
-  
-  if (completedSets < targetSets) {
-    // Start 90 second rest timer
-    startRestTimer(90);
-  }
-}
+// Note: addExerciseSet already handles rest timer in its implementation
+// No need for wrapper here - removed to prevent recursion
 
 // Enhanced startWorkoutExercises with keyboard shortcuts
 const originalStartWorkoutExercises = startWorkoutExercises;
