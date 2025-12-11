@@ -18,6 +18,9 @@ const state = {
   theme: null
 };
 
+// Prevent concurrent set logging
+let isAddingSet = false;
+
 // Theme Management
 function initTheme() {
   // Check for saved theme preference or default to system preference
@@ -4000,6 +4003,7 @@ function renderWorkoutExerciseTabs() {
   updateWorkoutTimerDisplay();
   
   // Auto-focus on weight input for faster logging
+  // Use named functions to prevent event listener accumulation
   setTimeout(() => {
     const weightInput = document.getElementById('newSetWeight');
     const repsInput = document.getElementById('newSetReps');
@@ -4007,27 +4011,41 @@ function renderWorkoutExerciseTabs() {
     if (weightInput) {
       weightInput.focus();
       
-      // Add Enter key navigation
-      weightInput.addEventListener('keydown', (e) => {
+      // Use addEventListener with once: true to ensure single execution
+      weightInput.addEventListener('keydown', function handleWeightEnter(e) {
         if (e.key === 'Enter') {
           e.preventDefault();
           e.stopPropagation();
-          if (repsInput) repsInput.focus();
+          const repsField = document.getElementById('newSetReps');
+          if (repsField) repsField.focus();
         }
-      });
+      }, { once: false }); // Keep alive for multiple uses
     }
     
     if (repsInput) {
-      // Add Enter key submission via Ctrl+Enter for safety
-      repsInput.addEventListener('keydown', (e) => {
+      // Use addEventListener with once: true to prevent accumulation
+      repsInput.addEventListener('keydown', function handleRepsEnter(e) {
         if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
           e.preventDefault();
           e.stopPropagation();
-          // Just trigger the button click instead of calling function directly
+          // Check if already processing to prevent duplicate calls
+          if (isAddingSet) {
+            console.log('Already logging a set, ignoring Enter key');
+            return;
+          }
+          // Get the current exercise ID from the button's onclick attribute
           const logButton = document.querySelector('.btn-primary[onclick^="addExerciseSet"]');
-          if (logButton) logButton.click();
+          if (logButton) {
+            // Extract exercise ID from onclick attribute
+            const onclickAttr = logButton.getAttribute('onclick');
+            const match = onclickAttr.match(/addExerciseSet\((\d+)\)/);
+            if (match) {
+              const exerciseId = parseInt(match[1]);
+              addExerciseSet(exerciseId);
+            }
+          }
         }
-      });
+      }, { once: false }); // Keep alive for multiple uses
     }
   }, 100);
 }
@@ -4146,8 +4164,6 @@ function renderExerciseContent(exercise, index) {
 }
 
 // Add set to exercise
-let isAddingSet = false; // Prevent concurrent calls
-
 async function addExerciseSet(exerciseId) {
   // Prevent concurrent execution
   if (isAddingSet) {
