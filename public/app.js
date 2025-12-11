@@ -312,9 +312,15 @@ async function loadDashboard() {
                     </div>
                   ` : ''}
                   <div style="display: flex; gap: 8px; margin-top: 12px;">
-                    <button class="btn btn-outline" onclick="event.stopPropagation(); viewWorkout(${w.id})" style="flex: 1;">
-                      <i class="fas fa-eye"></i> View Details
-                    </button>
+                    ${w.completed ? `
+                      <button class="btn btn-outline" onclick="event.stopPropagation(); viewWorkout(${w.id})" style="flex: 1;">
+                        <i class="fas fa-eye"></i> View Details
+                      </button>
+                    ` : `
+                      <button class="btn btn-primary" onclick="event.stopPropagation(); viewWorkout(${w.id})" style="flex: 1;">
+                        <i class="fas fa-play"></i> Continue Workout
+                      </button>
+                    `}
                     <button class="btn btn-danger" onclick="event.stopPropagation(); deleteDashboardWorkout(${w.id})">
                       <i class="fas fa-trash"></i> Delete
                     </button>
@@ -485,6 +491,13 @@ async function viewWorkout(workoutId) {
   try {
     const data = await api(`/workouts/${workoutId}`);
     const workout = data.workout;
+    
+    // If workout is not completed, resume it in the modal instead
+    if (!workout.completed) {
+      state.currentWorkout = workout;
+      resumeWorkoutModal();
+      return;
+    }
     
     // Calculate total volume
     let totalVolume = 0;
@@ -1156,9 +1169,9 @@ async function loadWorkout() {
     }
   }
 
-  // If there's an active workout, show the workout recording interface
+  // If there's an active workout, resume it in the modal
   if (state.currentWorkout) {
-    loadWorkoutInterface();
+    resumeWorkoutModal();
     return;
   }
 
@@ -3896,6 +3909,61 @@ function cancelWorkoutStart() {
   if (state.currentWorkout) {
     api(`/workouts/${state.currentWorkout.id}`, { method: 'DELETE' });
     state.currentWorkout = null;
+  }
+}
+
+// Resume workout in modal (when navigating back to an active workout)
+async function resumeWorkoutModal() {
+  // Check if modal already exists
+  let modal = document.getElementById('workout-modal');
+  
+  // If modal doesn't exist, create it
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'workout-modal';
+    modal.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: var(--bg-secondary);
+      z-index: 1000;
+      overflow-y: auto;
+      padding: 20px;
+    `;
+    document.body.appendChild(modal);
+  }
+  
+  // Initialize workout state if not exists
+  if (!state.workoutExercise) {
+    state.workoutExercise = {
+      currentIndex: 0,
+      completed: []
+    };
+  }
+  
+  // Start workout timer if not already started
+  if (!state.workoutTimer) {
+    startWorkoutTimer();
+  }
+  
+  // Fetch latest workout data
+  try {
+    const data = await api(`/workouts/${state.currentWorkout.id}`);
+    state.currentWorkout = data.workout;
+    
+    // Render tabbed exercise interface
+    renderWorkoutExerciseTabs();
+    
+    // Enable keyboard shortcuts
+    enableKeyboardShortcuts();
+    
+    showNotification('Workout resumed!', 'success');
+    
+  } catch (error) {
+    showNotification('Error resuming workout: ' + error.message, 'error');
+    console.error('Error resuming workout:', error);
   }
 }
 
