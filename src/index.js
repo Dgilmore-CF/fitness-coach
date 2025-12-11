@@ -9,6 +9,7 @@ import analyticsRoutes from './routes/analytics';
 import nutritionRoutes from './routes/nutrition';
 import healthRoutes from './routes/health';
 import achievementsRoutes from './routes/achievements';
+import aiRoutes from './routes/ai';
 import { serveStatic } from './middleware/static';
 
 const app = new Hono();
@@ -26,6 +27,7 @@ app.route('/api/analytics', analyticsRoutes);
 app.route('/api/nutrition', nutritionRoutes);
 app.route('/api/health', healthRoutes);
 app.route('/api/achievements', achievementsRoutes);
+app.route('/api/ai', aiRoutes);
 
 // Serve static frontend
 app.get('/*', serveStatic);
