@@ -10,6 +10,12 @@ export async function serveStatic(c) {
   // Serve index.html for root and all non-API routes
   if (path === '/' || !path.startsWith('/api')) {
     const html = getIndexHTML();
+    
+    // Add cache control headers to prevent stale content
+    c.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+    c.header('Pragma', 'no-cache');
+    c.header('Expires', '0');
+    
     return c.html(html);
   }
   
