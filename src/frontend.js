@@ -4252,12 +4252,25 @@ async function addExerciseSet(exerciseId) {
   
   const weightInput = document.getElementById('newSetWeight');
   const repsInput = document.getElementById('newSetReps');
+  const logButton = document.querySelector('.btn-primary[onclick^="addExerciseSet"]');
+  
+  // Disable button to prevent duplicate clicks
+  if (logButton) {
+    logButton.disabled = true;
+    logButton.style.opacity = '0.5';
+    logButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Logging...';
+  }
   
   // Check if inputs exist
   if (!weightInput || !repsInput) {
     showNotification('Error: Input fields not found. Please refresh the page.', 'error');
     console.error('Missing input elements:', { weightInput, repsInput });
     isAddingSet = false;
+    if (logButton) {
+      logButton.disabled = false;
+      logButton.style.opacity = '1';
+      logButton.innerHTML = '<i class="fas fa-plus"></i> Log Set';
+    }
     return;
   }
 
@@ -4267,6 +4280,11 @@ async function addExerciseSet(exerciseId) {
   if (!weight || !reps || isNaN(weight) || isNaN(reps)) {
     showNotification('Please enter valid weight and reps', 'warning');
     isAddingSet = false;
+    if (logButton) {
+      logButton.disabled = false;
+      logButton.style.opacity = '1';
+      logButton.innerHTML = '<i class="fas fa-plus"></i> Log Set';
+    }
     return;
   }
   
@@ -4286,33 +4304,43 @@ async function addExerciseSet(exerciseId) {
     const data = await api(\`/workouts/\${state.currentWorkout.id}\`);
     state.currentWorkout = data.workout;
     
-    // Re-render current exercise
-    renderWorkoutExerciseTabs();
-    
     showNotification('Set logged!', 'success');
     
     // Start rest timer after logging set
     startRestTimer(90);
     
-    // Auto-advance if target sets reached
-    const currentExercise = state.currentWorkout.exercises[state.workoutExercise.currentIndex];
-    const completedSets = (currentExercise.sets || []).length;
-    const targetSets = currentExercise.target_sets || 3;
+    // Reset flag BEFORE re-rendering to prevent issues
+    isAddingSet = false;
     
-    if (completedSets >= targetSets) {
-      setTimeout(() => {
-        if (confirm('Target sets complete! Move to next exercise?')) {
-          nextExercise();
-        }
-      }, 500);
-    }
+    // Defer re-render to next tick to completely clear call stack
+    // This prevents the new button's onclick from firing during render
+    setTimeout(() => {
+      renderWorkoutExerciseTabs();
+      
+      // Auto-advance if target sets reached
+      const currentExercise = state.currentWorkout.exercises[state.workoutExercise.currentIndex];
+      const completedSets = (currentExercise.sets || []).length;
+      const targetSets = currentExercise.target_sets || 3;
+      
+      if (completedSets >= targetSets) {
+        setTimeout(() => {
+          if (confirm('Target sets complete! Move to next exercise?')) {
+            nextExercise();
+          }
+        }, 500);
+      }
+    }, 0);
     
   } catch (error) {
     console.error('Error logging set:', error);
     showNotification('Error logging set: ' + error.message, 'error');
-  } finally {
-    // Always reset the flag
     isAddingSet = false;
+    // Re-enable button on error
+    if (logButton) {
+      logButton.disabled = false;
+      logButton.style.opacity = '1';
+      logButton.innerHTML = '<i class="fas fa-plus"></i> Log Set';
+    }
   }
 }
 
