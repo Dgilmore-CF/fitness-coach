@@ -1010,6 +1010,9 @@ function getIndexHTML() {
             <button class="tab" onclick="switchTab('analytics')">
                 <i class="fas fa-chart-line"></i> Analytics
             </button>
+            <button class="tab" onclick="switchTab('insights')">
+                <i class="fas fa-brain"></i> AI Insights
+            </button>
             <button class="tab" onclick="switchTab('achievements')">
                 <i class="fas fa-trophy"></i> Achievements
             </button>
@@ -1035,6 +1038,10 @@ function getIndexHTML() {
 
         <div id="analytics" class="tab-content">
             <!-- Analytics content will be loaded here -->
+        </div>
+
+        <div id="insights" class="tab-content">
+            <!-- AI Insights content will be loaded here -->
         </div>
 
         <div id="achievements" class="tab-content">

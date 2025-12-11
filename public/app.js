@@ -188,11 +188,14 @@ function switchTab(tabName) {
     case 'analytics':
       loadAnalytics();
       break;
+    case 'insights':
+      loadInsights();
+      break;
     case 'achievements':
       loadAchievements();
       break;
-    case 'nutrition':
-      loadNutrition();
+    default:
+      loadDashboard();
       break;
     case 'learn':
       loadLearn();
@@ -2468,6 +2471,289 @@ async function loadWorkoutHistory(container) {
   }
 }
 
+// AI Insights & Recommendations
+async function loadInsights() {
+  const container = document.getElementById('insights');
+  
+  try {
+    const [recommendations, progress] = await Promise.all([
+      api('/ai/recommendations'),
+      api('/analytics/progress?days=30')
+    ]);
+    
+    container.innerHTML = `
+      <div class="card" style="background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); color: white; border: none;">
+        <h2 style="margin: 0 0 12px 0; color: white;"><i class="fas fa-brain"></i> AI-Powered Training Insights</h2>
+        <p style="margin: 0; opacity: 0.95; font-size: 15px;">Personalized recommendations based on your performance data, recovery patterns, and training history</p>
+      </div>
+      
+      ${recommendations.recommendations && recommendations.recommendations.length > 0 ? `
+        <!-- Active Recommendations -->
+        <div class="card">
+          <h3><i class="fas fa-lightbulb"></i> Current Recommendations</h3>
+          <div style="display: flex; flex-direction: column; gap: 16px; margin-top: 16px;">
+            ${recommendations.recommendations.map(rec => `
+              <div style="background: ${rec.priority === 'high' ? 'var(--danger-light)' : rec.priority === 'medium' ? 'var(--warning-light)' : 'var(--secondary-light)'}; 
+                          border-left: 4px solid ${rec.priority === 'high' ? 'var(--danger)' : rec.priority === 'medium' ? 'var(--warning)' : 'var(--secondary)'}; 
+                          padding: 16px; border-radius: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+                  <div>
+                    <strong style="font-size: 16px; color: var(--dark);">${rec.title}</strong>
+                    <div style="font-size: 13px; color: var(--gray); margin-top: 4px;">
+                      <i class="fas fa-tag"></i> ${rec.category} • 
+                      <i class="fas fa-clock"></i> ${new Date(rec.created_at).toLocaleDateString()}
+                    </div>
+                  </div>
+                  <span style="background: ${rec.priority === 'high' ? 'var(--danger)' : rec.priority === 'medium' ? 'var(--warning)' : 'var(--secondary)'}; 
+                               color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; text-transform: uppercase;">
+                    ${rec.priority}
+                  </span>
+                </div>
+                <p style="margin: 0 0 12px 0; line-height: 1.6;">${rec.description}</p>
+                ${rec.action_items && rec.action_items.length > 0 ? `
+                  <div style="background: white; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
+                    <strong style="font-size: 13px; color: var(--dark); display: block; margin-bottom: 8px;">
+                      <i class="fas fa-tasks"></i> Action Items:
+                    </strong>
+                    <ul style="margin: 0; padding-left: 20px; line-height: 1.8;">
+                      ${rec.action_items.map(item => `<li>${item}</li>`).join('')}
+                    </ul>
+                  </div>
+                ` : ''}
+                <div style="display: flex; gap: 8px;">
+                  ${rec.auto_apply ? `
+                    <button class="btn btn-primary" onclick="applyRecommendation(${rec.id})" style="flex: 1;">
+                      <i class="fas fa-magic"></i> Apply Automatically
+                    </button>
+                  ` : ''}
+                  <button class="btn btn-outline" onclick="dismissRecommendation(${rec.id})" style="flex: 1;">
+                    <i class="fas fa-times"></i> Dismiss
+                  </button>
+                  <button class="btn btn-outline" onclick="viewRecommendationDetails(${rec.id})">
+                    <i class="fas fa-info-circle"></i> Details
+                  </button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : `
+        <div class="card">
+          <div style="text-align: center; padding: 40px 20px;">
+            <i class="fas fa-brain" style="font-size: 64px; color: var(--gray); margin-bottom: 16px;"></i>
+            <h3 style="color: var(--dark);">Analyzing Your Training...</h3>
+            <p style="color: var(--gray); margin-bottom: 24px;">Complete more workouts to receive personalized AI recommendations</p>
+            <button class="btn btn-primary" onclick="generateRecommendations()">
+              <i class="fas fa-sync"></i> Generate Recommendations Now
+            </button>
+          </div>
+        </div>
+      `}
+      
+      <!-- Recommendation Categories -->
+      <div class="card">
+        <h3><i class="fas fa-th-large"></i> Recommendation Categories</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 16px;">
+          <div style="background: var(--primary-light); padding: 20px; border-radius: 12px; text-align: center;">
+            <i class="fas fa-chart-line" style="font-size: 32px; color: var(--primary); margin-bottom: 8px;"></i>
+            <div style="font-size: 24px; font-weight: bold; color: var(--primary);">${recommendations.stats?.volume || 0}</div>
+            <div style="font-size: 13px; color: var(--gray); margin-top: 4px;">Volume Insights</div>
+          </div>
+          <div style="background: var(--secondary-light); padding: 20px; border-radius: 12px; text-align: center;">
+            <i class="fas fa-sync" style="font-size: 32px; color: var(--secondary); margin-bottom: 8px;"></i>
+            <div style="font-size: 24px; font-weight: bold; color: var(--secondary);">${recommendations.stats?.recovery || 0}</div>
+            <div style="font-size: 13px; color: var(--gray); margin-top: 4px;">Recovery Alerts</div>
+          </div>
+          <div style="background: var(--warning-light); padding: 20px; border-radius: 12px; text-align: center;">
+            <i class="fas fa-balance-scale" style="font-size: 32px; color: var(--warning); margin-bottom: 8px;"></i>
+            <div style="font-size: 24px; font-weight: bold; color: var(--warning);">${recommendations.stats?.balance || 0}</div>
+            <div style="font-size: 13px; color: var(--gray); margin-top: 4px;">Muscle Balance</div>
+          </div>
+          <div style="background: var(--danger-light); padding: 20px; border-radius: 12px; text-align: center;">
+            <i class="fas fa-exclamation-triangle" style="font-size: 32px; color: var(--danger); margin-bottom: 8px;"></i>
+            <div style="font-size: 24px; font-weight: bold; color: var(--danger);">${recommendations.stats?.warnings || 0}</div>
+            <div style="font-size: 13px; color: var(--gray); margin-top: 4px;">Injury Risks</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- AI Settings -->
+      <div class="card">
+        <h3><i class="fas fa-cog"></i> AI Recommendation Settings</h3>
+        <div style="display: flex; flex-direction: column; gap: 16px; margin-top: 16px;">
+          <label style="display: flex; align-items: center; justify-content: space-between; padding: 12px; background: var(--light); border-radius: 8px; cursor: pointer;">
+            <div>
+              <strong style="display: block; margin-bottom: 4px;">Auto-Apply Recommendations</strong>
+              <span style="font-size: 13px; color: var(--gray);">Automatically modify your program based on AI insights</span>
+            </div>
+            <input type="checkbox" id="autoApplyRecs" ${recommendations.settings?.auto_apply ? 'checked' : ''} 
+                   onchange="toggleAutoApply(this.checked)" 
+                   style="width: 20px; height: 20px; cursor: pointer;">
+          </label>
+          <label style="display: flex; align-items: center; justify-content: space-between; padding: 12px; background: var(--light); border-radius: 8px; cursor: pointer;">
+            <div>
+              <strong style="display: block; margin-bottom: 4px;">Weekly Analysis</strong>
+              <span style="font-size: 13px; color: var(--gray);">Generate new recommendations every week</span>
+            </div>
+            <input type="checkbox" id="weeklyAnalysis" ${recommendations.settings?.weekly_analysis !== false ? 'checked' : ''} 
+                   onchange="toggleWeeklyAnalysis(this.checked)" 
+                   style="width: 20px; height: 20px; cursor: pointer;">
+          </label>
+          <label style="display: flex; align-items: center; justify-content: space-between; padding: 12px; background: var(--light); border-radius: 8px; cursor: pointer;">
+            <div>
+              <strong style="display: block; margin-bottom: 4px;">Real-Time Suggestions</strong>
+              <span style="font-size: 13px; color: var(--gray);">Show suggestions during workouts</span>
+            </div>
+            <input type="checkbox" id="realtimeSuggestions" ${recommendations.settings?.realtime_suggestions !== false ? 'checked' : ''} 
+                   onchange="toggleRealtimeSuggestions(this.checked)" 
+                   style="width: 20px; height: 20px; cursor: pointer;">
+          </label>
+        </div>
+      </div>
+    `;
+  } catch (error) {
+    container.innerHTML = `
+      <div class="card">
+        <p>Error loading AI insights: ${error.message}</p>
+        <button class="btn btn-primary" onclick="loadInsights()">
+          <i class="fas fa-sync"></i> Retry
+        </button>
+      </div>
+    `;
+  }
+}
+
+// Generate AI recommendations
+async function generateRecommendations() {
+  try {
+    showNotification('Analyzing your training data...', 'info');
+    await api('/ai/recommendations/generate', { method: 'POST' });
+    showNotification('Recommendations generated!', 'success');
+    loadInsights();
+  } catch (error) {
+    showNotification('Error generating recommendations: ' + error.message, 'error');
+  }
+}
+
+// Apply a recommendation automatically
+async function applyRecommendation(recId) {
+  if (!confirm('This will automatically modify your training program based on this recommendation. Continue?')) return;
+  
+  try {
+    await api(`/ai/recommendations/${recId}/apply`, { method: 'POST' });
+    showNotification('Recommendation applied! Your program has been updated.', 'success');
+    loadInsights();
+    loadPrograms(); // Refresh programs to show changes
+  } catch (error) {
+    showNotification('Error applying recommendation: ' + error.message, 'error');
+  }
+}
+
+// Dismiss a recommendation
+async function dismissRecommendation(recId) {
+  try {
+    await api(`/ai/recommendations/${recId}/dismiss`, { method: 'POST' });
+    showNotification('Recommendation dismissed', 'success');
+    loadInsights();
+  } catch (error) {
+    showNotification('Error dismissing recommendation: ' + error.message, 'error');
+  }
+}
+
+// View recommendation details in modal
+async function viewRecommendationDetails(recId) {
+  try {
+    const data = await api(`/ai/recommendations/${recId}`);
+    const rec = data.recommendation;
+    
+    showModal(`
+      <h2>${rec.title}</h2>
+      <div style="margin: 20px 0;">
+        <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+          <span style="background: ${rec.priority === 'high' ? 'var(--danger)' : rec.priority === 'medium' ? 'var(--warning)' : 'var(--secondary)'}; color: white; padding: 6px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">
+            ${rec.priority.toUpperCase()} PRIORITY
+          </span>
+          <span style="background: var(--light); color: var(--dark); padding: 6px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">
+            ${rec.category}
+          </span>
+        </div>
+        <p style="line-height: 1.8; margin-bottom: 16px;">${rec.description}</p>
+        ${rec.reasoning ? `
+          <div style="background: var(--light); padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+            <strong style="display: block; margin-bottom: 8px;"><i class="fas fa-brain"></i> AI Analysis:</strong>
+            <p style="margin: 0; line-height: 1.6;">${rec.reasoning}</p>
+          </div>
+        ` : ''}
+        ${rec.action_items && rec.action_items.length > 0 ? `
+          <div style="margin-bottom: 16px;">
+            <strong style="display: block; margin-bottom: 8px;"><i class="fas fa-tasks"></i> Action Items:</strong>
+            <ul style="margin: 0; padding-left: 20px; line-height: 1.8;">
+              ${rec.action_items.map(item => `<li>${item}</li>`).join('')}
+            </ul>
+          </div>
+        ` : ''}
+        ${rec.expected_outcome ? `
+          <div style="background: var(--secondary-light); padding: 16px; border-radius: 8px;">
+            <strong style="display: block; margin-bottom: 8px; color: var(--secondary);"><i class="fas fa-target"></i> Expected Outcome:</strong>
+            <p style="margin: 0; line-height: 1.6;">${rec.expected_outcome}</p>
+          </div>
+        ` : ''}
+      </div>
+      <div style="display: flex; gap: 12px;">
+        ${rec.auto_apply ? `
+          <button class="btn btn-primary" onclick="closeModal(); applyRecommendation(${recId});" style="flex: 1;">
+            <i class="fas fa-magic"></i> Apply Now
+          </button>
+        ` : ''}
+        <button class="btn btn-outline" onclick="closeModal();" style="flex: 1;">
+          Close
+        </button>
+      </div>
+    `);
+  } catch (error) {
+    showNotification('Error loading recommendation details: ' + error.message, 'error');
+  }
+}
+
+// Toggle auto-apply recommendations
+async function toggleAutoApply(enabled) {
+  try {
+    await api('/ai/recommendations/settings', {
+      method: 'PATCH',
+      body: JSON.stringify({ auto_apply: enabled })
+    });
+    showNotification(`Auto-apply ${enabled ? 'enabled' : 'disabled'}`, 'success');
+  } catch (error) {
+    showNotification('Error updating settings: ' + error.message, 'error');
+  }
+}
+
+// Toggle weekly analysis
+async function toggleWeeklyAnalysis(enabled) {
+  try {
+    await api('/ai/recommendations/settings', {
+      method: 'PATCH',
+      body: JSON.stringify({ weekly_analysis: enabled })
+    });
+    showNotification(`Weekly analysis ${enabled ? 'enabled' : 'disabled'}`, 'success');
+  } catch (error) {
+    showNotification('Error updating settings: ' + error.message, 'error');
+  }
+}
+
+// Toggle real-time suggestions
+async function toggleRealtimeSuggestions(enabled) {
+  try {
+    await api('/ai/recommendations/settings', {
+      method: 'PATCH',
+      body: JSON.stringify({ realtime_suggestions: enabled })
+    });
+    showNotification(`Real-time suggestions ${enabled ? 'enabled' : 'disabled'}`, 'success');
+  } catch (error) {
+    showNotification('Error updating settings: ' + error.message, 'error');
+  }
+}
+
 // Achievements
 async function loadAchievements() {
   const container = document.getElementById('achievements');
@@ -4152,8 +4438,16 @@ function renderExerciseContent(exercise, index) {
           </div>
         </div>
         <div style="text-align: right;">
-          <div style="font-size: 36px; font-weight: bold; color: var(--primary);">${completedSets}/${targetSets}</div>
-          <div style="font-size: 12px; color: var(--gray); text-transform: uppercase;">Sets Complete</div>
+          <div style="display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-bottom: 8px;">
+            <button onclick="adjustTargetSets(${exercise.id}, -1)" class="btn btn-outline" style="padding: 8px 12px; min-width: auto;" title="Decrease target sets">
+              <i class="fas fa-minus"></i>
+            </button>
+            <div style="font-size: 36px; font-weight: bold; color: var(--primary);">${completedSets}/${targetSets}</div>
+            <button onclick="adjustTargetSets(${exercise.id}, 1)" class="btn btn-primary" style="padding: 8px 12px; min-width: auto;" title="Increase target sets">
+              <i class="fas fa-plus"></i>
+            </button>
+          </div>
+          <div style="font-size: 12px; color: var(--gray); text-transform: uppercase;">Sets Target</div>
         </div>
       </div>
       
@@ -4342,6 +4636,37 @@ async function addExerciseSet(exerciseId) {
       logButton.style.opacity = '1';
       logButton.innerHTML = '<i class="fas fa-plus"></i> Log Set';
     }
+  }
+}
+
+// Adjust target sets for an exercise during workout
+async function adjustTargetSets(exerciseId, adjustment) {
+  const exercise = state.currentWorkout.exercises.find(ex => ex.id === exerciseId);
+  if (!exercise) return;
+  
+  const newTarget = (exercise.target_sets || 3) + adjustment;
+  
+  // Minimum 1 set, maximum 10 sets
+  if (newTarget < 1 || newTarget > 10) {
+    showNotification(`Target sets must be between 1 and 10`, 'warning');
+    return;
+  }
+  
+  try {
+    await api(`/workouts/${state.currentWorkout.id}/exercises/${exerciseId}/target-sets`, {
+      method: 'PATCH',
+      body: JSON.stringify({ target_sets: newTarget })
+    });
+    
+    // Update local state
+    exercise.target_sets = newTarget;
+    
+    // Re-render to show new target
+    renderWorkoutExerciseTabs();
+    
+    showNotification(`Target sets ${adjustment > 0 ? 'increased' : 'decreased'} to ${newTarget}`, 'success');
+  } catch (error) {
+    showNotification('Error updating target sets: ' + error.message, 'error');
   }
 }
 
