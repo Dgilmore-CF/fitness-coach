@@ -4359,15 +4359,39 @@ function getFunWeightComparison(totalKg) {
 async function deleteCompletedWorkout() {
   if (!confirm('Are you sure you want to delete this workout? This cannot be undone.')) return;
   
+  const workoutId = state.currentWorkout.id;
+  
   try {
-    await api(`/workouts/${state.currentWorkout.id}`, {
+    await api(`/workouts/${workoutId}`, {
       method: 'DELETE'
     });
     
     showNotification('Workout deleted', 'success');
-    finishWorkoutSummary();
+    
+    // Clear workout state
+    state.currentWorkout = null;
+    state.workoutExercise = null;
+    state.workoutNotes = '';
+    
+    // Close modal
+    const modal = document.getElementById('workout-modal');
+    if (modal) modal.remove();
+    
+    // Stop any active rest timer
+    if (state.restTimerInterval) {
+      clearInterval(state.restTimerInterval);
+      state.restTimerInterval = null;
+    }
+    
+    // Disable keyboard shortcuts
+    disableKeyboardShortcuts();
+    
+    // Return to dashboard and reload it
+    switchTab('dashboard');
+    loadDashboard();
     
   } catch (error) {
+    console.error('Error deleting workout:', error);
     showNotification('Error deleting workout: ' + error.message, 'error');
   }
 }
