@@ -3994,7 +3994,33 @@ function renderWorkoutExerciseTabs() {
   // Auto-focus on weight input for faster logging
   setTimeout(() => {
     const weightInput = document.getElementById('newSetWeight');
-    if (weightInput) weightInput.focus();
+    const repsInput = document.getElementById('newSetReps');
+    
+    if (weightInput) {
+      weightInput.focus();
+      
+      // Add Enter key navigation
+      weightInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          e.stopPropagation();
+          if (repsInput) repsInput.focus();
+        }
+      });
+    }
+    
+    if (repsInput) {
+      // Add Enter key submission via Ctrl+Enter for safety
+      repsInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
+          e.preventDefault();
+          e.stopPropagation();
+          // Just trigger the button click instead of calling function directly
+          const logButton = document.querySelector('.btn-primary[onclick^="addExerciseSet"]');
+          if (logButton) logButton.click();
+        }
+      });
+    }
   }, 100);
 }
 
@@ -4083,13 +4109,11 @@ function renderExerciseContent(exercise, index) {
                 <td><strong>\${completedSets + 1}</strong></td>
                 <td>
                   <input type="number" id="newSetWeight" placeholder="0" step="\${system === 'imperial' ? '5' : '2.5'}" 
-                    style="width: 100%; padding: 8px; border: 2px solid var(--border); border-radius: 6px; font-size: 14px;"
-                    onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('newSetReps').focus();}">
+                    style="width: 100%; padding: 8px; border: 2px solid var(--border); border-radius: 6px; font-size: 14px;">
                 </td>
                 <td>
                   <input type="number" id="newSetReps" placeholder="0" min="1"
-                    style="width: 100%; padding: 8px; border: 2px solid var(--border); border-radius: 6px; font-size: 14px;"
-                    onkeydown="if(event.key==='Enter'){event.preventDefault();addExerciseSet(\${exercise.id});}">
+                    style="width: 100%; padding: 8px; border: 2px solid var(--border); border-radius: 6px; font-size: 14px;">
                 </td>
                 <td colspan="2">
                   <button class="btn btn-primary" onclick="addExerciseSet(\${exercise.id})" style="width: 100%;">
@@ -4114,7 +4138,17 @@ function renderExerciseContent(exercise, index) {
 }
 
 // Add set to exercise
+let isAddingSet = false; // Prevent concurrent calls
+
 async function addExerciseSet(exerciseId) {
+  // Prevent concurrent execution
+  if (isAddingSet) {
+    console.log('Already processing a set, ignoring duplicate call');
+    return;
+  }
+  
+  isAddingSet = true;
+  
   const weightInput = document.getElementById('newSetWeight');
   const repsInput = document.getElementById('newSetReps');
   
@@ -4122,14 +4156,16 @@ async function addExerciseSet(exerciseId) {
   if (!weightInput || !repsInput) {
     showNotification('Error: Input fields not found. Please refresh the page.', 'error');
     console.error('Missing input elements:', { weightInput, repsInput });
+    isAddingSet = false;
     return;
   }
-  
+
   let weight = parseFloat(weightInput.value);
   const reps = parseInt(repsInput.value);
   
   if (!weight || !reps || isNaN(weight) || isNaN(reps)) {
     showNotification('Please enter valid weight and reps', 'warning');
+    isAddingSet = false;
     return;
   }
   
@@ -4173,6 +4209,9 @@ async function addExerciseSet(exerciseId) {
   } catch (error) {
     console.error('Error logging set:', error);
     showNotification('Error logging set: ' + error.message, 'error');
+  } finally {
+    // Always reset the flag
+    isAddingSet = false;
   }
 }
 
