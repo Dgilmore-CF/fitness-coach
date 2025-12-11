@@ -1901,7 +1901,7 @@ async function loadWorkoutInterface() {
 
     // Start workout timer if not already started
     if (!state.workoutTimer) {
-      startWorkoutTimer();
+      startWorkoutTimer(workout);
     }
 
     const totalSets = workout.exercises.reduce((sum, ex) => sum + (ex.sets?.length || 0), 0);
@@ -2159,9 +2159,21 @@ async function recordSet(exerciseId) {
 }
 
 // Timers
-function startWorkoutTimer() {
-  state.workoutStartTime = Date.now();
-  state.workoutTimer = setInterval(updateWorkoutTimerDisplay, 1000);
+function startWorkoutTimer(workout) {
+  // If workout has a start_time from DB, use that. Otherwise use current time.
+  if (workout && workout.start_time) {
+    state.workoutStartTime = new Date(workout.start_time).getTime();
+  } else {
+    state.workoutStartTime = Date.now();
+  }
+  
+  // Only create interval if it doesn't exist
+  if (!state.workoutTimer) {
+    state.workoutTimer = setInterval(updateWorkoutTimerDisplay, 1000);
+  }
+  
+  // Update display immediately
+  updateWorkoutTimerDisplay();
 }
 
 function updateWorkoutTimerDisplay() {
@@ -3944,15 +3956,15 @@ async function resumeWorkoutModal() {
     };
   }
   
-  // Start workout timer if not already started
-  if (!state.workoutTimer) {
-    startWorkoutTimer();
-  }
-  
-  // Fetch latest workout data
+  // Fetch latest workout data first
   try {
     const data = await api(\`/workouts/\${state.currentWorkout.id}\`);
     state.currentWorkout = data.workout;
+    
+    // Start workout timer if not already started (use workout's actual start_time)
+    if (!state.workoutTimer) {
+      startWorkoutTimer(state.currentWorkout);
+    }
     
     // Render tabbed exercise interface
     renderWorkoutExerciseTabs();
@@ -3981,15 +3993,15 @@ async function startWorkoutExercises() {
     };
   }
   
-  // Start workout timer
-  if (!state.workoutTimer) {
-    startWorkoutTimer();
-  }
-  
-  // Fetch full workout data
+  // Fetch full workout data first
   try {
     const data = await api(\`/workouts/\${state.currentWorkout.id}\`);
     state.currentWorkout = data.workout;
+    
+    // Start workout timer (use workout's actual start_time)
+    if (!state.workoutTimer) {
+      startWorkoutTimer(state.currentWorkout);
+    }
     
     // Render tabbed exercise interface
     renderWorkoutExerciseTabs();
