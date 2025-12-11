@@ -3989,6 +3989,12 @@ function renderWorkoutExerciseTabs() {
   `;
   
   updateWorkoutTimerDisplay();
+  
+  // Auto-focus on weight input for faster logging
+  setTimeout(() => {
+    const weightInput = document.getElementById('newSetWeight');
+    if (weightInput) weightInput.focus();
+  }, 100);
 }
 
 // Render exercise content with set table
@@ -4076,11 +4082,13 @@ function renderExerciseContent(exercise, index) {
                 <td><strong>${completedSets + 1}</strong></td>
                 <td>
                   <input type="number" id="newSetWeight" placeholder="0" step="${system === 'imperial' ? '5' : '2.5'}" 
-                    style="width: 100%; padding: 8px; border: 2px solid var(--border); border-radius: 6px; font-size: 14px;">
+                    style="width: 100%; padding: 8px; border: 2px solid var(--border); border-radius: 6px; font-size: 14px;"
+                    onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('newSetReps').focus();}">
                 </td>
                 <td>
                   <input type="number" id="newSetReps" placeholder="0" min="1"
-                    style="width: 100%; padding: 8px; border: 2px solid var(--border); border-radius: 6px; font-size: 14px;">
+                    style="width: 100%; padding: 8px; border: 2px solid var(--border); border-radius: 6px; font-size: 14px;"
+                    onkeydown="if(event.key==='Enter'){event.preventDefault();addExerciseSet(${exercise.id});}">
                 </td>
                 <td colspan="2">
                   <button class="btn btn-primary" onclick="addExerciseSet(${exercise.id})" style="width: 100%;">
@@ -4109,11 +4117,18 @@ async function addExerciseSet(exerciseId) {
   const weightInput = document.getElementById('newSetWeight');
   const repsInput = document.getElementById('newSetReps');
   
+  // Check if inputs exist
+  if (!weightInput || !repsInput) {
+    showNotification('Error: Input fields not found. Please refresh the page.', 'error');
+    console.error('Missing input elements:', { weightInput, repsInput });
+    return;
+  }
+  
   let weight = parseFloat(weightInput.value);
   const reps = parseInt(repsInput.value);
   
-  if (!weight || !reps) {
-    showNotification('Please enter weight and reps', 'warning');
+  if (!weight || !reps || isNaN(weight) || isNaN(reps)) {
+    showNotification('Please enter valid weight and reps', 'warning');
     return;
   }
   
@@ -4138,6 +4153,9 @@ async function addExerciseSet(exerciseId) {
     
     showNotification('Set logged!', 'success');
     
+    // Start rest timer after logging set
+    startRestTimer(90);
+    
     // Auto-advance if target sets reached
     const currentExercise = state.currentWorkout.exercises[state.workoutExercise.currentIndex];
     const completedSets = (currentExercise.sets || []).length;
@@ -4152,6 +4170,7 @@ async function addExerciseSet(exerciseId) {
     }
     
   } catch (error) {
+    console.error('Error logging set:', error);
     showNotification('Error logging set: ' + error.message, 'error');
   }
 }
@@ -4541,11 +4560,19 @@ function disableKeyboardShortcuts() {
 function handleKeyboardShortcut(e) {
   if (!state.keyboardShortcutsEnabled) return;
   
-  // Ignore if typing in input field
-  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-  
   const modal = document.getElementById('workout-modal');
   if (!modal) return;
+  
+  // Special handling for Ctrl+Enter to log set (works even in input fields)
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    const logButton = document.querySelector('.btn-primary[onclick^="addExerciseSet"]');
+    if (logButton) logButton.click();
+    return;
+  }
+  
+  // Ignore other shortcuts if typing in input field
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
   
   switch(e.key) {
     case 'ArrowLeft':
@@ -4555,13 +4582,6 @@ function handleKeyboardShortcut(e) {
     case 'ArrowRight':
       e.preventDefault();
       nextExercise();
-      break;
-    case 'Enter':
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-        const logButton = document.querySelector('.btn-primary[onclick^="addExerciseSet"]');
-        if (logButton) logButton.click();
-      }
       break;
     case 'Escape':
       e.preventDefault();
