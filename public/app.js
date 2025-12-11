@@ -4003,28 +4003,36 @@ function renderWorkoutExerciseTabs() {
   updateWorkoutTimerDisplay();
   
   // Auto-focus on weight input for faster logging
-  // Use named functions to prevent event listener accumulation
+  // Clone and replace inputs to remove ALL old event listeners (prevents accumulation)
   setTimeout(() => {
-    const weightInput = document.getElementById('newSetWeight');
-    const repsInput = document.getElementById('newSetReps');
+    const oldWeightInput = document.getElementById('newSetWeight');
+    const oldRepsInput = document.getElementById('newSetReps');
     
-    if (weightInput) {
+    // Clone inputs to remove all event listeners
+    if (oldWeightInput) {
+      const weightInput = oldWeightInput.cloneNode(true);
+      oldWeightInput.parentNode.replaceChild(weightInput, oldWeightInput);
+      
       weightInput.focus();
       
-      // Use addEventListener with once: true to ensure single execution
-      weightInput.addEventListener('keydown', function handleWeightEnter(e) {
+      // Add fresh event listener (no accumulation since we cloned)
+      weightInput.addEventListener('keydown', function(e) {
         if (e.key === 'Enter') {
           e.preventDefault();
           e.stopPropagation();
           const repsField = document.getElementById('newSetReps');
           if (repsField) repsField.focus();
         }
-      }, { once: false }); // Keep alive for multiple uses
+      });
     }
     
-    if (repsInput) {
-      // Use addEventListener with once: true to prevent accumulation
-      repsInput.addEventListener('keydown', function handleRepsEnter(e) {
+    if (oldRepsInput) {
+      // Clone to remove all event listeners
+      const repsInput = oldRepsInput.cloneNode(true);
+      oldRepsInput.parentNode.replaceChild(repsInput, oldRepsInput);
+      
+      // Add fresh event listener (no accumulation since we cloned)
+      repsInput.addEventListener('keydown', function(e) {
         if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
           e.preventDefault();
           e.stopPropagation();
@@ -4045,7 +4053,7 @@ function renderWorkoutExerciseTabs() {
             }
           }
         }
-      }, { once: false }); // Keep alive for multiple uses
+      });
     }
   }, 100);
 }
