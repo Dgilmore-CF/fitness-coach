@@ -2492,6 +2492,21 @@ async function loadNutrition() {
         </div>
       </div>
 
+      <!-- Today's Entries -->
+      <div class="card" id="nutrition-entries-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h2><i class="fas fa-list"></i> Today's Entries</h2>
+          <button class="btn btn-outline" onclick="loadNutritionEntries()" style="padding: 6px 12px; font-size: 12px;">
+            <i class="fas fa-sync"></i> Refresh
+          </button>
+        </div>
+        <div id="nutrition-entries-table">
+          <div style="text-align: center; padding: 20px; color: var(--gray);">
+            <i class="fas fa-spinner fa-spin"></i> Loading entries...
+          </div>
+        </div>
+      </div>
+
       <!-- Nutrition Analytics & Trends -->
       <div class="card">
         <h2><i class="fas fa-chart-line"></i> Nutrition Analytics (30 Days)</h2>
@@ -2723,6 +2738,9 @@ async function loadNutrition() {
         \` : '<p>No data yet. Start logging your nutrition to see trends!</p>'}
       </div>
     \`;
+    
+    // Load today's individual entries
+    loadNutritionEntries();
   } catch (error) {
     container.innerHTML = \`<div class="card"><p>Error loading nutrition: \${error.message}</p></div>\`;
   }
@@ -2737,12 +2755,17 @@ async function logProtein(amount) {
   }
 
   try {
-    await api('/nutrition/protein', {
+    await api('/nutrition/entries', {
       method: 'POST',
-      body: JSON.stringify({ grams })
+      body: JSON.stringify({ 
+        entry_type: 'protein', 
+        amount: grams, 
+        unit: 'g'
+      })
     });
 
     showNotification('Protein logged!', 'success');
+    document.getElementById('proteinInput').value = '';
     loadNutrition();
   } catch (error) {
     showNotification('Error logging protein: ' + error.message, 'error');
@@ -2758,12 +2781,17 @@ async function logWater(amount) {
   }
 
   try {
-    await api('/nutrition/water', {
+    await api('/nutrition/entries', {
       method: 'POST',
-      body: JSON.stringify({ ml })
+      body: JSON.stringify({ 
+        entry_type: 'water', 
+        amount: ml, 
+        unit: 'ml'
+      })
     });
 
     showNotification('Water logged!', 'success');
+    if (!amount) document.getElementById('waterInput').value = '';
     loadNutrition();
   } catch (error) {
     showNotification('Error logging water: ' + error.message, 'error');
@@ -2779,15 +2807,171 @@ async function logCreatine(amount) {
   }
 
   try {
-    await api('/nutrition/creatine', {
+    await api('/nutrition/entries', {
       method: 'POST',
-      body: JSON.stringify({ grams })
+      body: JSON.stringify({ 
+        entry_type: 'creatine', 
+        amount: grams, 
+        unit: 'g'
+      })
     });
 
     showNotification('Creatine logged!', 'success');
+    if (!amount) document.getElementById('creatineInput').value = '';
     loadNutrition();
   } catch (error) {
     showNotification('Error logging creatine: ' + error.message, 'error');
+  }
+}
+
+// Load nutrition entries for today
+async function loadNutritionEntries() {
+  const today = new Date().toISOString().split('T')[0];
+  const container = document.getElementById('nutrition-entries-table');
+  
+  try {
+    const data = await api(\`/nutrition/entries?start_date=\${today}&end_date=\${today}\`);
+    const entries = data.entries || [];
+    
+    if (entries.length === 0) {
+      container.innerHTML = \`
+        <div style="text-align: center; padding: 20px; color: var(--gray);">
+          <i class="fas fa-inbox"></i>
+          <p style="margin-top: 8px;">No entries logged today. Start tracking above!</p>
+        </div>
+      \`;
+      return;
+    }
+    
+    // Group entries by type
+    const grouped = {
+      protein: entries.filter(e => e.entry_type === 'protein'),
+      water: entries.filter(e => e.entry_type === 'water'),
+      creatine: entries.filter(e => e.entry_type === 'creatine')
+    };
+    
+    const formatTime = (timestamp) => {
+      const date = new Date(timestamp);
+      return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    };
+    
+    const renderEntries = (entries, icon, color) => {
+      if (entries.length === 0) return '';
+      
+      return \`
+        <div style="margin-bottom: 20px;">
+          <h4 style="color: \${color}; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+            <i class="\${icon}"></i> \${entries[0].entry_type.charAt(0).toUpperCase() + entries[0].entry_type.slice(1)} 
+            <span style="font-size: 14px; font-weight: normal; color: var(--gray);">(\${entries.length} \${entries.length === 1 ? 'entry' : 'entries'})</span>
+          </h4>
+          <div style="overflow-x: auto;">
+            <table class="data-table" style="font-size: 14px;">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Amount</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                \${entries.map(entry => \`
+                  <tr>
+                    <td>\${formatTime(entry.logged_at)}</td>
+                    <td><strong>\${entry.amount}\${entry.unit}</strong></td>
+                    <td>
+                      <button class="btn btn-outline" onclick="editNutritionEntry(\${entry.id}, '\${entry.entry_type}', \${entry.amount})" 
+                              style="padding: 4px 8px; font-size: 12px; margin-right: 4px;">
+                        <i class="fas fa-edit"></i>
+                      </button>
+                      <button class="btn btn-outline" onclick="deleteNutritionEntry(\${entry.id})" 
+                              style="padding: 4px 8px; font-size: 12px; color: var(--danger);">
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    </td>
+                  </tr>
+                \`).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      \`;
+    };
+    
+    container.innerHTML = \`
+      \${renderEntries(grouped.protein, 'fas fa-drumstick-bite', 'var(--secondary)')}
+      \${renderEntries(grouped.water, 'fas fa-tint', 'var(--primary)')}
+      \${renderEntries(grouped.creatine, 'fas fa-flask', '#8b5cf6')}
+    \`;
+    
+  } catch (error) {
+    container.innerHTML = \`
+      <div style="text-align: center; padding: 20px; color: var(--danger);">
+        <i class="fas fa-exclamation-triangle"></i>
+        <p style="margin-top: 8px;">Error loading entries: \${error.message}</p>
+      </div>
+    \`;
+  }
+}
+
+// Edit nutrition entry
+function editNutritionEntry(id, type, currentAmount) {
+  const modalBody = document.getElementById('modalBody');
+  
+  modalBody.innerHTML = \`
+    <div class="form-group">
+      <label>Type:</label>
+      <input type="text" value="\${type.charAt(0).toUpperCase() + type.slice(1)}" disabled style="background: var(--light);">
+    </div>
+    <div class="form-group">
+      <label>Amount:</label>
+      <input type="number" id="editEntryAmount" value="\${currentAmount}" step="0.5" min="0.1">
+    </div>
+    <button class="btn btn-primary" onclick="saveNutritionEntryEdit(\${id})">
+      <i class="fas fa-save"></i> Save Changes
+    </button>
+  \`;
+  
+  openModal('Edit Entry');
+}
+
+// Save nutrition entry edit
+async function saveNutritionEntryEdit(id) {
+  const amount = parseFloat(document.getElementById('editEntryAmount').value);
+  
+  if (!amount || amount <= 0) {
+    showNotification('Please enter a valid amount', 'warning');
+    return;
+  }
+  
+  try {
+    await api(\`/nutrition/entries/\${id}\`, {
+      method: 'PUT',
+      body: JSON.stringify({ amount })
+    });
+    
+    showNotification('Entry updated!', 'success');
+    closeModal();
+    loadNutritionEntries();
+    loadNutrition();
+  } catch (error) {
+    showNotification('Error updating entry: ' + error.message, 'error');
+  }
+}
+
+// Delete nutrition entry
+async function deleteNutritionEntry(id) {
+  if (!confirm('Delete this entry?')) return;
+  
+  try {
+    await api(\`/nutrition/entries/\${id}\`, {
+      method: 'DELETE'
+    });
+    
+    showNotification('Entry deleted!', 'success');
+    loadNutritionEntries();
+    loadNutrition();
+  } catch (error) {
+    showNotification('Error deleting entry: ' + error.message, 'error');
   }
 }
 
@@ -4065,9 +4249,17 @@ function startRestTimer(seconds = 90) {
         <div style="font-size: 48px; font-weight: bold; font-family: monospace; line-height: 1;">
           \${mins}:\${secs.toString().padStart(2, '0')}
         </div>
-        <button class="btn btn-outline" onclick="skipRestTimer()" style="margin-top: 12px; background: white; color: var(--primary); border: none; padding: 8px 16px; font-size: 12px;">
-          Skip Rest
-        </button>
+        <div style="display: flex; gap: 8px; margin-top: 12px; justify-content: center; align-items: center;">
+          <button class="btn btn-outline" onclick="adjustRestTimer(-15)" style="background: white; color: var(--primary); border: none; padding: 8px 12px; font-size: 12px; min-width: 50px;">
+            -15s
+          </button>
+          <button class="btn btn-outline" onclick="skipRestTimer()" style="background: white; color: var(--primary); border: none; padding: 8px 16px; font-size: 12px;">
+            Skip
+          </button>
+          <button class="btn btn-outline" onclick="adjustRestTimer(15)" style="background: white; color: var(--primary); border: none; padding: 8px 12px; font-size: 12px; min-width: 50px;">
+            +15s
+          </button>
+        </div>
       \`;
     }
   }, 1000);
@@ -4086,6 +4278,37 @@ function skipRestTimer() {
   }
   
   showNotification('Rest skipped', 'info');
+}
+
+// Adjust rest timer by seconds (can be negative)
+function adjustRestTimer(seconds) {
+  if (!state.restTimerInterval) return;
+  
+  state.restTimeRemaining = Math.max(5, state.restTimeRemaining + seconds);
+  
+  // Immediate update display
+  const timerDisplay = document.getElementById('rest-timer-display');
+  if (timerDisplay) {
+    const mins = Math.floor(state.restTimeRemaining / 60);
+    const secs = state.restTimeRemaining % 60;
+    timerDisplay.innerHTML = \`
+      <div style="font-size: 14px; opacity: 0.9; margin-bottom: 8px;">Rest Timer \${seconds > 0 ? '(+' + seconds + 's)' : '(' + seconds + 's)'}</div>
+      <div style="font-size: 48px; font-weight: bold; font-family: monospace; line-height: 1;">
+        \${mins}:\${secs.toString().padStart(2, '0')}
+      </div>
+      <div style="display: flex; gap: 8px; margin-top: 12px; justify-content: center; align-items: center;">
+        <button class="btn btn-outline" onclick="adjustRestTimer(-15)" style="background: white; color: var(--primary); border: none; padding: 8px 12px; font-size: 12px; min-width: 50px;">
+          -15s
+        </button>
+        <button class="btn btn-outline" onclick="skipRestTimer()" style="background: white; color: var(--primary); border: none; padding: 8px 16px; font-size: 12px;">
+          Skip
+        </button>
+        <button class="btn btn-outline" onclick="adjustRestTimer(15)" style="background: white; color: var(--primary); border: none; padding: 8px 12px; font-size: 12px; min-width: 50px;">
+          +15s
+        </button>
+      </div>
+    \`;
+  }
 }
 
 function playRestCompleteSound() {

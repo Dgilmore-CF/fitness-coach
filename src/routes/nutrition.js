@@ -527,4 +527,150 @@ nutrition.delete('/daily/:date', async (c) => {
   return c.json({ message: 'Nutrition log deleted' });
 });
 
+// ========== INDIVIDUAL NUTRITION ENTRIES (Timestamped) ==========
+
+// Add individual nutrition entry
+nutrition.post('/entries', async (c) => {
+  const user = requireAuth(c);
+  const body = await c.req.json();
+  const { entry_type, amount, unit, notes, logged_at } = body;
+  const db = c.env.DB;
+
+  if (!['protein', 'water', 'creatine'].includes(entry_type)) {
+    return c.json({ error: 'Invalid entry_type' }, 400);
+  }
+
+  const timestamp = logged_at || new Date().toISOString();
+
+  const result = await db.prepare(
+    `INSERT INTO nutrition_entries (user_id, entry_type, amount, unit, notes, logged_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     RETURNING *`
+  ).bind(user.id, entry_type, amount, unit, notes || null, timestamp).first();
+
+  // Also update the daily summary for backward compatibility
+  const logDate = timestamp.split('T')[0];
+  const column = entry_type === 'protein' ? 'protein_grams' : entry_type === 'water' ? 'water_ml' : 'creatine_grams';
+  
+  await db.prepare(
+    `INSERT INTO nutrition_log (user_id, date, ${column}, updated_at)
+     VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+     ON CONFLICT(user_id, date) 
+     DO UPDATE SET 
+       ${column} = ${column} + excluded.${column},
+       updated_at = CURRENT_TIMESTAMP`
+  ).bind(user.id, logDate, amount).run();
+
+  return c.json({ entry: result, message: 'Entry added' });
+});
+
+// Get nutrition entries
+nutrition.get('/entries', async (c) => {
+  const user = requireAuth(c);
+  const db = c.env.DB;
+  const startDate = c.req.query('start_date') || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const endDate = c.req.query('end_date') || new Date().toISOString().split('T')[0];
+  const entryType = c.req.query('entry_type'); // optional filter
+
+  let query = `
+    SELECT * FROM nutrition_entries 
+    WHERE user_id = ? 
+    AND date(logged_at) >= ? 
+    AND date(logged_at) <= ?
+  `;
+  const params = [user.id, startDate, endDate];
+
+  if (entryType) {
+    query += ' AND entry_type = ?';
+    params.push(entryType);
+  }
+
+  query += ' ORDER BY logged_at DESC';
+
+  const entries = await db.prepare(query).bind(...params).all();
+
+  return c.json({ entries: entries.results || [] });
+});
+
+// Update nutrition entry
+nutrition.put('/entries/:id', async (c) => {
+  const user = requireAuth(c);
+  const entryId = c.req.param('id');
+  const body = await c.req.json();
+  const { amount, notes, logged_at } = body;
+  const db = c.env.DB;
+
+  // Verify ownership
+  const existing = await db.prepare(
+    'SELECT * FROM nutrition_entries WHERE id = ? AND user_id = ?'
+  ).bind(entryId, user.id).first();
+
+  if (!existing) {
+    return c.json({ error: 'Entry not found' }, 404);
+  }
+
+  const oldAmount = existing.amount;
+  const newAmount = amount !== undefined ? amount : existing.amount;
+  const newNotes = notes !== undefined ? notes : existing.notes;
+  const newLoggedAt = logged_at || existing.logged_at;
+
+  // Update entry
+  const updated = await db.prepare(
+    `UPDATE nutrition_entries 
+     SET amount = ?, notes = ?, logged_at = ?
+     WHERE id = ? AND user_id = ?
+     RETURNING *`
+  ).bind(newAmount, newNotes, newLoggedAt, entryId, user.id).first();
+
+  // Update daily summary (adjust the difference)
+  const logDate = newLoggedAt.split('T')[0];
+  const column = existing.entry_type === 'protein' ? 'protein_grams' : existing.entry_type === 'water' ? 'water_ml' : 'creatine_grams';
+  const amountDiff = newAmount - oldAmount;
+
+  if (amountDiff !== 0) {
+    await db.prepare(
+      `UPDATE nutrition_log 
+       SET ${column} = MAX(0, ${column} + ?),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE user_id = ? AND date = ?`
+    ).bind(amountDiff, user.id, logDate).run();
+  }
+
+  return c.json({ entry: updated, message: 'Entry updated' });
+});
+
+// Delete nutrition entry
+nutrition.delete('/entries/:id', async (c) => {
+  const user = requireAuth(c);
+  const entryId = c.req.param('id');
+  const db = c.env.DB;
+
+  // Get entry to adjust daily summary
+  const entry = await db.prepare(
+    'SELECT * FROM nutrition_entries WHERE id = ? AND user_id = ?'
+  ).bind(entryId, user.id).first();
+
+  if (!entry) {
+    return c.json({ error: 'Entry not found' }, 404);
+  }
+
+  // Delete entry
+  await db.prepare(
+    'DELETE FROM nutrition_entries WHERE id = ? AND user_id = ?'
+  ).bind(entryId, user.id).run();
+
+  // Update daily summary (subtract the amount)
+  const logDate = entry.logged_at.split('T')[0];
+  const column = entry.entry_type === 'protein' ? 'protein_grams' : entry.entry_type === 'water' ? 'water_ml' : 'creatine_grams';
+
+  await db.prepare(
+    `UPDATE nutrition_log 
+     SET ${column} = MAX(0, ${column} - ?),
+         updated_at = CURRENT_TIMESTAMP
+     WHERE user_id = ? AND date = ?`
+  ).bind(entry.amount, user.id, logDate).run();
+
+  return c.json({ message: 'Entry deleted' });
+});
+
 export default nutrition;

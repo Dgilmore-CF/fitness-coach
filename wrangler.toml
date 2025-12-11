@@ -2,6 +2,11 @@ name = "ai-fitness-coach"
 main = "src/index.js"
 compatibility_date = "2024-01-01"
 
+# Custom domain
+[[routes]]
+pattern = "fitness.dtg-lab.net"
+custom_domain = true
+
 # Cloudflare D1 Database
 [[d1_databases]]
 binding = "DB"
