@@ -4071,60 +4071,50 @@ function renderWorkoutExerciseTabs() {
   
   updateWorkoutTimerDisplay();
   
-  // Auto-focus on weight input for faster logging
-  // Clone and replace inputs to remove ALL old event listeners (prevents accumulation)
+  // Auto-focus and attach event handlers (using event delegation pattern)
   setTimeout(() => {
-    const oldWeightInput = document.getElementById('newSetWeight');
-    const oldRepsInput = document.getElementById('newSetReps');
+    const weightInput = document.getElementById('newSetWeight');
+    const repsInput = document.getElementById('newSetReps');
+    const logButton = document.getElementById('logSetButton');
     
-    // Clone inputs to remove all event listeners
-    if (oldWeightInput) {
-      const weightInput = oldWeightInput.cloneNode(true);
-      oldWeightInput.parentNode.replaceChild(weightInput, oldWeightInput);
-      
+    // Focus on weight input
+    if (weightInput) {
       weightInput.focus();
       
-      // Add fresh event listener (no accumulation since we cloned)
-      weightInput.addEventListener('keydown', function(e) {
+      // Simple Enter key navigation (no need to clone - this element is fresh from render)
+      weightInput.onkeydown = function(e) {
         if (e.key === 'Enter') {
           e.preventDefault();
-          e.stopPropagation();
-          const repsField = document.getElementById('newSetReps');
-          if (repsField) repsField.focus();
+          const reps = document.getElementById('newSetReps');
+          if (reps) reps.focus();
         }
-      });
+      };
     }
     
-    if (oldRepsInput) {
-      // Clone to remove all event listeners
-      const repsInput = oldRepsInput.cloneNode(true);
-      oldRepsInput.parentNode.replaceChild(repsInput, oldRepsInput);
-      
-      // Add fresh event listener (no accumulation since we cloned)
-      repsInput.addEventListener('keydown', function(e) {
+    // Handle Enter key in reps field
+    if (repsInput) {
+      repsInput.onkeydown = function(e) {
         if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
           e.preventDefault();
-          e.stopPropagation();
-          // Check if already processing to prevent duplicate calls
-          if (isAddingSet) {
-            console.log('Already logging a set, ignoring Enter key');
-            return;
-          }
-          // Get the current exercise ID from the button's onclick attribute
-          const logButton = document.querySelector('.btn-primary[onclick^="addExerciseSet"]');
-          if (logButton) {
-            // Extract exercise ID from onclick attribute
-            const onclickAttr = logButton.getAttribute('onclick');
-            const match = onclickAttr.match(/addExerciseSet\\((\\d+)\\)/);
-            if (match) {
-              const exerciseId = parseInt(match[1]);
-              addExerciseSet(exerciseId);
-            }
-          }
+          if (isAddingSet) return;
+          const btn = document.getElementById('logSetButton');
+          if (btn) btn.click();
         }
-      });
+      };
     }
-  }, 100);
+    
+    // Attach button click handler
+    if (logButton) {
+      logButton.onclick = function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const exerciseId = parseInt(this.getAttribute('data-exercise-id'));
+        if (!isNaN(exerciseId)) {
+          addExerciseSet(exerciseId);
+        }
+      };
+    }
+  }, 0); // Changed to 0 - no need to wait, elements are immediately available
 }
 
 // Render exercise content with set table
@@ -4219,7 +4209,7 @@ function renderExerciseContent(exercise, index) {
                     style="width: 100%; padding: 8px; border: 2px solid var(--border); border-radius: 6px; font-size: 14px;">
                 </td>
                 <td colspan="2">
-                  <button class="btn btn-primary" onclick="addExerciseSet(\${exercise.id})" style="width: 100%;">
+                  <button class="btn btn-primary" id="logSetButton" data-exercise-id="\${exercise.id}" style="width: 100%;">
                     <i class="fas fa-plus"></i> Log Set
                   </button>
                 </td>
@@ -4252,7 +4242,7 @@ async function addExerciseSet(exerciseId) {
   
   const weightInput = document.getElementById('newSetWeight');
   const repsInput = document.getElementById('newSetReps');
-  const logButton = document.querySelector('.btn-primary[onclick^="addExerciseSet"]');
+  const logButton = document.getElementById('logSetButton');
   
   // Disable button to prevent duplicate clicks
   if (logButton) {
@@ -4759,7 +4749,7 @@ function handleKeyboardShortcut(e) {
   // Special handling for Ctrl+Enter to log set (works even in input fields)
   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
     e.preventDefault();
-    const logButton = document.querySelector('.btn-primary[onclick^="addExerciseSet"]');
+    const logButton = document.getElementById('logSetButton');
     if (logButton) logButton.click();
     return;
   }
