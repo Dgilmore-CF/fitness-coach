@@ -2167,7 +2167,9 @@ async function recordSet(exerciseId) {
 function startWorkoutTimer(workout) {
   // If workout has a start_time from DB, use that. Otherwise use current time.
   if (workout && workout.start_time) {
-    state.workoutStartTime = new Date(workout.start_time).getTime();
+    // Parse the ISO date string properly
+    const startTime = new Date(workout.start_time.replace(' ', 'T') + 'Z');
+    state.workoutStartTime = startTime.getTime();
   } else {
     state.workoutStartTime = Date.now();
   }
@@ -2186,7 +2188,7 @@ function updateWorkoutTimerDisplay() {
   
   const elapsed = Math.floor((Date.now() - state.workoutStartTime) / 1000);
   const display = document.getElementById('workoutTimer');
-  if (display) {
+  if (display && elapsed >= 0) {
     display.textContent = formatDuration(elapsed);
   }
 }
@@ -3158,7 +3160,7 @@ async function loadNutrition() {
               <tbody id="weeklyTrendsBody">
                 ${weekly_trends.map(week => `
                   <tr data-week-start="${week.week_start}" data-protein="${Math.round(week.avg_protein)}" data-water="${Math.round(week.avg_water)}" data-creatine="${week.avg_creatine.toFixed(1)}" data-logged="${week.days_logged}" data-goals="${week.days_hit_goals}">
-                    <td><small>${new Date(week.week_start).toLocaleDateString()} - ${new Date(week.week_end).toLocaleDateString()}</small></td>
+                    <td><small>${formatDateOnly(week.week_start)} - ${formatDateOnly(week.week_end)}</small></td>
                     <td><strong>${Math.round(week.avg_protein)}g</strong></td>
                     <td><strong>${Math.round(week.avg_water)}ml</strong></td>
                     <td><strong>${week.avg_creatine.toFixed(1)}g</strong></td>
@@ -3191,7 +3193,7 @@ async function loadNutrition() {
               <tbody>
                 ${daily_data.slice().reverse().map(day => `
                   <tr>
-                    <td><strong>${new Date(day.date).toLocaleDateString()}</strong></td>
+                    <td><strong>${formatDateOnly(day.date)}</strong></td>
                     <td>${day.protein}g ${day.hit_protein ? '✅' : '❌'}</td>
                     <td>${day.water}ml ${day.hit_water ? '✅' : '❌'}</td>
                     <td>${day.creatine}g ${day.hit_creatine ? '✅' : '❌'}</td>
@@ -3218,10 +3220,13 @@ async function loadNutrition() {
           <h3><i class="fas fa-chart-area"></i> Recent Trends (Last 14 Days)</h3>
           <div style="background: var(--light); padding: 16px; border-radius: 12px; overflow-x: auto;">
             <div style="display: flex; gap: 12px; min-width: 800px;">
-              ${daily_data.slice(-14).map(day => `
+              ${daily_data.slice(-14).map(day => {
+                const [year, month, dayNum] = day.date.split('-').map(Number);
+                const date = new Date(year, month - 1, dayNum);
+                return `
                 <div style="flex: 1; text-align: center;">
                   <div style="font-size: 11px; color: var(--gray); margin-bottom: 8px;">
-                    ${new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </div>
                   
                   <!-- Protein Bar -->
@@ -3244,7 +3249,8 @@ async function loadNutrition() {
                   
                   ${day.hit_all ? '<div style="font-size: 16px; margin-top: 8px;">✅</div>' : ''}
                 </div>
-              `).join('')}
+                `;
+              }).join('')}
             </div>
           </div>
         </div>
@@ -3623,7 +3629,9 @@ async function saveProfile() {
 
 // Utility functions
 function formatDuration(seconds) {
-  if (!seconds) return '00:00';
+  if (!seconds || seconds < 0) return '00:00';
+  
+  seconds = Math.abs(Math.floor(seconds));
   
   const hrs = Math.floor(seconds / 3600);
   const mins = Math.floor((seconds % 3600) / 60);
@@ -3634,6 +3642,13 @@ function formatDuration(seconds) {
   }
   
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+function formatDateOnly(dateStr) {
+  // Parse date without timezone conversion
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function openModal(wide = false) {
@@ -4414,6 +4429,30 @@ function renderWorkoutExerciseTabs() {
         }
       };
     }
+    
+    // Attach +/- set button handlers
+    const plusButtons = document.querySelectorAll('[data-adjust-sets="1"]');
+    const minusButtons = document.querySelectorAll('[data-adjust-sets="-1"]');
+    
+    plusButtons.forEach(btn => {
+      btn.onclick = function(e) {
+        e.preventDefault();
+        const exerciseId = parseInt(this.getAttribute('data-exercise-id'));
+        if (!isNaN(exerciseId)) {
+          adjustTargetSets(exerciseId, 1);
+        }
+      };
+    });
+    
+    minusButtons.forEach(btn => {
+      btn.onclick = function(e) {
+        e.preventDefault();
+        const exerciseId = parseInt(this.getAttribute('data-exercise-id'));
+        if (!isNaN(exerciseId)) {
+          adjustTargetSets(exerciseId, -1);
+        }
+      };
+    });
   }, 0); // Changed to 0 - no need to wait, elements are immediately available
 }
 
@@ -4442,11 +4481,11 @@ function renderExerciseContent(exercise, index) {
         </div>
         <div style="text-align: right;">
           <div style="display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-bottom: 8px;">
-            <button onclick="adjustTargetSets(${exercise.id}, -1)" class="btn btn-outline" style="padding: 8px 12px; min-width: auto;" title="Decrease target sets">
+            <button data-adjust-sets="-1" data-exercise-id="${exercise.id}" class="btn btn-outline" style="padding: 8px 12px; min-width: auto;" title="Decrease target sets">
               <i class="fas fa-minus"></i>
             </button>
             <div style="font-size: 36px; font-weight: bold; color: var(--primary);">${completedSets}/${targetSets}</div>
-            <button onclick="adjustTargetSets(${exercise.id}, 1)" class="btn btn-primary" style="padding: 8px 12px; min-width: auto;" title="Increase target sets">
+            <button data-adjust-sets="1" data-exercise-id="${exercise.id}" class="btn btn-primary" style="padding: 8px 12px; min-width: auto;" title="Increase target sets">
               <i class="fas fa-plus"></i>
             </button>
           </div>
@@ -4816,6 +4855,28 @@ async function showWorkoutSummary() {
           </div>
         </div>
         
+        <!-- Perceived Exertion -->
+        <div class="card" style="margin-bottom: 32px;">
+          <h3 style="margin: 0 0 16px 0;"><i class="fas fa-gauge-high"></i> How Hard Was This Workout?</h3>
+          <p style="color: var(--gray); margin-bottom: 20px; font-size: 14px;">Rate your perceived exertion (optional)</p>
+          
+          <div style="display: flex; align-items: center; gap: 20px;">
+            <span style="font-size: 14px; font-weight: 600; min-width: 60px; color: var(--secondary);">Easy</span>
+            <div style="flex: 1; position: relative;">
+              <input type="range" id="perceivedExertion" min="1" max="10" value="5" step="1" 
+                style="width: 100%; height: 8px; border-radius: 4px; background: linear-gradient(90deg, var(--secondary) 0%, var(--warning) 50%, var(--danger) 100%); outline: none; -webkit-appearance: none; appearance: none;">
+              <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: var(--gray);">
+                ${Array.from({length: 10}, (_, i) => `<span>${i + 1}</span>`).join('')}
+              </div>
+            </div>
+            <span style="font-size: 14px; font-weight: 600; min-width: 60px; text-align: right; color: var(--danger);">Hard</span>
+          </div>
+          
+          <div style="text-align: center; margin-top: 16px;">
+            <div id="exertionDisplay" style="font-size: 24px; font-weight: bold; color: var(--primary);">5/10</div>
+          </div>
+        </div>
+        
         <!-- Actions -->
         <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
           <button class="btn btn-outline" onclick="deleteCompletedWorkout()" style="min-width: 180px;">
@@ -4827,6 +4888,19 @@ async function showWorkoutSummary() {
         </div>
       </div>
     `;
+    
+    // Add event listener for perceived exertion slider
+    setTimeout(() => {
+      const slider = document.getElementById('perceivedExertion');
+      const display = document.getElementById('exertionDisplay');
+      if (slider && display) {
+        slider.oninput = function() {
+          display.textContent = `${this.value}/10`;
+          // Store the value for later saving
+          state.perceivedExertion = parseInt(this.value);
+        };
+      }
+    }, 0);
     
   } catch (error) {
     showNotification('Error completing workout: ' + error.message, 'error');
