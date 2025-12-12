@@ -194,11 +194,14 @@ function switchTab(tabName) {
     case 'achievements':
       loadAchievements();
       break;
-    default:
-      loadDashboard();
+    case 'nutrition':
+      loadNutrition();
       break;
     case 'learn':
       loadLearn();
+      break;
+    default:
+      loadDashboard();
       break;
   }
 }
