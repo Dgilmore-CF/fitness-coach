@@ -1,6 +1,3 @@
--- Add AI recommendation settings to users table (check if columns don't exist first)
--- SQLite doesn't support IF NOT EXISTS for ALTER TABLE, so we'll just create the table structure
-
 -- Create AI recommendations table
 CREATE TABLE IF NOT EXISTS ai_recommendations (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
