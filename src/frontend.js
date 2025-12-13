@@ -4215,6 +4215,39 @@ function showWorkoutWarmupScreen(workout) {
   \`;
   
   document.body.appendChild(modal);
+  
+  // Set up event delegation for the modal (handles all button clicks)
+  setupWorkoutModalEventDelegation(modal);
+}
+
+// Set up event delegation for workout modal buttons
+function setupWorkoutModalEventDelegation(modal) {
+  modal.addEventListener('click', function(e) {
+    // Handle +/- set buttons
+    const adjustBtn = e.target.closest('[data-adjust-sets]');
+    if (adjustBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const exerciseId = parseInt(adjustBtn.getAttribute('data-exercise-id'));
+      const adjustment = parseInt(adjustBtn.getAttribute('data-adjust-sets'));
+      if (!isNaN(exerciseId) && !isNaN(adjustment)) {
+        adjustTargetSets(exerciseId, adjustment);
+      }
+      return;
+    }
+    
+    // Handle delete set buttons
+    const deleteBtn = e.target.closest('[data-delete-set]');
+    if (deleteBtn) {
+      e.preventDefault();
+      const exerciseId = parseInt(deleteBtn.getAttribute('data-exercise-id'));
+      const setId = parseInt(deleteBtn.getAttribute('data-set-id'));
+      if (!isNaN(exerciseId) && !isNaN(setId)) {
+        deleteExerciseSet(exerciseId, setId);
+      }
+      return;
+    }
+  });
 }
 
 // Cancel workout start
@@ -4250,6 +4283,9 @@ async function resumeWorkoutModal() {
       padding: 20px;
     \`;
     document.body.appendChild(modal);
+    
+    // Set up event delegation for the modal
+    setupWorkoutModalEventDelegation(modal);
   }
   
   // Initialize workout state if not exists
@@ -4431,30 +4467,8 @@ function renderWorkoutExerciseTabs() {
       };
     }
     
-    // Attach +/- set button handlers
-    const plusButtons = document.querySelectorAll('[data-adjust-sets="1"]');
-    const minusButtons = document.querySelectorAll('[data-adjust-sets="-1"]');
-    
-    plusButtons.forEach(btn => {
-      btn.onclick = function(e) {
-        e.preventDefault();
-        const exerciseId = parseInt(this.getAttribute('data-exercise-id'));
-        if (!isNaN(exerciseId)) {
-          adjustTargetSets(exerciseId, 1);
-        }
-      };
-    });
-    
-    minusButtons.forEach(btn => {
-      btn.onclick = function(e) {
-        e.preventDefault();
-        const exerciseId = parseInt(this.getAttribute('data-exercise-id'));
-        if (!isNaN(exerciseId)) {
-          adjustTargetSets(exerciseId, -1);
-        }
-      };
-    });
   }, 0); // Changed to 0 - no need to wait, elements are immediately available
+  // Note: +/- set buttons use event delegation on the modal (setupWorkoutModalEventDelegation)
 }
 
 // Render exercise content with set table
