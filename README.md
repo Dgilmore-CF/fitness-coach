@@ -1135,11 +1135,15 @@ fitness-builder/
 ├── .github/
 │   └── workflows/
 │       └── deploy.yml           # CI/CD pipeline
+├── docs/
+│   ├── ai-model-analysis.md     # AI program generation quality & validation
+│   ├── fine-tuning-guide.md     # Guide for fine-tuning Llama 3
+│   └── muscle-maps.md           # AI image generation for muscle diagrams
 ├── migrations/
 │   ├── 0001_initial_schema.sql  # Database schema
 │   └── 0002_seed_exercises.sql  # Exercise & stretch data
 ├── public/
-│   └── app.js                   # Frontend application (4000+ lines)
+│   └── app.js                   # Frontend application (7000+ lines)
 ├── src/
 │   ├── index.js                 # Main Worker entry point
 │   ├── middleware/
@@ -1152,14 +1156,29 @@ fitness-builder/
 │   │   ├── exercises.js         # Exercise library
 │   │   ├── analytics.js         # Progress analytics
 │   │   ├── nutrition.js         # Nutrition tracking
-│   │   └── health.js            # Apple Health sync
+│   │   ├── health.js            # Apple Health sync
+│   │   ├── achievements.js      # Achievements & streaks
+│   │   └── ai.js                # AI recommendations API
 │   └── services/
-│       └── ai.js                # AI program generation
+│       ├── ai.js                # AI program generation
+│       └── achievements.js      # Achievement tracking logic
 ├── .gitignore                   # Git ignore rules
 ├── package.json                 # Dependencies
 ├── wrangler.toml                # Cloudflare configuration
 └── README.md                    # This file
 ```
+
+---
+
+## Additional Documentation
+
+For detailed technical documentation, see the `docs/` folder:
+
+| Document | Description |
+|----------|-------------|
+| [AI Model Analysis](docs/ai-model-analysis.md) | How AI program generation works, validation pipeline, and quality assurance |
+| [Fine-Tuning Guide](docs/fine-tuning-guide.md) | Advanced guide for fine-tuning Llama 3 for better program generation |
+| [Muscle Maps](docs/muscle-maps.md) | Guide for creating professional muscle visualization diagrams using AI image generation |
 
 ---
 
