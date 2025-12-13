@@ -277,32 +277,37 @@ workouts.put('/:workoutId/exercises/:exerciseId/sets/:setId', async (c) => {
 
 // Update target sets for an exercise in workout
 workouts.patch('/:workoutId/exercises/:exerciseId/target-sets', async (c) => {
-  const user = requireAuth(c);
-  const workoutId = c.req.param('workoutId');
-  const exerciseId = c.req.param('exerciseId');
-  const db = c.env.DB;
-  const { target_sets } = await c.req.json();
+  try {
+    const user = requireAuth(c);
+    const workoutId = c.req.param('workoutId');
+    const exerciseId = c.req.param('exerciseId');
+    const db = c.env.DB;
+    const { target_sets } = await c.req.json();
 
-  // Verify workout belongs to user
-  const workout = await db.prepare(
-    'SELECT * FROM workouts WHERE id = ? AND user_id = ?'
-  ).bind(workoutId, user.id).first();
+    // Verify workout belongs to user
+    const workout = await db.prepare(
+      'SELECT * FROM workouts WHERE id = ? AND user_id = ?'
+    ).bind(workoutId, user.id).first();
 
-  if (!workout) {
-    return c.json({ error: 'Workout not found' }, 404);
+    if (!workout) {
+      return c.json({ error: 'Workout not found' }, 404);
+    }
+
+    // Validate target_sets
+    if (!target_sets || target_sets < 1 || target_sets > 10) {
+      return c.json({ error: 'Target sets must be between 1 and 10' }, 400);
+    }
+
+    // Update target sets for this exercise in this workout
+    await db.prepare(
+      'UPDATE workout_exercises SET target_sets = ? WHERE workout_id = ? AND id = ?'
+    ).bind(target_sets, workoutId, exerciseId).run();
+
+    return c.json({ message: 'Target sets updated', target_sets });
+  } catch (error) {
+    console.error('Error updating target sets:', error);
+    return c.json({ error: 'Failed to update target sets: ' + error.message }, 500);
   }
-
-  // Validate target_sets
-  if (!target_sets || target_sets < 1 || target_sets > 10) {
-    return c.json({ error: 'Target sets must be between 1 and 10' }, 400);
-  }
-
-  // Update target sets for this exercise in this workout
-  await db.prepare(
-    'UPDATE workout_exercises SET target_sets = ? WHERE workout_id = ? AND id = ?'
-  ).bind(target_sets, workoutId, exerciseId).run();
-
-  return c.json({ message: 'Target sets updated', target_sets });
 });
 
 // Delete set
