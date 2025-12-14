@@ -403,6 +403,126 @@ workouts.delete('/:id', async (c) => {
   }
 });
 
+// Add exercises to an active workout
+workouts.post('/:workoutId/add-exercises', async (c) => {
+  try {
+    const user = requireAuth(c);
+    const workoutId = c.req.param('workoutId');
+    const { exercise_ids } = await c.req.json();
+    const db = c.env.DB;
+
+    // Verify workout belongs to user and is not completed
+    const workout = await db.prepare(
+      'SELECT * FROM workouts WHERE id = ? AND user_id = ? AND completed = 0'
+    ).bind(workoutId, user.id).first();
+
+    if (!workout) {
+      return c.json({ error: 'Workout not found or already completed' }, 404);
+    }
+
+    if (!exercise_ids || !Array.isArray(exercise_ids) || exercise_ids.length === 0) {
+      return c.json({ error: 'No exercises provided' }, 400);
+    }
+
+    // Get current max order_index
+    const maxOrder = await db.prepare(
+      'SELECT MAX(order_index) as max_idx FROM workout_exercises WHERE workout_id = ?'
+    ).bind(workoutId).first();
+    
+    let orderIndex = (maxOrder?.max_idx ?? -1) + 1;
+    const addedExercises = [];
+
+    // Add each exercise to the workout
+    for (const exerciseId of exercise_ids) {
+      // Verify exercise exists
+      const exercise = await db.prepare(
+        'SELECT * FROM exercises WHERE id = ?'
+      ).bind(exerciseId).first();
+
+      if (exercise) {
+        const result = await db.prepare(
+          `INSERT INTO workout_exercises (workout_id, exercise_id, order_index, target_sets)
+           VALUES (?, ?, ?, 3)
+           RETURNING *`
+        ).bind(workoutId, exerciseId, orderIndex).first();
+        
+        addedExercises.push({ ...result, name: exercise.name });
+        orderIndex++;
+      }
+    }
+
+    return c.json({ 
+      message: `Added ${addedExercises.length} exercise(s) to workout`,
+      exercises: addedExercises
+    });
+  } catch (error) {
+    console.error('Error adding exercises to workout:', error);
+    return c.json({ error: 'Failed to add exercises: ' + error.message }, 500);
+  }
+});
+
+// Save workout exercises to program day (persist changes)
+workouts.post('/:workoutId/save-to-program', async (c) => {
+  try {
+    const user = requireAuth(c);
+    const workoutId = c.req.param('workoutId');
+    const db = c.env.DB;
+
+    // Get workout with program day info
+    const workout = await db.prepare(
+      'SELECT * FROM workouts WHERE id = ? AND user_id = ?'
+    ).bind(workoutId, user.id).first();
+
+    if (!workout) {
+      return c.json({ error: 'Workout not found' }, 404);
+    }
+
+    if (!workout.program_day_id) {
+      return c.json({ error: 'This workout is not associated with a program day' }, 400);
+    }
+
+    // Verify program day belongs to user's program
+    const programDay = await db.prepare(
+      `SELECT pd.* FROM program_days pd
+       JOIN programs p ON pd.program_id = p.id
+       WHERE pd.id = ? AND p.user_id = ?`
+    ).bind(workout.program_day_id, user.id).first();
+
+    if (!programDay) {
+      return c.json({ error: 'Program day not found' }, 404);
+    }
+
+    // Get current workout exercises
+    const workoutExercises = await db.prepare(
+      `SELECT we.exercise_id, we.order_index, we.target_sets
+       FROM workout_exercises we
+       WHERE we.workout_id = ?
+       ORDER BY we.order_index`
+    ).bind(workoutId).all();
+
+    // Delete existing program exercises for this day
+    await db.prepare(
+      'DELETE FROM program_exercises WHERE program_day_id = ?'
+    ).bind(workout.program_day_id).run();
+
+    // Insert new program exercises based on workout
+    for (const we of workoutExercises.results) {
+      await db.prepare(
+        `INSERT INTO program_exercises (program_day_id, exercise_id, order_index, target_sets, target_reps, rest_seconds)
+         VALUES (?, ?, ?, ?, '8-12', 90)`
+      ).bind(workout.program_day_id, we.exercise_id, we.order_index, we.target_sets || 3).run();
+    }
+
+    return c.json({ 
+      message: 'Program day updated with current workout exercises',
+      exercises_count: workoutExercises.results.length
+    });
+  } catch (error) {
+    console.error('Error saving to program:', error);
+    return c.json({ error: 'Failed to save to program: ' + error.message }, 500);
+  }
+});
+
 // Mark workout as cardio
 workouts.put('/:id/cardio', async (c) => {
   const user = requireAuth(c);

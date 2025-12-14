@@ -4409,6 +4409,9 @@ function renderWorkoutExerciseTabs() {
             <button class="btn btn-outline" onclick="showWorkoutNotesModal()" title="Add workout notes">
               <i class="fas fa-note-sticky"></i> Notes
             </button>
+            <button class="btn btn-outline" onclick="showAddExercisesModal()" title="Add exercises to workout">
+              <i class="fas fa-plus-circle"></i> Add Exercises
+            </button>
           </div>
           <button class="btn btn-danger" onclick="endWorkoutEarly()">
             <i class="fas fa-stop"></i> End Workout
@@ -4783,6 +4786,214 @@ function endWorkoutEarly() {
   }
 }
 
+// Show add exercises modal
+async function showAddExercisesModal() {
+  // Fetch all available exercises
+  try {
+    const data = await api('/exercises');
+    const exercises = data.exercises || [];
+    
+    // Group exercises by muscle group
+    const grouped = {};
+    exercises.forEach(ex => {
+      const group = ex.muscle_group || 'Other';
+      if (!grouped[group]) grouped[group] = [];
+      grouped[group].push(ex);
+    });
+    
+    // Get current workout exercise IDs to mark already added
+    const currentExerciseIds = new Set(state.currentWorkout.exercises.map(e => e.exercise_id));
+    
+    // Store for selection tracking
+    state.addExerciseSelection = new Set();
+    
+    const overlay = document.createElement('div');
+    overlay.id = 'add-exercises-overlay';
+    overlay.style.cssText = \`
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 20000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    \`;
+    
+    overlay.innerHTML = \`
+      <div style="background: white; border-radius: 16px; max-width: 800px; width: 100%; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden;">
+        <!-- Header -->
+        <div style="padding: 20px; border-bottom: 1px solid var(--border); flex-shrink: 0;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h2 style="margin: 0;"><i class="fas fa-plus-circle"></i> Add Exercises</h2>
+            <button onclick="closeAddExercisesModal()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--gray);">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          
+          <!-- Search -->
+          <div style="position: relative;">
+            <i class="fas fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--gray);"></i>
+            <input type="text" id="exerciseSearchInput" placeholder="Search exercises..." 
+              style="width: 100%; padding: 12px 12px 12px 40px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px;"
+              oninput="filterExerciseList(this.value)">
+          </div>
+          
+          <!-- Selection count -->
+          <div id="exerciseSelectionCount" style="margin-top: 12px; font-size: 14px; color: var(--gray);">
+            <span id="selectedCount">0</span> exercise(s) selected
+          </div>
+        </div>
+        
+        <!-- Exercise List -->
+        <div id="exerciseListContainer" style="flex: 1; overflow-y: auto; padding: 16px;">
+          \${Object.entries(grouped).sort((a, b) => a[0].localeCompare(b[0])).map(([group, exs]) => \`
+            <div class="exercise-group" data-group="\${group}">
+              <h4 style="margin: 0 0 12px 0; color: var(--primary); font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">
+                <i class="fas fa-dumbbell"></i> \${group} (\${exs.length})
+              </h4>
+              <div style="display: grid; gap: 8px; margin-bottom: 20px;">
+                \${exs.map(ex => \`
+                  <label class="exercise-item" data-exercise-id="\${ex.id}" data-name="\${ex.name.toLowerCase()}" 
+                    style="display: flex; align-items: center; gap: 12px; padding: 12px; background: \${currentExerciseIds.has(ex.id) ? 'var(--light)' : 'white'}; border: 2px solid var(--border); border-radius: 8px; cursor: \${currentExerciseIds.has(ex.id) ? 'not-allowed' : 'pointer'}; transition: all 0.2s; \${currentExerciseIds.has(ex.id) ? 'opacity: 0.6;' : ''}">
+                    <input type="checkbox" data-exercise-id="\${ex.id}" 
+                      \${currentExerciseIds.has(ex.id) ? 'disabled checked' : ''}
+                      onchange="toggleExerciseSelection(\${ex.id}, this.checked)"
+                      style="width: 20px; height: 20px; accent-color: var(--primary);">
+                    <div style="flex: 1;">
+                      <div style="font-weight: 600;">\${ex.name}</div>
+                      <div style="font-size: 12px; color: var(--gray);">\${ex.equipment || 'Bodyweight'}</div>
+                    </div>
+                    \${currentExerciseIds.has(ex.id) ? '<span style="font-size: 12px; color: var(--secondary); font-weight: 600;">Already in workout</span>' : ''}
+                  </label>
+                \`).join('')}
+              </div>
+            </div>
+          \`).join('')}
+        </div>
+        
+        <!-- Footer -->
+        <div style="padding: 16px 20px; border-top: 1px solid var(--border); background: var(--light); flex-shrink: 0;">
+          <div style="display: flex; gap: 12px; justify-content: flex-end;">
+            <button class="btn btn-outline" onclick="closeAddExercisesModal()">Cancel</button>
+            <button class="btn btn-primary" id="addSelectedExercisesBtn" onclick="addSelectedExercises()" disabled>
+              <i class="fas fa-plus"></i> Add Selected (<span id="addBtnCount">0</span>)
+            </button>
+          </div>
+        </div>
+      </div>
+    \`;
+    
+    document.body.appendChild(overlay);
+    
+    // Focus search input
+    setTimeout(() => {
+      const searchInput = document.getElementById('exerciseSearchInput');
+      if (searchInput) searchInput.focus();
+    }, 100);
+    
+  } catch (error) {
+    showNotification('Error loading exercises: ' + error.message, 'error');
+  }
+}
+
+// Close add exercises modal
+function closeAddExercisesModal() {
+  const overlay = document.getElementById('add-exercises-overlay');
+  if (overlay) overlay.remove();
+  state.addExerciseSelection = null;
+}
+
+// Toggle exercise selection
+function toggleExerciseSelection(exerciseId, isSelected) {
+  if (!state.addExerciseSelection) state.addExerciseSelection = new Set();
+  
+  if (isSelected) {
+    state.addExerciseSelection.add(exerciseId);
+  } else {
+    state.addExerciseSelection.delete(exerciseId);
+  }
+  
+  // Update UI
+  const count = state.addExerciseSelection.size;
+  const countSpan = document.getElementById('selectedCount');
+  const btnCount = document.getElementById('addBtnCount');
+  const addBtn = document.getElementById('addSelectedExercisesBtn');
+  
+  if (countSpan) countSpan.textContent = count;
+  if (btnCount) btnCount.textContent = count;
+  if (addBtn) addBtn.disabled = count === 0;
+  
+  // Highlight selected items
+  const item = document.querySelector(\`.exercise-item[data-exercise-id="\${exerciseId}"]\`);
+  if (item && !item.querySelector('input:disabled')) {
+    item.style.borderColor = isSelected ? 'var(--primary)' : 'var(--border)';
+    item.style.background = isSelected ? 'var(--primary-light)' : 'white';
+  }
+}
+
+// Filter exercise list by search
+function filterExerciseList(query) {
+  const items = document.querySelectorAll('.exercise-item');
+  const groups = document.querySelectorAll('.exercise-group');
+  const lowerQuery = query.toLowerCase().trim();
+  
+  items.forEach(item => {
+    const name = item.getAttribute('data-name') || '';
+    const matches = !lowerQuery || name.includes(lowerQuery);
+    item.style.display = matches ? 'flex' : 'none';
+  });
+  
+  // Hide empty groups
+  groups.forEach(group => {
+    const visibleItems = group.querySelectorAll('.exercise-item[style*="display: flex"], .exercise-item:not([style*="display"])');
+    const hasVisible = Array.from(group.querySelectorAll('.exercise-item')).some(item => item.style.display !== 'none');
+    group.style.display = hasVisible ? 'block' : 'none';
+  });
+}
+
+// Add selected exercises to workout
+async function addSelectedExercises() {
+  if (!state.addExerciseSelection || state.addExerciseSelection.size === 0) return;
+  
+  const exerciseIds = Array.from(state.addExerciseSelection);
+  const addBtn = document.getElementById('addSelectedExercisesBtn');
+  
+  if (addBtn) {
+    addBtn.disabled = true;
+    addBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
+  }
+  
+  try {
+    const result = await api(\`/workouts/\${state.currentWorkout.id}/add-exercises\`, {
+      method: 'POST',
+      body: JSON.stringify({ exercise_ids: exerciseIds })
+    });
+    
+    // Refresh workout data
+    const data = await api(\`/workouts/\${state.currentWorkout.id}\`);
+    state.currentWorkout = data.workout;
+    
+    // Track that exercises were manually added (for save to program prompt)
+    state.workoutModified = true;
+    
+    closeAddExercisesModal();
+    renderWorkoutExerciseTabs();
+    
+    showNotification(result.message || \`Added \${exerciseIds.length} exercise(s)\`, 'success');
+    
+  } catch (error) {
+    showNotification('Error adding exercises: ' + error.message, 'error');
+    if (addBtn) {
+      addBtn.disabled = false;
+      addBtn.innerHTML = \`<i class="fas fa-plus"></i> Add Selected (<span id="addBtnCount">\${exerciseIds.length}</span>)\`;
+    }
+  }
+}
+
 // Show workout summary
 async function showWorkoutSummary() {
   const modal = document.getElementById('workout-modal');
@@ -4892,6 +5103,24 @@ async function showWorkoutSummary() {
           </div>
         </div>
         
+        <!-- Save to Program (if modified) -->
+        \${state.workoutModified && workout.program_day_id ? \`
+        <div class="card" style="margin-bottom: 32px; border: 2px solid var(--primary); background: var(--primary-light);">
+          <div style="display: flex; align-items: center; gap: 16px;">
+            <div style="font-size: 40px;">💾</div>
+            <div style="flex: 1;">
+              <h4 style="margin: 0 0 8px 0;">Save Changes to Program?</h4>
+              <p style="margin: 0; color: var(--gray); font-size: 14px;">
+                You added exercises to this workout. Would you like to save these changes to your program so they appear next time?
+              </p>
+            </div>
+            <button class="btn btn-primary" onclick="saveWorkoutToProgram()" id="saveToProgramBtn">
+              <i class="fas fa-save"></i> Save to Program
+            </button>
+          </div>
+        </div>
+        \` : ''}
+        
         <!-- Actions -->
         <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
           <button class="btn btn-outline" onclick="deleteCompletedWorkout()" style="min-width: 180px;">
@@ -4983,6 +5212,42 @@ async function deleteCompletedWorkout() {
   }
 }
 
+// Save workout exercises to program
+async function saveWorkoutToProgram() {
+  if (!state.currentWorkout) return;
+  
+  const btn = document.getElementById('saveToProgramBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+  }
+  
+  try {
+    const result = await api(\`/workouts/\${state.currentWorkout.id}/save-to-program\`, {
+      method: 'POST'
+    });
+    
+    showNotification(result.message || 'Program updated successfully!', 'success');
+    
+    // Update button to show success
+    if (btn) {
+      btn.innerHTML = '<i class="fas fa-check"></i> Saved!';
+      btn.classList.remove('btn-primary');
+      btn.classList.add('btn-secondary');
+    }
+    
+    // Clear the modified flag
+    state.workoutModified = false;
+    
+  } catch (error) {
+    showNotification('Error saving to program: ' + error.message, 'error');
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-save"></i> Save to Program';
+    }
+  }
+}
+
 // Finish workout summary and return to dashboard
 function finishWorkoutSummary() {
   const modal = document.getElementById('workout-modal');
@@ -4992,6 +5257,7 @@ function finishWorkoutSummary() {
   state.currentWorkout = null;
   state.workoutExercise = null;
   state.workoutNotes = '';
+  state.workoutModified = false;
   state.keyboardShortcutsEnabled = false;
   
   // Stop any active rest timer
