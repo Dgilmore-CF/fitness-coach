@@ -5839,27 +5839,32 @@ document.addEventListener('DOMContentLoaded', () => {
 // No need for wrapper here - removed to prevent recursion
 
 // Enhanced startWorkoutExercises with keyboard shortcuts
-const originalStartWorkoutExercises = startWorkoutExercises;
-startWorkoutExercises = async function() {
-  await originalStartWorkoutExercises();
-  enableKeyboardShortcuts();
-  
-  // Show keyboard shortcuts hint
-  setTimeout(() => {
-    showNotification('💡 Press ? for keyboard shortcuts', 'info');
-  }, 2000);
-};
+// Note: This wrapper is applied after the original function is defined
+(function() {
+  const originalFn = startWorkoutExercises;
+  window.startWorkoutExercises = async function() {
+    await originalFn();
+    enableKeyboardShortcuts();
+    
+    // Show keyboard shortcuts hint
+    setTimeout(() => {
+      showNotification('💡 Press ? for keyboard shortcuts', 'info');
+    }, 2000);
+  };
+})();
 
 // Enhanced showWorkoutSummary with confetti
-const originalShowWorkoutSummary = showWorkoutSummary;
-showWorkoutSummary = async function() {
-  await originalShowWorkoutSummary();
-  
-  // Trigger confetti animation
-  setTimeout(() => triggerConfetti(), 500);
-  
-  disableKeyboardShortcuts();
-};
+(function() {
+  const originalFn = showWorkoutSummary;
+  window.showWorkoutSummary = async function() {
+    await originalFn();
+    
+    // Trigger confetti animation
+    setTimeout(() => triggerConfetti(), 500);
+    
+    disableKeyboardShortcuts();
+  };
+})();
 
 // Load comprehensive training education content
 function loadLearn() {
