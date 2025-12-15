@@ -4479,6 +4479,11 @@ function renderWorkoutExerciseTabs() {
       };
     }
     
+    // Restore rest timer display if it was active
+    if (state.restTimerActive && state.restTimeRemaining > 0) {
+      updateRestTimerDisplay();
+    }
+    
   }, 0); // Changed to 0 - no need to wait, elements are immediately available
   // Note: +/- set buttons use event delegation on the modal (setupWorkoutModalEventDelegation)
 }
@@ -5346,19 +5351,10 @@ function startRestTimer(seconds = 90) {
   }
   
   state.restTimeRemaining = seconds;
+  state.restTimerActive = true;
   
-  // Show inline rest timer if it exists (within workout modal)
-  const inlineTimer = document.getElementById('inline-rest-timer');
-  const inlineTimeDisplay = document.getElementById('inline-rest-time');
-  
-  if (inlineTimer) {
-    inlineTimer.style.display = 'block';
-    // Scroll to make timer visible
-    inlineTimer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }
-  
-  // Update display immediately
-  updateRestTimerDisplay();
+  // Show and update inline timer immediately
+  showInlineRestTimer();
   
   // Start countdown
   state.restTimerInterval = setInterval(() => {
@@ -5367,8 +5363,10 @@ function startRestTimer(seconds = 90) {
     if (state.restTimeRemaining <= 0) {
       clearInterval(state.restTimerInterval);
       state.restTimerInterval = null;
+      state.restTimerActive = false;
       
       // Hide inline timer
+      const inlineTimer = document.getElementById('inline-rest-timer');
       if (inlineTimer) {
         inlineTimer.style.display = 'none';
       }
@@ -5384,9 +5382,30 @@ function startRestTimer(seconds = 90) {
   }, 1000);
 }
 
-// Update rest timer display (inline version)
-function updateRestTimerDisplay() {
+// Show and update inline rest timer (finds element fresh each time)
+function showInlineRestTimer() {
+  const inlineTimer = document.getElementById('inline-rest-timer');
   const inlineTimeDisplay = document.getElementById('inline-rest-time');
+  
+  if (inlineTimer && state.restTimerActive) {
+    inlineTimer.style.display = 'block';
+    // Scroll to make timer visible
+    inlineTimer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  
+  updateRestTimerDisplay();
+}
+
+// Update rest timer display (inline version) - finds element fresh each call
+function updateRestTimerDisplay() {
+  const inlineTimer = document.getElementById('inline-rest-timer');
+  const inlineTimeDisplay = document.getElementById('inline-rest-time');
+  
+  // Show timer if it exists and timer is active
+  if (inlineTimer && state.restTimerActive) {
+    inlineTimer.style.display = 'block';
+  }
+  
   if (inlineTimeDisplay && state.restTimeRemaining > 0) {
     const mins = Math.floor(state.restTimeRemaining / 60);
     const secs = state.restTimeRemaining % 60;
@@ -5399,6 +5418,8 @@ function skipRestTimer() {
     clearInterval(state.restTimerInterval);
     state.restTimerInterval = null;
   }
+  
+  state.restTimerActive = false;
   
   // Hide inline timer
   const inlineTimer = document.getElementById('inline-rest-timer');
