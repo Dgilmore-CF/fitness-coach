@@ -126,6 +126,17 @@ workouts.post('/:id/complete', async (c) => {
   const user = requireAuth(c);
   const workoutId = c.req.param('id');
   const db = c.env.DB;
+  
+  // Get optional perceived exertion from body
+  let perceivedExertion = null;
+  try {
+    const body = await c.req.json();
+    if (body.perceived_exertion && body.perceived_exertion >= 1 && body.perceived_exertion <= 10) {
+      perceivedExertion = body.perceived_exertion;
+    }
+  } catch (e) {
+    // No body or invalid JSON - that's fine, perceived_exertion is optional
+  }
 
   // Calculate total weight and duration
   const stats = await db.prepare(
@@ -142,10 +153,11 @@ workouts.post('/:id/complete', async (c) => {
      SET end_time = CURRENT_TIMESTAMP,
          total_duration_seconds = (strftime('%s', 'now') - strftime('%s', start_time)),
          total_weight_kg = ?,
-         completed = 1
+         completed = 1,
+         perceived_exertion = ?
      WHERE id = ? AND user_id = ?
      RETURNING *`
-  ).bind(stats.total_weight || 0, workoutId, user.id).first();
+  ).bind(stats.total_weight || 0, perceivedExertion, workoutId, user.id).first();
 
   if (!workout) {
     return c.json({ error: 'Workout not found' }, 404);
@@ -163,6 +175,32 @@ workouts.post('/:id/complete', async (c) => {
     message: 'Workout completed',
     achievements: newAchievements
   });
+});
+
+// Update perceived exertion for a completed workout
+workouts.patch('/:id/perceived-exertion', async (c) => {
+  const user = requireAuth(c);
+  const workoutId = c.req.param('id');
+  const db = c.env.DB;
+  const body = await c.req.json();
+  const { perceived_exertion } = body;
+  
+  if (!perceived_exertion || perceived_exertion < 1 || perceived_exertion > 10) {
+    return c.json({ error: 'Perceived exertion must be between 1 and 10' }, 400);
+  }
+  
+  const workout = await db.prepare(
+    `UPDATE workouts 
+     SET perceived_exertion = ?
+     WHERE id = ? AND user_id = ?
+     RETURNING *`
+  ).bind(perceived_exertion, workoutId, user.id).first();
+  
+  if (!workout) {
+    return c.json({ error: 'Workout not found' }, 404);
+  }
+  
+  return c.json({ workout, message: 'Perceived exertion updated' });
 });
 
 // Add exercise to workout

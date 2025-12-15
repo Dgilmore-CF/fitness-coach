@@ -294,7 +294,7 @@ async function loadDashboard() {
                 </div>
                 <!-- Expandable Details -->
                 <div id="workout-details-\${w.id}" style="display: none; border-top: 1px solid var(--border); background: var(--light); padding: 20px;">
-                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 16px;">
+                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; margin-bottom: 16px;">
                     <div>
                       <div style="font-size: 12px; color: var(--gray); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Training Time</div>
                       <div style="font-size: 18px; font-weight: 600;">\${formatDuration(w.total_duration_seconds)}</div>
@@ -310,6 +310,10 @@ async function loadDashboard() {
                     <div>
                       <div style="font-size: 12px; color: var(--gray); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Total Volume</div>
                       <div style="font-size: 18px; font-weight: 600;">\${w.total_weight_kg ? formatWeight(w.total_weight_kg) : 'N/A'}</div>
+                    </div>
+                    <div>
+                      <div style="font-size: 12px; color: var(--gray); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Effort Level</div>
+                      <div style="font-size: 18px; font-weight: 600;">\${w.perceived_exertion ? \`\${w.perceived_exertion}/10 \${getExertionEmoji(w.perceived_exertion)}\` : 'Not rated'}</div>
                     </div>
                   </div>
                   \${w.notes ? \`
@@ -533,7 +537,7 @@ async function viewWorkout(workoutId) {
       </div>
 
       <!-- Summary Stats -->
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 24px;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 12px; margin-bottom: 24px;">
         <div style="padding: 16px; background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white; border-radius: 12px; text-align: center;">
           <div style="font-size: 24px; font-weight: bold;">\${formatWeight(totalVolume)}</div>
           <div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">Total Volume</div>
@@ -549,6 +553,10 @@ async function viewWorkout(workoutId) {
         <div style="padding: 16px; background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); color: white; border-radius: 12px; text-align: center;">
           <div style="font-size: 24px; font-weight: bold;">\${workout.exercises?.length || 0}</div>
           <div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">Exercises</div>
+        </div>
+        <div style="padding: 16px; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; border-radius: 12px; text-align: center;">
+          <div style="font-size: 24px; font-weight: bold;">\${workout.perceived_exertion ? \`\${workout.perceived_exertion}/10\` : '-'}</div>
+          <div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">Effort \${workout.perceived_exertion ? getExertionEmoji(workout.perceived_exertion) : ''}</div>
         </div>
       </div>
 
@@ -2437,6 +2445,7 @@ async function loadWorkoutHistory(container) {
                   <th>Duration</th>
                   <th>Volume</th>
                   <th>Sets</th>
+                  <th>Effort</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
@@ -2449,6 +2458,7 @@ async function loadWorkoutHistory(container) {
                     <td>\${formatDuration(w.total_duration_seconds)}</td>
                     <td>\${w.total_weight_kg ? formatWeight(w.total_weight_kg) : 'N/A'}</td>
                     <td>\${w.total_sets || 0}</td>
+                    <td>\${w.perceived_exertion ? \`\${w.perceived_exertion}/10 \${getExertionEmoji(w.perceived_exertion)}\` : '-'}</td>
                     <td>
                       \${w.completed 
                         ? '<span style="background: var(--secondary-light); color: var(--secondary); padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600;">✓ Complete</span>' 
@@ -5242,6 +5252,15 @@ function getFunWeightComparison(totalKg) {
   return comparisons[0];
 }
 
+// Get emoji for perceived exertion level
+function getExertionEmoji(level) {
+  if (level <= 2) return '😊';
+  if (level <= 4) return '🙂';
+  if (level <= 6) return '😤';
+  if (level <= 8) return '💪';
+  return '🔥';
+}
+
 // Delete completed workout from summary
 async function deleteCompletedWorkout() {
   if (!confirm('Are you sure you want to delete this workout? This cannot be undone.')) return;
@@ -5320,7 +5339,19 @@ async function saveWorkoutToProgram() {
 }
 
 // Finish workout summary and return to dashboard
-function finishWorkoutSummary() {
+async function finishWorkoutSummary() {
+  // Save perceived exertion if set
+  if (state.perceivedExertion && state.currentWorkout) {
+    try {
+      await api(\`/workouts/\${state.currentWorkout.id}/perceived-exertion\`, {
+        method: 'PATCH',
+        body: JSON.stringify({ perceived_exertion: state.perceivedExertion })
+      });
+    } catch (error) {
+      console.error('Error saving perceived exertion:', error);
+    }
+  }
+  
   const modal = document.getElementById('workout-modal');
   if (modal) modal.remove();
   
@@ -5330,6 +5361,7 @@ function finishWorkoutSummary() {
   state.workoutNotes = '';
   state.workoutModified = false;
   state.keyboardShortcutsEnabled = false;
+  state.perceivedExertion = null;
   
   // Stop any active rest timer
   if (state.restTimerInterval) {
