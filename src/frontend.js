@@ -510,15 +510,19 @@ async function viewWorkout(workoutId) {
       return;
     }
     
-    // Calculate total volume
+    // Calculate total volume (accounting for unilateral exercises)
     let totalVolume = 0;
     let totalSets = 0;
     let totalReps = 0;
+    let exercisesWithSets = 0;
     
     workout.exercises.forEach(ex => {
-      if (ex.sets) {
+      if (ex.sets && ex.sets.length > 0) {
+        exercisesWithSets++;
         ex.sets.forEach(set => {
-          totalVolume += (set.weight_kg * set.reps);
+          // Multiply by 2 for unilateral exercises (same as backend calculation)
+          const multiplier = ex.is_unilateral ? 2 : 1;
+          totalVolume += (set.weight_kg * set.reps * multiplier);
           totalSets += 1;
           totalReps += set.reps;
         });
@@ -551,7 +555,7 @@ async function viewWorkout(workoutId) {
           <div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">Total Reps</div>
         </div>
         <div style="padding: 16px; background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); color: white; border-radius: 12px; text-align: center;">
-          <div style="font-size: 24px; font-weight: bold;">\${workout.exercises?.length || 0}</div>
+          <div style="font-size: 24px; font-weight: bold;">\${exercisesWithSets}</div>
           <div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">Exercises</div>
         </div>
         <div style="padding: 16px; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; border-radius: 12px; text-align: center;">
