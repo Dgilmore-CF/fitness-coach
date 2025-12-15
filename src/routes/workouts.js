@@ -13,7 +13,13 @@ workouts.get('/', async (c) => {
   const offset = c.req.query('offset') || 0;
 
   const workoutsList = await db.prepare(
-    `SELECT w.*, p.name as program_name, pd.name as day_name
+    `SELECT w.*, p.name as program_name, pd.name as day_name,
+       (SELECT COUNT(DISTINCT we.id) FROM workout_exercises we 
+        JOIN sets s ON s.workout_exercise_id = we.id 
+        WHERE we.workout_id = w.id) as exercise_count,
+       (SELECT COUNT(*) FROM sets s 
+        JOIN workout_exercises we ON s.workout_exercise_id = we.id 
+        WHERE we.workout_id = w.id) as total_sets
      FROM workouts w
      LEFT JOIN programs p ON w.program_id = p.id
      LEFT JOIN program_days pd ON w.program_day_id = pd.id
