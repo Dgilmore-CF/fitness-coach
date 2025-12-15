@@ -4361,7 +4361,7 @@ function renderWorkoutExerciseTabs() {
   
   if (!currentExercise) {
     // All exercises complete - show summary
-    showWorkoutSummary();
+    window.showWorkoutSummary();
     return;
   }
   
@@ -4806,7 +4806,7 @@ function nextExercise() {
   const nextIndex = state.workoutExercise.currentIndex + 1;
   if (nextIndex >= state.currentWorkout.exercises.length) {
     // Workout complete
-    showWorkoutSummary();
+    window.showWorkoutSummary();
   } else {
     state.workoutExercise.currentIndex = nextIndex;
     renderWorkoutExerciseTabs();
@@ -4824,7 +4824,7 @@ function previousExercise() {
 // End workout early
 function endWorkoutEarly() {
   if (confirm('Are you sure you want to end this workout? Your progress will be saved.')) {
-    showWorkoutSummary();
+    window.showWorkoutSummary();
   }
 }
 
