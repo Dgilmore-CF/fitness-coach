@@ -1,5 +1,9 @@
--- Create AI recommendations table
-CREATE TABLE IF NOT EXISTS ai_recommendations (
+-- Drop old ai_recommendations table (from 0001) and recreate with new schema
+-- The old table had: exercise_id, recommendation_type, current_weight_kg, suggested_weight_kg, accepted
+-- The new table has: title, description, category, priority, status, action_items, etc.
+DROP TABLE IF EXISTS ai_recommendations;
+
+CREATE TABLE ai_recommendations (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL,
   title TEXT NOT NULL,
@@ -16,6 +20,6 @@ CREATE TABLE IF NOT EXISTS ai_recommendations (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_ai_recommendations_user ON ai_recommendations(user_id);
-CREATE INDEX idx_ai_recommendations_status ON ai_recommendations(status);
-CREATE INDEX idx_ai_recommendations_priority ON ai_recommendations(priority);
+CREATE INDEX IF NOT EXISTS idx_ai_recommendations_user ON ai_recommendations(user_id);
+CREATE INDEX IF NOT EXISTS idx_ai_recommendations_status ON ai_recommendations(status);
+CREATE INDEX IF NOT EXISTS idx_ai_recommendations_priority ON ai_recommendations(priority);
