@@ -4134,7 +4134,7 @@ function showWorkoutWarmupScreen(workout) {
     left: 0;
     right: 0;
     bottom: 0;
-    background: white;
+    background: var(--bg-secondary);
     z-index: 10000;
     overflow-y: auto;
   `;
@@ -4163,28 +4163,28 @@ function showWorkoutWarmupScreen(workout) {
       <!-- Header -->
       <div style="text-align: center; margin-bottom: 40px;">
         <div style="width: 80px; height: 80px; background: linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%); border-radius: 50%; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center;">
-          <i class="fas fa-running" style="font-size: 40px; color: white;"></i>
+          <i class="fas fa-running" style="font-size: 40px; color: var(--white);"></i>
         </div>
-        <h1 style="font-size: 32px; margin: 0 0 12px 0;">Warm-Up & Stretch</h1>
-        <p style="font-size: 18px; color: var(--gray); margin: 0;">Prepare your body for ${workout.day_name || 'your workout'}</p>
+        <h1 style="font-size: clamp(24px, 5vw, 32px); margin: 0 0 12px 0; color: var(--text-primary);">Warm-Up & Stretch</h1>
+        <p style="font-size: 18px; color: var(--text-secondary); margin: 0;">Prepare your body for ${workout.day_name || 'your workout'}</p>
       </div>
       
       <!-- Warmup Exercises -->
-      <div style="background: var(--light); border-radius: 16px; padding: 24px; margin-bottom: 32px;">
-        <h3 style="margin: 0 0 20px 0; display: flex; align-items: center; gap: 10px;">
-          <i class="fas fa-list-check"></i> Recommended Warm-ups
+      <div class="card" style="margin-bottom: 32px;">
+        <h3 style="margin: 0 0 20px 0; display: flex; align-items: center; gap: 10px; color: var(--text-primary);">
+          <i class="fas fa-list-check" style="color: var(--primary);"></i> Recommended Warm-ups
         </h3>
         <div style="display: grid; gap: 12px;">
           ${warmups.slice(0, 6).map((warmup, idx) => `
-            <div style="background: white; border-radius: 12px; padding: 16px; display: flex; align-items: center; gap: 16px;">
-              <div style="background: var(--primary); color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0;">
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; padding: 16px; display: flex; align-items: center; gap: 16px;">
+              <div style="background: var(--primary); color: var(--white); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0;">
                 ${idx + 1}
               </div>
               <div style="flex: 1;">
-                <strong style="display: block; margin-bottom: 4px;">${warmup.name}</strong>
-                <span style="color: var(--gray); font-size: 13px;"><i class="fas fa-bullseye"></i> ${warmup.muscle}</span>
+                <strong style="display: block; margin-bottom: 4px; color: var(--text-primary);">${warmup.name}</strong>
+                <span style="color: var(--text-secondary); font-size: 13px;"><i class="fas fa-bullseye"></i> ${warmup.muscle}</span>
               </div>
-              <span style="color: var(--gray); font-size: 13px;">30-60 sec</span>
+              <span style="color: var(--text-secondary); font-size: 13px;">30-60 sec</span>
             </div>
           `).join('')}
         </div>
@@ -4193,7 +4193,7 @@ function showWorkoutWarmupScreen(workout) {
       <!-- Tips -->
       <div style="background: var(--primary-light); border-left: 4px solid var(--primary); border-radius: 8px; padding: 16px; margin-bottom: 32px;">
         <strong style="display: block; margin-bottom: 8px; color: var(--primary);"><i class="fas fa-lightbulb"></i> Pro Tips</strong>
-        <ul style="margin: 0; padding-left: 20px; line-height: 1.8;">
+        <ul style="margin: 0; padding-left: 20px; line-height: 1.8; color: var(--text-primary);">
           <li>Start with light cardio to raise your heart rate</li>
           <li>Focus on the muscles you'll be training today</li>
           <li>Perform dynamic stretches (movement-based)</li>
@@ -4202,7 +4202,7 @@ function showWorkoutWarmupScreen(workout) {
       </div>
       
       <!-- Actions -->
-      <div style="display: flex; gap: 12px; justify-content: center;">
+      <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
         <button class="btn btn-outline" onclick="cancelWorkoutStart()" style="min-width: 150px;">
           <i class="fas fa-times"></i> Cancel
         </button>
@@ -4398,26 +4398,36 @@ function renderWorkoutExerciseTabs() {
         </div>
       </div>
       
-      <!-- Footer Actions -->
-      <div style="background: white; border-top: 2px solid var(--border); padding: 16px 20px; flex-shrink: 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.05);">
-        <div style="max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
-          <div style="display: flex; gap: 8px;">
-            <button class="btn btn-outline" onclick="previousExercise()" ${currentIdx === 0 ? 'disabled style="opacity: 0.5;"' : ''}>
-              <i class="fas fa-arrow-left"></i> Previous
-            </button>
-            <button class="btn btn-outline" onclick="showWorkoutNotesModal()" title="Add workout notes">
-              <i class="fas fa-note-sticky"></i> Notes
-            </button>
-            <button class="btn btn-outline" onclick="showAddExercisesModal()" title="Add exercises to workout">
-              <i class="fas fa-plus-circle"></i> Add Exercises
-            </button>
+      <!-- Footer Actions - Mobile Optimized -->
+      <div style="background: var(--bg-primary); border-top: 2px solid var(--border); padding: 12px 16px; flex-shrink: 0; box-shadow: 0 -2px 10px var(--shadow);">
+        <div style="max-width: 1200px; margin: 0 auto;">
+          <!-- Mobile: Stack buttons vertically, Desktop: horizontal -->
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <!-- Primary actions row -->
+            <div style="display: flex; gap: 8px; justify-content: space-between; align-items: center;">
+              <button class="btn btn-outline" onclick="previousExercise()" ${currentIdx === 0 ? 'disabled style="opacity: 0.5;"' : ''} style="flex: 1; max-width: 120px;">
+                <i class="fas fa-arrow-left"></i> <span class="hide-mobile">Prev</span>
+              </button>
+              <button class="btn btn-primary" onclick="nextExercise()" style="flex: 2; max-width: 200px;">
+                ${currentIdx === workout.exercises.length - 1 ? '<i class="fas fa-flag-checkered"></i> Finish Workout' : '<i class="fas fa-arrow-right"></i> Next Exercise'}
+              </button>
+            </div>
+            <!-- Secondary actions row -->
+            <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+              <button class="btn btn-outline" onclick="showWorkoutNotesModal()" title="Add workout notes" style="font-size: 13px; padding: 8px 12px;">
+                <i class="fas fa-note-sticky"></i> <span class="hide-mobile">Notes</span>
+              </button>
+              <button class="btn btn-outline" onclick="showAddExercisesModal()" title="Add exercises" style="font-size: 13px; padding: 8px 12px;">
+                <i class="fas fa-plus-circle"></i> <span class="hide-mobile">Add</span>
+              </button>
+              <button class="btn btn-outline" onclick="minimizeWorkout()" title="Return to dashboard" style="font-size: 13px; padding: 8px 12px;">
+                <i class="fas fa-compress"></i> <span class="hide-mobile">Minimize</span>
+              </button>
+              <button class="btn btn-outline" onclick="endWorkoutEarly()" title="End workout" style="font-size: 13px; padding: 8px 12px; color: var(--danger); border-color: var(--danger);">
+                <i class="fas fa-stop"></i> <span class="hide-mobile">End</span>
+              </button>
+            </div>
           </div>
-          <button class="btn btn-danger" onclick="endWorkoutEarly()">
-            <i class="fas fa-stop"></i> End Workout
-          </button>
-          <button class="btn btn-primary" onclick="nextExercise()" style="min-width: 150px;">
-            ${currentIdx === workout.exercises.length - 1 ? '<i class="fas fa-flag-checkered"></i> Finish' : '<i class="fas fa-arrow-right"></i> Next Exercise'}
-          </button>
         </div>
       </div>
     </div>
@@ -4479,34 +4489,35 @@ function renderExerciseContent(exercise, index) {
   const weightUnit = system === 'imperial' ? 'lbs' : 'kg';
   const completedSets = (exercise.sets || []).length;
   const targetSets = exercise.target_sets || 3;
+  const showNewSetRow = completedSets < targetSets && completedSets < 10;
   
   return `
     <!-- Exercise Header -->
     <div class="card" style="margin-bottom: 20px;">
-      <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 16px;">
-        <div style="flex: 1;">
-          <h2 style="margin: 0 0 12px 0;">${exercise.name}</h2>
-          <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-            <span style="background: var(--secondary-light); color: var(--secondary); padding: 6px 14px; border-radius: 20px; font-size: 14px; font-weight: 600;">
+      <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 16px; flex-wrap: wrap; gap: 16px;">
+        <div style="flex: 1; min-width: 200px;">
+          <h2 style="margin: 0 0 12px 0; font-size: clamp(18px, 4vw, 24px);">${exercise.name}</h2>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <span style="background: var(--secondary-light); color: var(--secondary); padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: 600;">
               <i class="fas fa-bullseye"></i> ${exercise.muscle_group}
             </span>
-            <span style="background: var(--primary-light); color: var(--primary); padding: 6px 14px; border-radius: 20px; font-size: 14px; font-weight: 600;">
+            <span style="background: var(--primary-light); color: var(--primary); padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: 600;">
               <i class="fas fa-dumbbell"></i> ${exercise.equipment}
             </span>
-            ${exercise.is_unilateral ? '<span style="background: var(--warning); color: white; padding: 6px 14px; border-radius: 20px; font-size: 14px; font-weight: 600;"><i class="fas fa-balance-scale"></i> Unilateral</span>' : ''}
+            ${exercise.is_unilateral ? '<span style="background: var(--warning); color: var(--white); padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: 600;"><i class="fas fa-balance-scale"></i> Unilateral</span>' : ''}
           </div>
         </div>
         <div style="text-align: right;">
-          <div style="display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-bottom: 8px;">
-            <button data-adjust-sets="-1" data-exercise-id="${exercise.id}" class="btn btn-outline" style="padding: 8px 12px; min-width: auto;" title="Decrease target sets">
+          <div style="display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-bottom: 8px;">
+            <button data-adjust-sets="-1" data-exercise-id="${exercise.id}" class="btn btn-outline" style="padding: 6px 10px; min-width: auto;" title="Decrease target sets">
               <i class="fas fa-minus"></i>
             </button>
-            <div style="font-size: 36px; font-weight: bold; color: var(--primary);">${completedSets}/${targetSets}</div>
-            <button data-adjust-sets="1" data-exercise-id="${exercise.id}" class="btn btn-primary" style="padding: 8px 12px; min-width: auto;" title="Increase target sets">
+            <div style="font-size: clamp(24px, 6vw, 36px); font-weight: bold; color: var(--primary);">${completedSets}/${targetSets}</div>
+            <button data-adjust-sets="1" data-exercise-id="${exercise.id}" class="btn btn-primary" style="padding: 6px 10px; min-width: auto;" title="Increase target sets">
               <i class="fas fa-plus"></i>
             </button>
           </div>
-          <div style="font-size: 12px; color: var(--gray); text-transform: uppercase;">Sets Target</div>
+          <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase;">Sets Target</div>
         </div>
       </div>
       
@@ -4516,78 +4527,105 @@ function renderExerciseContent(exercise, index) {
       </div>
     </div>
     
+    <!-- Inline Rest Timer (visible when active) -->
+    <div id="inline-rest-timer" style="display: none; margin-bottom: 20px;">
+      <div class="card" style="background: linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%); color: var(--white); text-align: center; padding: 20px;">
+        <div style="font-size: 14px; opacity: 0.9; margin-bottom: 8px;"><i class="fas fa-clock"></i> Rest Timer</div>
+        <div id="inline-rest-time" style="font-size: clamp(36px, 10vw, 56px); font-weight: bold; font-family: monospace; line-height: 1;">0:00</div>
+        <div style="display: flex; gap: 8px; margin-top: 16px; justify-content: center; flex-wrap: wrap;">
+          <button class="btn" onclick="adjustRestTimer(-15)" style="background: rgba(255,255,255,0.2); color: var(--white); border: none; padding: 8px 16px; font-size: 14px;">-15s</button>
+          <button class="btn" onclick="skipRestTimer()" style="background: var(--white); color: var(--primary); border: none; padding: 8px 20px; font-size: 14px; font-weight: 600;">Skip</button>
+          <button class="btn" onclick="adjustRestTimer(15)" style="background: rgba(255,255,255,0.2); color: var(--white); border: none; padding: 8px 16px; font-size: 14px;">+15s</button>
+        </div>
+      </div>
+    </div>
+    
     <!-- Exercise Tips -->
     ${exercise.tips ? `
       <div class="card" style="margin-bottom: 20px;">
-        <details open>
+        <details>
           <summary style="cursor: pointer; font-weight: 600; color: var(--primary); user-select: none; font-size: 16px;">
             <i class="fas fa-lightbulb"></i> Form & Technique Tips
           </summary>
-          <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); line-height: 1.6; color: var(--dark);">
+          <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); line-height: 1.6; color: var(--text-primary);">
             ${exercise.tips}
           </div>
         </details>
       </div>
     ` : ''}
     
-    <!-- Set Table -->
+    <!-- Set Table - Mobile Optimized -->
     <div class="card">
-      <h3 style="margin: 0 0 16px 0;"><i class="fas fa-table"></i> Set Tracker</h3>
+      <h3 style="margin: 0 0 16px 0; color: var(--text-primary);"><i class="fas fa-table"></i> Set Tracker</h3>
       
-      <div class="table-container">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th style="width: 80px;">Set</th>
-              <th>Weight (${weightUnit})</th>
-              <th>Reps</th>
-              <th style="width: 120px;">1RM</th>
-              <th style="width: 100px;">Complete</th>
-              <th style="width: 80px;">Actions</th>
-            </tr>
-          </thead>
-          <tbody id="set-table-body">
-            ${(exercise.sets || []).map((set, idx) => `
-              <tr style="background: var(--secondary-light);">
-                <td><strong>${set.set_number}</strong></td>
-                <td><strong>${formatWeight(set.weight_kg, system)}</strong></td>
-                <td><strong>${set.reps}</strong></td>
-                <td>${formatWeight(set.one_rep_max_kg, system)}</td>
-                <td><span style="color: var(--secondary); font-size: 20px;"><i class="fas fa-check-circle"></i></span></td>
-                <td>
-                  <button class="btn btn-danger" onclick="deleteExerciseSet(${exercise.id}, ${set.id})" style="padding: 4px 8px; font-size: 12px;">
-                    <i class="fas fa-trash"></i>
-                  </button>
-                </td>
-              </tr>
-            `).join('')}
-            ${completedSets < 10 ? `
-              <tr id="new-set-row">
-                <td><strong>${completedSets + 1}</strong></td>
-                <td>
-                  <input type="number" id="newSetWeight" placeholder="0" step="${system === 'imperial' ? '5' : '2.5'}" 
-                    style="width: 100%; padding: 8px; border: 2px solid var(--border); border-radius: 6px; font-size: 14px;">
-                </td>
-                <td>
-                  <input type="number" id="newSetReps" placeholder="0" min="1"
-                    style="width: 100%; padding: 8px; border: 2px solid var(--border); border-radius: 6px; font-size: 14px;">
-                </td>
-                <td colspan="2">
-                  <button class="btn btn-primary" id="logSetButton" data-exercise-id="${exercise.id}" style="width: 100%;">
-                    <i class="fas fa-plus"></i> Log Set
-                  </button>
-                </td>
-                <td></td>
-              </tr>
-            ` : ''}
-          </tbody>
-        </table>
+      <!-- Mobile-friendly set cards -->
+      <div class="set-list" style="display: flex; flex-direction: column; gap: 12px;">
+        ${(exercise.sets || []).map((set, idx) => `
+          <div class="set-card" style="background: var(--secondary-light); border-radius: 12px; padding: 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <div style="background: var(--secondary); color: var(--white); width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0;">
+              ${set.set_number}
+            </div>
+            <div style="flex: 1; display: flex; gap: 16px; flex-wrap: wrap; min-width: 150px;">
+              <div>
+                <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase;">Weight</div>
+                <div style="font-size: 18px; font-weight: bold; color: var(--text-primary);">${formatWeight(set.weight_kg, system)} ${weightUnit}</div>
+              </div>
+              <div>
+                <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase;">Reps</div>
+                <div style="font-size: 18px; font-weight: bold; color: var(--text-primary);">${set.reps}</div>
+              </div>
+              <div>
+                <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase;">Est. 1RM</div>
+                <div style="font-size: 14px; color: var(--text-secondary);">${formatWeight(set.one_rep_max_kg, system)}</div>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="color: var(--secondary); font-size: 20px;"><i class="fas fa-check-circle"></i></span>
+              <button class="btn btn-outline" data-delete-set="true" data-exercise-id="${exercise.id}" data-set-id="${set.id}" style="padding: 6px 10px; font-size: 12px; color: var(--danger); border-color: var(--danger);">
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+          </div>
+        `).join('')}
+        
+        ${showNewSetRow ? `
+          <!-- New Set Input -->
+          <div class="new-set-card" style="background: var(--bg-primary); border: 2px dashed var(--primary); border-radius: 12px; padding: 16px;">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+              <div style="background: var(--primary-light); color: var(--primary); width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0;">
+                ${completedSets + 1}
+              </div>
+              <div style="font-weight: 600; color: var(--text-primary);">Log Next Set</div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+              <div>
+                <label style="font-size: 12px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Weight (${weightUnit})</label>
+                <input type="number" id="newSetWeight" placeholder="0" step="${system === 'imperial' ? '5' : '2.5'}" 
+                  style="width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 18px; font-weight: bold; background: var(--bg-secondary); color: var(--text-primary);">
+              </div>
+              <div>
+                <label style="font-size: 12px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Reps</label>
+                <input type="number" id="newSetReps" placeholder="0" min="1"
+                  style="width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 18px; font-weight: bold; background: var(--bg-secondary); color: var(--text-primary);">
+              </div>
+            </div>
+            <button class="btn btn-primary" id="logSetButton" data-exercise-id="${exercise.id}" style="width: 100%; padding: 14px; font-size: 16px;">
+              <i class="fas fa-plus"></i> Log Set
+            </button>
+          </div>
+        ` : ''}
       </div>
       
       ${completedSets >= targetSets ? `
-        <div style="margin-top: 16px; padding: 16px; background: var(--secondary-light); border-radius: 8px; text-align: center;">
-          <i class="fas fa-check-circle" style="font-size: 24px; color: var(--secondary); margin-bottom: 8px;"></i>
-          <div style="font-weight: 600; color: var(--secondary);">Target Sets Complete! Ready to move on.</div>
+        <div style="margin-top: 16px; padding: 16px; background: var(--secondary-light); border-radius: 12px; text-align: center;">
+          <i class="fas fa-check-circle" style="font-size: 28px; color: var(--secondary); margin-bottom: 8px; display: block;"></i>
+          <div style="font-weight: 600; color: var(--secondary); font-size: 16px;">Target Sets Complete!</div>
+          <div style="color: var(--text-secondary); font-size: 14px; margin-top: 4px;">Ready to move on or add more sets</div>
+          ${completedSets < 10 ? `
+            <button class="btn btn-outline" onclick="showExtraSetInput(${exercise.id})" style="margin-top: 12px;">
+              <i class="fas fa-plus"></i> Add Another Set
+            </button>
+          ` : ''}
         </div>
       ` : ''}
     </div>
@@ -4785,6 +4823,34 @@ function endWorkoutEarly() {
   }
 }
 
+// Minimize workout - return to dashboard while keeping workout active
+function minimizeWorkout() {
+  const modal = document.getElementById('workout-modal');
+  if (modal) {
+    modal.style.display = 'none';
+  }
+  
+  // Stop the rest timer display but keep workout state
+  if (state.restTimerInterval) {
+    clearInterval(state.restTimerInterval);
+    state.restTimerInterval = null;
+  }
+  
+  showNotification('Workout minimized. Resume from dashboard.', 'info');
+  switchTab('dashboard');
+}
+
+// Show extra set input when target is already reached
+function showExtraSetInput(exerciseId) {
+  // Re-render with the input shown by temporarily adjusting target
+  const exercise = state.currentWorkout.exercises.find(ex => ex.id === exerciseId);
+  if (exercise) {
+    // Increase target by 1 to show the input
+    exercise.target_sets = (exercise.target_sets || 3) + 1;
+    renderWorkoutExerciseTabs();
+  }
+}
+
 // Show add exercises modal
 async function showAddExercisesModal() {
   // Fetch all available exercises
@@ -4823,32 +4889,32 @@ async function showAddExercisesModal() {
     `;
     
     overlay.innerHTML = `
-      <div style="background: white; border-radius: 16px; max-width: 800px; width: 100%; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden;">
+      <div style="background: var(--bg-primary); border-radius: 16px; max-width: 800px; width: 100%; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border);">
         <!-- Header -->
         <div style="padding: 20px; border-bottom: 1px solid var(--border); flex-shrink: 0;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-            <h2 style="margin: 0;"><i class="fas fa-plus-circle"></i> Add Exercises</h2>
-            <button onclick="closeAddExercisesModal()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--gray);">
+            <h2 style="margin: 0; color: var(--text-primary);"><i class="fas fa-plus-circle"></i> Add Exercises</h2>
+            <button onclick="closeAddExercisesModal()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-secondary);">
               <i class="fas fa-times"></i>
             </button>
           </div>
           
           <!-- Search -->
           <div style="position: relative;">
-            <i class="fas fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--gray);"></i>
+            <i class="fas fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-secondary);"></i>
             <input type="text" id="exerciseSearchInput" placeholder="Search exercises..." 
-              style="width: 100%; padding: 12px 12px 12px 40px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px;"
+              style="width: 100%; padding: 12px 12px 12px 40px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--bg-secondary); color: var(--text-primary);"
               oninput="filterExerciseList(this.value)">
           </div>
           
           <!-- Selection count -->
-          <div id="exerciseSelectionCount" style="margin-top: 12px; font-size: 14px; color: var(--gray);">
+          <div id="exerciseSelectionCount" style="margin-top: 12px; font-size: 14px; color: var(--text-secondary);">
             <span id="selectedCount">0</span> exercise(s) selected
           </div>
         </div>
         
         <!-- Exercise List -->
-        <div id="exerciseListContainer" style="flex: 1; overflow-y: auto; padding: 16px;">
+        <div id="exerciseListContainer" style="flex: 1; overflow-y: auto; padding: 16px; background: var(--bg-secondary);">
           ${Object.entries(grouped).sort((a, b) => a[0].localeCompare(b[0])).map(([group, exs]) => `
             <div class="exercise-group" data-group="${group}">
               <h4 style="margin: 0 0 12px 0; color: var(--primary); font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">
@@ -4857,14 +4923,14 @@ async function showAddExercisesModal() {
               <div style="display: grid; gap: 8px; margin-bottom: 20px;">
                 ${exs.map(ex => `
                   <label class="exercise-item" data-exercise-id="${ex.id}" data-name="${ex.name.toLowerCase()}" 
-                    style="display: flex; align-items: center; gap: 12px; padding: 12px; background: ${currentExerciseIds.has(ex.id) ? 'var(--light)' : 'white'}; border: 2px solid var(--border); border-radius: 8px; cursor: ${currentExerciseIds.has(ex.id) ? 'not-allowed' : 'pointer'}; transition: all 0.2s; ${currentExerciseIds.has(ex.id) ? 'opacity: 0.6;' : ''}">
+                    style="display: flex; align-items: center; gap: 12px; padding: 12px; background: ${currentExerciseIds.has(ex.id) ? 'var(--light)' : 'var(--bg-primary)'}; border: 2px solid var(--border); border-radius: 8px; cursor: ${currentExerciseIds.has(ex.id) ? 'not-allowed' : 'pointer'}; transition: all 0.2s; ${currentExerciseIds.has(ex.id) ? 'opacity: 0.6;' : ''}">
                     <input type="checkbox" data-exercise-id="${ex.id}" 
                       ${currentExerciseIds.has(ex.id) ? 'disabled checked' : ''}
                       onchange="toggleExerciseSelection(${ex.id}, this.checked)"
                       style="width: 20px; height: 20px; accent-color: var(--primary);">
                     <div style="flex: 1;">
-                      <div style="font-weight: 600;">${ex.name}</div>
-                      <div style="font-size: 12px; color: var(--gray);">${ex.equipment || 'Bodyweight'}</div>
+                      <div style="font-weight: 600; color: var(--text-primary);">${ex.name}</div>
+                      <div style="font-size: 12px; color: var(--text-secondary);">${ex.equipment || 'Bodyweight'}</div>
                     </div>
                     ${currentExerciseIds.has(ex.id) ? '<span style="font-size: 12px; color: var(--secondary); font-weight: 600;">Already in workout</span>' : ''}
                   </label>
@@ -5024,108 +5090,108 @@ async function showWorkoutSummary() {
     // Fun comparisons
     const comparison = getFunWeightComparison(totalVolume);
     
+    // Ensure modal is visible and properly styled for summary
+    modal.style.display = 'block';
+    modal.style.overflow = 'auto';
+    
     modal.innerHTML = `
-      <div style="max-width: 900px; margin: 0 auto; padding: 40px 20px;">
+      <div style="max-width: 900px; margin: 0 auto; padding: clamp(20px, 5vw, 40px) 16px; min-height: 100vh;">
         <!-- Success Icon -->
-        <div style="text-align: center; margin-bottom: 32px;">
-          <div style="width: 100px; height: 100px; background: linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%); border-radius: 50%; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; animation: scaleIn 0.5s ease-out;">
-            <i class="fas fa-trophy" style="font-size: 50px; color: white;"></i>
+        <div style="text-align: center; margin-bottom: 24px;">
+          <div style="width: clamp(70px, 15vw, 100px); height: clamp(70px, 15vw, 100px); background: linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%); border-radius: 50%; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; animation: scaleIn 0.5s ease-out;">
+            <i class="fas fa-trophy" style="font-size: clamp(30px, 8vw, 50px); color: var(--white);"></i>
           </div>
-          <h1 style="font-size: 36px; margin: 0 0 12px 0;">Workout Complete!</h1>
-          <p style="font-size: 18px; color: var(--gray); margin: 0;">Outstanding work today 💪</p>
+          <h1 style="font-size: clamp(24px, 6vw, 36px); margin: 0 0 8px 0; color: var(--text-primary);">Workout Complete!</h1>
+          <p style="font-size: clamp(14px, 4vw, 18px); color: var(--text-secondary); margin: 0;">Outstanding work today 💪</p>
         </div>
         
         <!-- Stats Grid -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 32px;">
-          <div class="card" style="text-align: center;">
-            <div style="font-size: 14px; color: var(--gray); text-transform: uppercase; margin-bottom: 8px;">Duration</div>
-            <div style="font-size: 32px; font-weight: bold; color: var(--primary);">${formatDuration(duration)}</div>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px;">
+          <div class="card" style="text-align: center; padding: 16px;">
+            <div style="font-size: 12px; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 4px;">Duration</div>
+            <div style="font-size: clamp(20px, 5vw, 32px); font-weight: bold; color: var(--primary);">${formatDuration(duration)}</div>
           </div>
-          <div class="card" style="text-align: center;">
-            <div style="font-size: 14px; color: var(--gray); text-transform: uppercase; margin-bottom: 8px;">Total Sets</div>
-            <div style="font-size: 32px; font-weight: bold; color: var(--primary);">${totalSets}</div>
+          <div class="card" style="text-align: center; padding: 16px;">
+            <div style="font-size: 12px; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 4px;">Sets</div>
+            <div style="font-size: clamp(20px, 5vw, 32px); font-weight: bold; color: var(--primary);">${totalSets}</div>
           </div>
-          <div class="card" style="text-align: center;">
-            <div style="font-size: 14px; color: var(--gray); text-transform: uppercase; margin-bottom: 8px;">Total Volume</div>
-            <div style="font-size: 32px; font-weight: bold; color: var(--primary);">${Math.round(totalVolume)} kg</div>
+          <div class="card" style="text-align: center; padding: 16px;">
+            <div style="font-size: 12px; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 4px;">Volume</div>
+            <div style="font-size: clamp(20px, 5vw, 32px); font-weight: bold; color: var(--primary);">${Math.round(totalVolume)}kg</div>
           </div>
         </div>
         
         <!-- Fun Comparison -->
-        <div class="card" style="background: linear-gradient(135deg, var(--primary-light) 0%, var(--secondary-light) 100%); border: none; margin-bottom: 32px;">
-          <div style="display: flex; align-items: center; gap: 20px;">
-            <div style="font-size: 60px;">${comparison.emoji}</div>
-            <div>
-              <div style="font-size: 20px; font-weight: 600; margin-bottom: 8px;">${comparison.title}</div>
-              <div style="font-size: 16px; color: var(--gray);">${comparison.description}</div>
+        <div class="card" style="background: linear-gradient(135deg, var(--primary-light) 0%, var(--secondary-light) 100%); border: none; margin-bottom: 24px; padding: 16px;">
+          <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+            <div style="font-size: clamp(40px, 10vw, 60px);">${comparison.emoji}</div>
+            <div style="flex: 1; min-width: 150px;">
+              <div style="font-size: clamp(16px, 4vw, 20px); font-weight: 600; margin-bottom: 4px; color: var(--text-primary);">${comparison.title}</div>
+              <div style="font-size: clamp(13px, 3vw, 16px); color: var(--text-secondary);">${comparison.description}</div>
             </div>
           </div>
         </div>
         
         <!-- Exercise Summary -->
-        <div class="card" style="margin-bottom: 32px;">
-          <h3 style="margin: 0 0 16px 0;"><i class="fas fa-list-check"></i> Exercise Summary</h3>
-          <div style="display: flex; flex-direction: column; gap: 12px;">
+        <div class="card" style="margin-bottom: 24px;">
+          <h3 style="margin: 0 0 12px 0; color: var(--text-primary); font-size: 16px;"><i class="fas fa-list-check" style="color: var(--primary);"></i> Exercise Summary</h3>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
             ${workout.exercises.map((ex, idx) => `
-              <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--light); border-radius: 8px;">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                  <div style="background: var(--primary); color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: var(--bg-secondary); border-radius: 8px; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0;">
+                  <div style="background: var(--primary); color: var(--white); width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px; flex-shrink: 0;">
                     ${idx + 1}
                   </div>
-                  <strong>${ex.name}</strong>
+                  <strong style="color: var(--text-primary); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${ex.name}</strong>
                 </div>
-                <span style="color: var(--gray);">${(ex.sets || []).length} sets completed</span>
+                <span style="color: var(--text-secondary); font-size: 13px; white-space: nowrap;">${(ex.sets || []).length} sets</span>
               </div>
             `).join('')}
           </div>
         </div>
         
         <!-- Perceived Exertion -->
-        <div class="card" style="margin-bottom: 32px;">
-          <h3 style="margin: 0 0 16px 0;"><i class="fas fa-gauge-high"></i> How Hard Was This Workout?</h3>
-          <p style="color: var(--gray); margin-bottom: 20px; font-size: 14px;">Rate your perceived exertion (optional)</p>
+        <div class="card" style="margin-bottom: 24px;">
+          <h3 style="margin: 0 0 12px 0; color: var(--text-primary); font-size: 16px;"><i class="fas fa-gauge-high" style="color: var(--primary);"></i> Rate Your Effort</h3>
           
-          <div style="display: flex; align-items: center; gap: 20px;">
-            <span style="font-size: 14px; font-weight: 600; min-width: 60px; color: var(--secondary);">Easy</span>
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 12px; font-weight: 600; color: var(--secondary);">Easy</span>
             <div style="flex: 1; position: relative;">
               <input type="range" id="perceivedExertion" min="1" max="10" value="5" step="1" 
                 style="width: 100%; height: 8px; border-radius: 4px; background: linear-gradient(90deg, var(--secondary) 0%, var(--warning) 50%, var(--danger) 100%); outline: none; -webkit-appearance: none; appearance: none;">
-              <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: var(--gray);">
-                ${Array.from({length: 10}, (_, i) => `<span>${i + 1}</span>`).join('')}
-              </div>
             </div>
-            <span style="font-size: 14px; font-weight: 600; min-width: 60px; text-align: right; color: var(--danger);">Hard</span>
+            <span style="font-size: 12px; font-weight: 600; color: var(--danger);">Hard</span>
           </div>
           
-          <div style="text-align: center; margin-top: 16px;">
-            <div id="exertionDisplay" style="font-size: 24px; font-weight: bold; color: var(--primary);">5/10</div>
+          <div style="text-align: center; margin-top: 12px;">
+            <div id="exertionDisplay" style="font-size: 20px; font-weight: bold; color: var(--primary);">5/10</div>
           </div>
         </div>
         
         <!-- Save to Program (if modified) -->
         ${state.workoutModified && workout.program_day_id ? `
-        <div class="card" style="margin-bottom: 32px; border: 2px solid var(--primary); background: var(--primary-light);">
-          <div style="display: flex; align-items: center; gap: 16px;">
-            <div style="font-size: 40px;">💾</div>
-            <div style="flex: 1;">
-              <h4 style="margin: 0 0 8px 0;">Save Changes to Program?</h4>
-              <p style="margin: 0; color: var(--gray); font-size: 14px;">
-                You added exercises to this workout. Would you like to save these changes to your program so they appear next time?
+        <div class="card" style="margin-bottom: 24px; border: 2px solid var(--primary); background: var(--primary-light);">
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <div style="font-size: 32px;">💾</div>
+            <div style="flex: 1; min-width: 150px;">
+              <h4 style="margin: 0 0 4px 0; color: var(--text-primary); font-size: 15px;">Save Changes to Program?</h4>
+              <p style="margin: 0; color: var(--text-secondary); font-size: 13px;">
+                Save added exercises to your program for next time.
               </p>
             </div>
-            <button class="btn btn-primary" onclick="saveWorkoutToProgram()" id="saveToProgramBtn">
-              <i class="fas fa-save"></i> Save to Program
+            <button class="btn btn-primary" onclick="saveWorkoutToProgram()" id="saveToProgramBtn" style="white-space: nowrap;">
+              <i class="fas fa-save"></i> Save
             </button>
           </div>
         </div>
         ` : ''}
         
         <!-- Actions -->
-        <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
-          <button class="btn btn-outline" onclick="deleteCompletedWorkout()" style="min-width: 180px;">
-            <i class="fas fa-trash"></i> Delete Workout
+        <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; padding-bottom: 20px;">
+          <button class="btn btn-outline" onclick="deleteCompletedWorkout()" style="flex: 1; max-width: 180px;">
+            <i class="fas fa-trash"></i> Delete
           </button>
-          <button class="btn btn-primary" onclick="finishWorkoutSummary()" style="min-width: 200px; font-size: 16px;">
+          <button class="btn btn-primary" onclick="finishWorkoutSummary()" style="flex: 1; max-width: 200px; font-size: 16px;">
             <i class="fas fa-check"></i> Done
           </button>
         </div>
@@ -5272,7 +5338,7 @@ function finishWorkoutSummary() {
 
 // ========== PHASE 4: POLISH & REFINEMENTS ==========
 
-// Rest Timer System
+// Rest Timer System - Uses inline display within workout modal
 function startRestTimer(seconds = 90) {
   // Clear any existing timer
   if (state.restTimerInterval) {
@@ -5281,27 +5347,18 @@ function startRestTimer(seconds = 90) {
   
   state.restTimeRemaining = seconds;
   
-  // Create or update rest timer display
-  let timerDisplay = document.getElementById('rest-timer-display');
-  if (!timerDisplay) {
-    timerDisplay = document.createElement('div');
-    timerDisplay.id = 'rest-timer-display';
-    timerDisplay.style.cssText = `
-      position: fixed;
-      top: 80px;
-      right: 20px;
-      background: linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%);
-      color: white;
-      padding: 20px 30px;
-      border-radius: 16px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-      z-index: 10001;
-      min-width: 200px;
-      text-align: center;
-      animation: slideInRight 0.3s ease-out;
-    `;
-    document.body.appendChild(timerDisplay);
+  // Show inline rest timer if it exists (within workout modal)
+  const inlineTimer = document.getElementById('inline-rest-timer');
+  const inlineTimeDisplay = document.getElementById('inline-rest-time');
+  
+  if (inlineTimer) {
+    inlineTimer.style.display = 'block';
+    // Scroll to make timer visible
+    inlineTimer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
+  
+  // Update display immediately
+  updateRestTimerDisplay();
   
   // Start countdown
   state.restTimerInterval = setInterval(() => {
@@ -5311,40 +5368,30 @@ function startRestTimer(seconds = 90) {
       clearInterval(state.restTimerInterval);
       state.restTimerInterval = null;
       
+      // Hide inline timer
+      if (inlineTimer) {
+        inlineTimer.style.display = 'none';
+      }
+      
       // Show notification
       showNotification('Rest complete! Ready for next set 💪', 'success');
-      
-      // Remove timer display with animation
-      if (timerDisplay) {
-        timerDisplay.style.animation = 'slideOutRight 0.3s ease-out';
-        setTimeout(() => timerDisplay.remove(), 300);
-      }
       
       // Play sound if available
       playRestCompleteSound();
     } else {
-      // Update display
-      const mins = Math.floor(state.restTimeRemaining / 60);
-      const secs = state.restTimeRemaining % 60;
-      timerDisplay.innerHTML = `
-        <div style="font-size: 14px; opacity: 0.9; margin-bottom: 8px;">Rest Timer</div>
-        <div style="font-size: 48px; font-weight: bold; font-family: monospace; line-height: 1;">
-          ${mins}:${secs.toString().padStart(2, '0')}
-        </div>
-        <div style="display: flex; gap: 8px; margin-top: 12px; justify-content: center; align-items: center;">
-          <button class="btn btn-outline" onclick="adjustRestTimer(-15)" style="background: white; color: var(--primary); border: none; padding: 8px 12px; font-size: 12px; min-width: 50px;">
-            -15s
-          </button>
-          <button class="btn btn-outline" onclick="skipRestTimer()" style="background: white; color: var(--primary); border: none; padding: 8px 16px; font-size: 12px;">
-            Skip
-          </button>
-          <button class="btn btn-outline" onclick="adjustRestTimer(15)" style="background: white; color: var(--primary); border: none; padding: 8px 12px; font-size: 12px; min-width: 50px;">
-            +15s
-          </button>
-        </div>
-      `;
+      updateRestTimerDisplay();
     }
   }, 1000);
+}
+
+// Update rest timer display (inline version)
+function updateRestTimerDisplay() {
+  const inlineTimeDisplay = document.getElementById('inline-rest-time');
+  if (inlineTimeDisplay && state.restTimeRemaining > 0) {
+    const mins = Math.floor(state.restTimeRemaining / 60);
+    const secs = state.restTimeRemaining % 60;
+    inlineTimeDisplay.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+  }
 }
 
 function skipRestTimer() {
@@ -5353,10 +5400,10 @@ function skipRestTimer() {
     state.restTimerInterval = null;
   }
   
-  const timerDisplay = document.getElementById('rest-timer-display');
-  if (timerDisplay) {
-    timerDisplay.style.animation = 'slideOutRight 0.3s ease-out';
-    setTimeout(() => timerDisplay.remove(), 300);
+  // Hide inline timer
+  const inlineTimer = document.getElementById('inline-rest-timer');
+  if (inlineTimer) {
+    inlineTimer.style.display = 'none';
   }
   
   showNotification('Rest skipped', 'info');
@@ -5368,29 +5415,10 @@ function adjustRestTimer(seconds) {
   
   state.restTimeRemaining = Math.max(5, state.restTimeRemaining + seconds);
   
-  // Immediate update display
-  const timerDisplay = document.getElementById('rest-timer-display');
-  if (timerDisplay) {
-    const mins = Math.floor(state.restTimeRemaining / 60);
-    const secs = state.restTimeRemaining % 60;
-    timerDisplay.innerHTML = `
-      <div style="font-size: 14px; opacity: 0.9; margin-bottom: 8px;">Rest Timer ${seconds > 0 ? '(+' + seconds + 's)' : '(' + seconds + 's)'}</div>
-      <div style="font-size: 48px; font-weight: bold; font-family: monospace; line-height: 1;">
-        ${mins}:${secs.toString().padStart(2, '0')}
-      </div>
-      <div style="display: flex; gap: 8px; margin-top: 12px; justify-content: center; align-items: center;">
-        <button class="btn btn-outline" onclick="adjustRestTimer(-15)" style="background: white; color: var(--primary); border: none; padding: 8px 12px; font-size: 12px; min-width: 50px;">
-          -15s
-        </button>
-        <button class="btn btn-outline" onclick="skipRestTimer()" style="background: white; color: var(--primary); border: none; padding: 8px 16px; font-size: 12px;">
-          Skip
-        </button>
-        <button class="btn btn-outline" onclick="adjustRestTimer(15)" style="background: white; color: var(--primary); border: none; padding: 8px 12px; font-size: 12px; min-width: 50px;">
-          +15s
-        </button>
-      </div>
-    `;
-  }
+  // Update inline display
+  updateRestTimerDisplay();
+  
+  showNotification(`Rest timer ${seconds > 0 ? '+' : ''}${seconds}s`, 'info');
 }
 
 function playRestCompleteSound() {

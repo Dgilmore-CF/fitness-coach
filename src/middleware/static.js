@@ -914,6 +914,11 @@ function getIndexHTML() {
                 font-size: 12px;
             }
             
+            /* Hide text labels on mobile, show only icons */
+            .hide-mobile {
+                display: none !important;
+            }
+            
             .timer-display {
                 font-size: 36px;
             }
