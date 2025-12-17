@@ -2123,7 +2123,12 @@ function renderExerciseEnhanced(exercise, index) {
   
   // Auto-fill last weight and reps from previous set
   const lastSet = exercise.sets && exercise.sets.length > 0 ? exercise.sets[exercise.sets.length - 1] : null;
-  const defaultWeight = lastSet ? formatWeight(lastSet.weight_kg, system).replace(weightUnit, '').trim() : '';
+  let defaultWeight = '';
+  if (lastSet && lastSet.weight_kg) {
+    // Convert to user's preferred unit system
+    const weightValue = isImperial ? kgToLbs(lastSet.weight_kg) : lastSet.weight_kg;
+    defaultWeight = weightValue % 1 === 0 ? weightValue : weightValue.toFixed(1);
+  }
   const defaultReps = lastSet ? lastSet.reps : (exercise.target_reps || '');
   
   return `
@@ -2194,10 +2199,10 @@ function renderExerciseEnhanced(exercise, index) {
           ${exercise.sets.map((set, setIdx) => `
             <div style="background: linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%); color: white; padding: 12px; border-radius: 10px; position: relative;">
               <div style="position: absolute; top: 4px; right: 4px; display: flex; gap: 4px;">
-                <button onclick="editSet(${exercise.id}, ${set.id}, ${set.weight_kg}, ${set.reps})" 
+                <button onclick="editSet(${exercise.id}, ${set.id}, ${set.weight_kg || 0}, ${set.reps || 0})" 
                   style="background: rgba(0,0,0,0.2); border: none; color: white; width: 24px; height: 24px; border-radius: 50%; cursor: pointer; font-size: 10px; display: flex; align-items: center; justify-content: center;"
                   title="Edit set">
-                  <i class="fas fa-pencil"></i>
+                  <i class="fas fa-pencil-alt"></i>
                 </button>
                 <button onclick="deleteSet(${exercise.id}, ${set.id})" 
                   style="background: rgba(0,0,0,0.2); border: none; color: white; width: 24px; height: 24px; border-radius: 50%; cursor: pointer; font-size: 10px; display: flex; align-items: center; justify-content: center;"
@@ -4272,7 +4277,7 @@ async function saveEditedSet(exerciseId, setId) {
   let weight = parseFloat(weightInput.value);
   const reps = parseInt(repsInput.value);
   
-  if (!weight || !reps || isNaN(weight) || isNaN(reps)) {
+  if (isNaN(weight) || weight < 0 || isNaN(reps) || reps < 1) {
     showNotification('Please enter valid weight and reps', 'warning');
     return;
   }
