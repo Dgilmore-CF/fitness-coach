@@ -52,7 +52,7 @@ workouts.get('/:id', async (c) => {
   // Get workout exercises with program exercise details
   const exercises = await db.prepare(
     `SELECT we.*, e.name, e.muscle_group, e.equipment, e.description, e.tips, e.is_unilateral,
-            pe.sets as target_sets, pe.reps as target_reps, pe.rpe as target_rpe
+            pe.target_sets, pe.target_reps
      FROM workout_exercises we
      JOIN exercises e ON we.exercise_id = e.id
      LEFT JOIN program_exercises pe ON we.program_exercise_id = pe.id
