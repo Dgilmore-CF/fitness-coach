@@ -2124,12 +2124,17 @@ function renderExerciseEnhanced(exercise, index) {
   // Auto-fill last weight and reps from previous set
   const lastSet = exercise.sets && exercise.sets.length > 0 ? exercise.sets[exercise.sets.length - 1] : null;
   let defaultWeight = '';
-  if (lastSet && lastSet.weight_kg) {
-    // Convert to user's preferred unit system
-    const weightValue = isImperial ? kgToLbs(lastSet.weight_kg) : lastSet.weight_kg;
-    defaultWeight = weightValue % 1 === 0 ? weightValue : weightValue.toFixed(1);
+  let defaultReps = exercise.target_reps || '';
+  if (lastSet) {
+    if (lastSet.weight_kg) {
+      // Convert to user's preferred unit system
+      const weightValue = isImperial ? kgToLbs(lastSet.weight_kg) : lastSet.weight_kg;
+      defaultWeight = weightValue % 1 === 0 ? String(weightValue) : weightValue.toFixed(1);
+    }
+    if (lastSet.reps) {
+      defaultReps = lastSet.reps;
+    }
   }
-  const defaultReps = lastSet ? lastSet.reps : (exercise.target_reps || '');
   
   return `
     <div style="background: var(--white); border: 2px solid var(--border); border-radius: 16px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);" id="exercise-${exercise.id}">
@@ -4997,7 +5002,7 @@ function renderExerciseContent(exercise, index) {
             <div style="flex: 1; display: flex; gap: 16px; flex-wrap: wrap; min-width: 150px;">
               <div>
                 <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase;">Weight</div>
-                <div style="font-size: 18px; font-weight: bold; color: var(--text-primary);">${formatWeight(set.weight_kg, system)} ${weightUnit}</div>
+                <div style="font-size: 18px; font-weight: bold; color: var(--text-primary);">${formatWeight(set.weight_kg, system)}</div>
               </div>
               <div>
                 <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase;">Reps</div>
