@@ -354,6 +354,39 @@ workouts.patch('/:workoutId/exercises/:exerciseId/target-sets', async (c) => {
   }
 });
 
+// Delete exercise from workout
+workouts.delete('/:workoutId/exercises/:exerciseId', async (c) => {
+  const user = requireAuth(c);
+  const workoutId = c.req.param('workoutId');
+  const exerciseId = c.req.param('exerciseId');
+  const db = c.env.DB;
+
+  // Verify workout belongs to user
+  const workout = await db.prepare(
+    'SELECT * FROM workouts WHERE id = ? AND user_id = ?'
+  ).bind(workoutId, user.id).first();
+
+  if (!workout) {
+    return c.json({ error: 'Workout not found' }, 404);
+  }
+
+  // Delete all sets for this exercise first
+  await db.prepare(
+    'DELETE FROM sets WHERE workout_exercise_id = ?'
+  ).bind(exerciseId).run();
+
+  // Delete the workout exercise
+  const result = await db.prepare(
+    'DELETE FROM workout_exercises WHERE id = ? AND workout_id = ?'
+  ).bind(exerciseId, workoutId).run();
+
+  if (result.meta.changes === 0) {
+    return c.json({ error: 'Exercise not found in workout' }, 404);
+  }
+
+  return c.json({ message: 'Exercise removed from workout' });
+});
+
 // Delete set
 workouts.delete('/:workoutId/exercises/:exerciseId/sets/:setId', async (c) => {
   const user = requireAuth(c);

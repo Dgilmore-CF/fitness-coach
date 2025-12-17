@@ -103,9 +103,12 @@ function formatWeight(kg, system) {
   if (!kg) return 'N/A';
   system = system || (state.user && state.user.measurement_system) || 'metric';
   if (system === 'imperial') {
-    return \`\${Math.round(kgToLbs(kg))} lbs\`;
+    const lbs = kgToLbs(kg);
+    // Show decimal only if it's not a whole number
+    return lbs % 1 === 0 ? \`\${lbs} lbs\` : \`\${lbs.toFixed(1)} lbs\`;
   }
-  return \`\${Math.round(kg)} kg\`;
+  // Show decimal only if it's not a whole number
+  return kg % 1 === 0 ? \`\${kg} kg\` : \`\${parseFloat(kg).toFixed(1)} kg\`;
 }
 
 function formatHeight(cm, system) {
@@ -158,7 +161,7 @@ async function loadUser() {
 
 // Tab switching
 function switchTab(tabName) {
-  // Update tab buttons
+  // Update desktop tab buttons
   document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
   
   // Find and activate the correct tab button by matching onclick attribute
@@ -169,6 +172,19 @@ function switchTab(tabName) {
   
   if (targetTab) {
     targetTab.classList.add('active');
+  }
+  
+  // Update mobile nav buttons
+  document.querySelectorAll('.mobile-nav-item').forEach(item => item.classList.remove('active'));
+  const mobileNavItem = document.querySelector(\`.mobile-nav-item[data-tab="\${tabName}"]\`);
+  if (mobileNavItem) {
+    mobileNavItem.classList.add('active');
+  } else {
+    // If tab is in "More" menu, highlight the More button
+    const moreBtn = document.querySelector('.mobile-nav-item[data-tab="more"]');
+    if (moreBtn && ['insights', 'achievements', 'nutrition', 'learn'].includes(tabName)) {
+      moreBtn.classList.add('active');
+    }
   }
 
   // Update tab content
@@ -205,6 +221,33 @@ function switchTab(tabName) {
       loadDashboard();
       break;
   }
+}
+
+// Mobile "More" menu
+function showMobileMoreMenu() {
+  const modal = document.getElementById('modal');
+  const modalTitle = document.getElementById('modalTitle');
+  const modalBody = document.getElementById('modalBody');
+  
+  modalTitle.textContent = 'More';
+  modalBody.innerHTML = \`
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      <button class="btn btn-outline" onclick="closeModal(); switchTab('insights')" style="justify-content: flex-start; padding: 16px;">
+        <i class="fas fa-brain" style="width: 24px;"></i> AI Insights
+      </button>
+      <button class="btn btn-outline" onclick="closeModal(); switchTab('achievements')" style="justify-content: flex-start; padding: 16px;">
+        <i class="fas fa-trophy" style="width: 24px;"></i> Achievements
+      </button>
+      <button class="btn btn-outline" onclick="closeModal(); switchTab('nutrition')" style="justify-content: flex-start; padding: 16px;">
+        <i class="fas fa-apple-alt" style="width: 24px;"></i> Nutrition
+      </button>
+      <button class="btn btn-outline" onclick="closeModal(); switchTab('learn')" style="justify-content: flex-start; padding: 16px;">
+        <i class="fas fa-graduation-cap" style="width: 24px;"></i> Learn
+      </button>
+    </div>
+  \`;
+  
+  modal.classList.add('active');
 }
 
 // Dashboard
@@ -947,6 +990,14 @@ function showGenerateProgram() {
       </select>
     </div>
 
+    <div class="form-group">
+      <label>Custom Instructions (optional):</label>
+      <textarea id="customInstructions" class="form-control" rows="3" 
+        placeholder="E.g., Include a cardio day, add core exercises to each day, focus on upper body, include HIIT sessions..."
+        style="resize: vertical; min-height: 80px;"></textarea>
+      <small style="color: var(--gray); font-size: 12px;">Tell the AI any specific preferences for your program</small>
+    </div>
+
     <p style="font-size: 14px; color: var(--gray); margin: 16px 0;">
       AI will generate a personalized program based on your profile and available equipment.
     </p>
@@ -964,6 +1015,7 @@ function showGenerateProgram() {
 async function generateProgram() {
   const days = document.getElementById('daysPerWeek').value;
   const goal = document.getElementById('programGoal').value;
+  const customInstructions = document.getElementById('customInstructions')?.value || '';
 
   // Show loading state in modal
   const modalBody = document.getElementById('modalBody');
@@ -997,7 +1049,8 @@ async function generateProgram() {
       method: 'POST',
       body: JSON.stringify({
         days_per_week: parseInt(days),
-        goal
+        goal,
+        custom_instructions: customInstructions
       })
     });
 
@@ -2059,9 +2112,17 @@ function renderExerciseEnhanced(exercise, index) {
             \${exercise.is_unilateral ? '<span style="background: var(--warning); color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;"><i class="fas fa-balance-scale"></i> Unilateral</span>' : ''}
           </div>
         </div>
-        <div style="text-align: right;">
-          <div style="font-size: 24px; font-weight: bold; color: var(--primary);">\${completedSets}/\${targetSets}</div>
-          <div style="font-size: 11px; color: var(--gray); text-transform: uppercase; letter-spacing: 0.5px;">Sets</div>
+        <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
+          <button onclick="deleteExerciseFromWorkout(\${exercise.id}, '\${exercise.name.replace(/'/g, "\\\\'")}')" 
+            style="background: none; border: none; color: var(--danger); cursor: pointer; font-size: 14px; padding: 4px 8px; opacity: 0.6; transition: opacity 0.2s;"
+            onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'"
+            title="Remove exercise">
+            <i class="fas fa-trash"></i>
+          </button>
+          <div>
+            <div style="font-size: 24px; font-weight: bold; color: var(--primary);">\${completedSets}/\${targetSets}</div>
+            <div style="font-size: 11px; color: var(--gray); text-transform: uppercase; letter-spacing: 0.5px;">Sets</div>
+          </div>
         </div>
       </div>
 
@@ -2097,11 +2158,18 @@ function renderExerciseEnhanced(exercise, index) {
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px;">
           \${exercise.sets.map((set, setIdx) => \`
             <div style="background: linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%); color: white; padding: 12px; border-radius: 10px; position: relative;">
-              <button onclick="deleteSet(\${exercise.id}, \${set.id})" 
-                style="position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.2); border: none; color: white; width: 24px; height: 24px; border-radius: 50%; cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: center;"
-                title="Delete set">
-                <i class="fas fa-times"></i>
-              </button>
+              <div style="position: absolute; top: 4px; right: 4px; display: flex; gap: 4px;">
+                <button onclick="editSet(\${exercise.id}, \${set.id}, \${set.weight_kg}, \${set.reps})" 
+                  style="background: rgba(0,0,0,0.2); border: none; color: white; width: 24px; height: 24px; border-radius: 50%; cursor: pointer; font-size: 10px; display: flex; align-items: center; justify-content: center;"
+                  title="Edit set">
+                  <i class="fas fa-pencil"></i>
+                </button>
+                <button onclick="deleteSet(\${exercise.id}, \${set.id})" 
+                  style="background: rgba(0,0,0,0.2); border: none; color: white; width: 24px; height: 24px; border-radius: 50%; cursor: pointer; font-size: 10px; display: flex; align-items: center; justify-content: center;"
+                  title="Delete set">
+                  <i class="fas fa-times"></i>
+                </button>
+              </div>
               <div style="font-size: 11px; opacity: 0.9; margin-bottom: 4px;">Set \${set.set_number}</div>
               <div style="font-size: 18px; font-weight: bold;">\${formatWeight(set.weight_kg, system)} × \${set.reps}</div>
               <div style="font-size: 11px; opacity: 0.9; margin-top: 4px;">1RM: \${formatWeight(set.one_rep_max_kg, system)}</div>
@@ -3938,6 +4006,79 @@ function sortWeeklyTrendsByColumn(column) {
   }
 }
 
+// Edit a set
+function editSet(exerciseId, setId, currentWeightKg, currentReps) {
+  const system = (state.user && state.user.measurement_system) || 'metric';
+  const isImperial = system === 'imperial';
+  const weightUnit = isImperial ? 'lbs' : 'kg';
+  const currentWeight = isImperial ? kgToLbs(currentWeightKg) : currentWeightKg;
+  
+  const modal = document.getElementById('modal');
+  const modalTitle = document.getElementById('modalTitle');
+  const modalBody = document.getElementById('modalBody');
+  
+  modalTitle.textContent = 'Edit Set';
+  modalBody.innerHTML = \`
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+      <div class="form-group">
+        <label>Weight (\${weightUnit})</label>
+        <input type="number" id="editSetWeight" value="\${currentWeight}" step="\${isImperial ? '5' : '2.5'}" 
+               style="width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 16px;">
+      </div>
+      <div class="form-group">
+        <label>Reps</label>
+        <input type="number" id="editSetReps" value="\${currentReps}" min="1"
+               style="width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 16px;">
+      </div>
+      <div style="display: flex; gap: 12px;">
+        <button class="btn btn-outline" onclick="closeModal()" style="flex: 1;">Cancel</button>
+        <button class="btn btn-primary" onclick="saveEditedSet(\${exerciseId}, \${setId})" style="flex: 1;">
+          <i class="fas fa-save"></i> Save
+        </button>
+      </div>
+    </div>
+  \`;
+  
+  modal.classList.add('active');
+}
+
+// Save edited set
+async function saveEditedSet(exerciseId, setId) {
+  const weightInput = document.getElementById('editSetWeight');
+  const repsInput = document.getElementById('editSetReps');
+  
+  let weight = parseFloat(weightInput.value);
+  const reps = parseInt(repsInput.value);
+  
+  if (!weight || !reps || isNaN(weight) || isNaN(reps)) {
+    showNotification('Please enter valid weight and reps', 'warning');
+    return;
+  }
+  
+  // Convert to kg if imperial
+  const system = (state.user && state.user.measurement_system) || 'metric';
+  if (system === 'imperial') {
+    weight = weight * 0.453592;
+  }
+  
+  try {
+    await api(\`/workouts/\${state.currentWorkout.id}/exercises/\${exerciseId}/sets/\${setId}\`, {
+      method: 'PUT',
+      body: JSON.stringify({ weight_kg: weight, reps, rest_seconds: 90 })
+    });
+    
+    closeModal();
+    showNotification('Set updated!', 'success');
+    
+    // Refresh workout data
+    const data = await api(\`/workouts/\${state.currentWorkout.id}\`);
+    state.currentWorkout = data.workout;
+    loadWorkoutInterface();
+  } catch (error) {
+    showNotification('Error updating set: ' + error.message, 'error');
+  }
+}
+
 // Delete a set
 async function deleteSet(exerciseId, setId) {
   if (!confirm('Delete this set?')) return;
@@ -3951,6 +4092,26 @@ async function deleteSet(exerciseId, setId) {
     loadWorkoutInterface();
   } catch (error) {
     showNotification('Error deleting set: ' + error.message, 'error');
+  }
+}
+
+// Delete exercise from workout
+async function deleteExerciseFromWorkout(exerciseId, exerciseName) {
+  if (!confirm(\`Remove "\${exerciseName}" from this workout? Any logged sets will be deleted.\`)) return;
+  
+  try {
+    await api(\`/workouts/\${state.currentWorkout.id}/exercises/\${exerciseId}\`, {
+      method: 'DELETE'
+    });
+    
+    showNotification('Exercise removed!', 'success');
+    
+    // Refresh workout data
+    const data = await api(\`/workouts/\${state.currentWorkout.id}\`);
+    state.currentWorkout = data.workout;
+    loadWorkoutInterface();
+  } catch (error) {
+    showNotification('Error removing exercise: ' + error.message, 'error');
   }
 }
 
@@ -4396,13 +4557,34 @@ function renderWorkoutExerciseTabs() {
       <!-- Exercise Tabs -->
       <div style="background: var(--light); border-bottom: 2px solid var(--border); padding: 8px 0; overflow-x: auto; flex-shrink: 0;">
         <div style="max-width: 1200px; margin: 0 auto; padding: 0 20px; display: flex; gap: 8px;">
-          \${workout.exercises.map((ex, idx) => \`
+          \${workout.exercises.map((ex, idx) => {
+            const hasRecordedSets = ex.sets && ex.sets.length > 0;
+            const isComplete = hasRecordedSets && ex.sets.length >= (ex.target_sets || 1);
+            const isCurrent = idx === currentIdx;
+            let bgColor = 'white';
+            let textColor = 'var(--gray)';
+            let opacity = '1';
+            
+            if (isCurrent) {
+              bgColor = 'var(--primary)';
+              textColor = 'white';
+            } else if (isComplete) {
+              bgColor = 'var(--secondary)';
+              textColor = 'white';
+            } else if (hasRecordedSets) {
+              bgColor = 'var(--warning)';
+              textColor = 'white';
+            } else if (idx > currentIdx) {
+              opacity = '0.5';
+            }
+            
+            return \`
             <button 
               onclick="switchToExercise(\${idx})"
-              style="padding: 12px 20px; border: none; background: \${idx === currentIdx ? 'var(--primary)' : idx < currentIdx ? 'var(--secondary)' : 'white'}; color: \${idx === currentIdx || idx < currentIdx ? 'white' : 'var(--gray)'}; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap; \${idx > currentIdx ? 'opacity: 0.5;' : ''}">
-              \${idx < currentIdx ? '<i class="fas fa-check"></i>' : ''} \${ex.name.length > 20 ? ex.name.substring(0, 20) + '...' : ex.name}
+              style="padding: 12px 20px; border: none; background: \${bgColor}; color: \${textColor}; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap; opacity: \${opacity};">
+              \${isComplete ? '<i class="fas fa-check"></i>' : ''} \${ex.name.length > 20 ? ex.name.substring(0, 20) + '...' : ex.name}
             </button>
-          \`).join('')}
+          \`}).join('')}
         </div>
       </div>
       
@@ -4733,10 +4915,14 @@ async function addExerciseSet(exerciseId) {
       const currentExercise = state.currentWorkout.exercises[state.workoutExercise.currentIndex];
       const completedSets = (currentExercise.sets || []).length;
       const targetSets = currentExercise.target_sets || 3;
+      const isLastExercise = state.workoutExercise.currentIndex === state.currentWorkout.exercises.length - 1;
       
       if (completedSets >= targetSets) {
         setTimeout(() => {
-          if (confirm('Target sets complete! Move to next exercise?')) {
+          const message = isLastExercise 
+            ? 'Target sets complete! Finish workout?' 
+            : 'Target sets complete! Move to next exercise?';
+          if (confirm(message)) {
             nextExercise();
           }
         }, 500);

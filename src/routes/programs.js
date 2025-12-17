@@ -8,7 +8,7 @@ const programs = new Hono();
 programs.post('/generate', async (c) => {
   const user = requireAuth(c);
   const body = await c.req.json();
-  const { days_per_week, goal = 'hypertrophy' } = body;
+  const { days_per_week, goal = 'hypertrophy', custom_instructions = '' } = body;
 
   if (!days_per_week || days_per_week < 1 || days_per_week > 7) {
     return c.json({ error: 'Invalid days_per_week' }, 400);
@@ -27,6 +27,7 @@ programs.post('/generate', async (c) => {
     user,
     days_per_week,
     goal,
+    custom_instructions,
     exercises: exercises.results
   });
 

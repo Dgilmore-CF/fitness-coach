@@ -320,6 +320,63 @@ function getIndexHTML() {
             display: block;
         }
         
+        /* Mobile Bottom Navigation */
+        .mobile-nav {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--bg-primary);
+            border-top: 1px solid var(--border);
+            padding: 8px 4px;
+            padding-bottom: max(8px, env(safe-area-inset-bottom));
+            z-index: 1000;
+            box-shadow: 0 -2px 10px var(--shadow);
+        }
+        
+        .mobile-nav-inner {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .mobile-nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 6px 8px;
+            border: none;
+            background: none;
+            color: var(--gray);
+            font-size: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-width: 50px;
+        }
+        
+        .mobile-nav-item i {
+            font-size: 18px;
+            margin-bottom: 2px;
+        }
+        
+        .mobile-nav-item.active {
+            color: var(--primary);
+        }
+        
+        .mobile-nav-item:hover {
+            color: var(--primary);
+        }
+        
+        /* Add padding to container when mobile nav is visible */
+        @media (max-width: 480px) {
+            .container {
+                padding-bottom: 80px;
+            }
+        }
+        
         .form-group {
             margin-bottom: 16px;
         }
@@ -914,6 +971,15 @@ function getIndexHTML() {
                 font-size: 12px;
             }
             
+            /* Hide desktop tabs on mobile, show bottom nav */
+            .tabs {
+                display: none !important;
+            }
+            
+            .mobile-nav {
+                display: flex !important;
+            }
+            
             /* Hide text labels on mobile, show only icons */
             .hide-mobile {
                 display: none !important;
@@ -1061,6 +1127,32 @@ function getIndexHTML() {
             <!-- Learn content will be loaded here -->
         </div>
     </div>
+
+    <!-- Mobile Bottom Navigation -->
+    <nav class="mobile-nav" id="mobileNav">
+        <div class="mobile-nav-inner">
+            <button class="mobile-nav-item active" onclick="switchTab('dashboard')" data-tab="dashboard">
+                <i class="fas fa-home"></i>
+                <span>Home</span>
+            </button>
+            <button class="mobile-nav-item" onclick="switchTab('program')" data-tab="program">
+                <i class="fas fa-list"></i>
+                <span>Program</span>
+            </button>
+            <button class="mobile-nav-item" onclick="switchTab('workout')" data-tab="workout">
+                <i class="fas fa-dumbbell"></i>
+                <span>Workout</span>
+            </button>
+            <button class="mobile-nav-item" onclick="switchTab('analytics')" data-tab="analytics">
+                <i class="fas fa-chart-line"></i>
+                <span>Stats</span>
+            </button>
+            <button class="mobile-nav-item" onclick="showMobileMoreMenu()" data-tab="more">
+                <i class="fas fa-ellipsis-h"></i>
+                <span>More</span>
+            </button>
+        </div>
+    </nav>
 
     <div id="modal" class="modal">
         <div class="modal-content">

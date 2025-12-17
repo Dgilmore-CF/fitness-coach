@@ -188,13 +188,62 @@ const EXAMPLE_PROGRAMS = {
 };
 
 /**
+ * Define functionally equivalent exercises that should not appear together on the same day
+ * Each array contains exercises that are essentially the same movement with different equipment
+ */
+const EQUIVALENT_EXERCISES = [
+  ['Barbell Squat', 'Smith Machine Squat'],
+  ['Barbell Bench Press', 'Smith Machine Bench Press'],
+  ['Barbell Incline Press', 'Smith Machine Incline Press'],
+  ['Barbell Overhead Press', 'Smith Machine Overhead Press'],
+  ['Barbell Romanian Deadlift', 'Smith Machine Romanian Deadlift'],
+  ['Barbell Deadlift', 'Smith Machine Deadlift'],
+  ['Barbell Lunge', 'Smith Machine Lunge'],
+  ['Barbell Hip Thrust', 'Smith Machine Hip Thrust'],
+  ['Barbell Calf Raise', 'Smith Machine Calf Raise'],
+  ['Barbell Row', 'Smith Machine Row'],
+];
+
+/**
+ * Check if two exercises are functionally equivalent
+ */
+function areExercisesEquivalent(exercise1, exercise2) {
+  for (const group of EQUIVALENT_EXERCISES) {
+    if (group.includes(exercise1) && group.includes(exercise2)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Remove duplicate/equivalent exercises from a day's exercise list
+ * Keeps the first occurrence and removes equivalents
+ */
+function removeDuplicateExercises(dayExercises) {
+  const result = [];
+  for (const exercise of dayExercises) {
+    const hasDuplicate = result.some(existing => 
+      areExercisesEquivalent(existing.name, exercise.name)
+    );
+    if (!hasDuplicate) {
+      result.push(exercise);
+    }
+  }
+  return result;
+}
+
+/**
  * Generate workout program using hybrid AI approach:
  * 1. Few-shot learning with perfect examples
  * 2. Prompt chaining (structure first, then exercises)
  * 3. Validation at each step
  */
-export async function generateProgram(ai, { user, days_per_week, goal, exercises }) {
+export async function generateProgram(ai, { user, days_per_week, goal, custom_instructions = '', exercises }) {
   console.log(`\n🔧 Starting hybrid AI program generation (${days_per_week} days, ${goal})...`);
+  if (custom_instructions) {
+    console.log(`📝 Custom instructions: ${custom_instructions}`);
+  }
   
   // Categorize exercises by muscle group for validation
   const upperBodyMuscles = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps'];
@@ -223,7 +272,7 @@ export async function generateProgram(ai, { user, days_per_week, goal, exercises
     // STEP 1: Generate program structure with few-shot learning
     console.log('📋 Step 1: Generating program structure with few-shot learning...');
     const programData = await generateProgramStructureWithFewShot(
-      ai, days_per_week, goal, user
+      ai, days_per_week, goal, user, custom_instructions
     );
     
     if (!programData || !programData.days) {
@@ -247,18 +296,27 @@ export async function generateProgram(ai, { user, days_per_week, goal, exercises
       
       // Generate exercises for this specific day
       const dayExercises = await generateExercisesForDay(
-        ai, day, validExercises, formatExerciseList
+        ai, day, validExercises, formatExerciseList, custom_instructions
       );
       
       // STEP 3: Validate and map exercises
-      const validatedExercises = validateAndMapExercises(
+      let validatedExercises = validateAndMapExercises(
         dayExercises, validExercises, day.name, dayType
       );
+      
+      // STEP 4: Remove duplicate/equivalent exercises (e.g., Barbell Squat + Smith Machine Squat)
+      const beforeCount = validatedExercises.length;
+      validatedExercises = removeDuplicateExercises(validatedExercises);
+      if (validatedExercises.length < beforeCount) {
+        console.log(`   🔄 Removed ${beforeCount - validatedExercises.length} duplicate/equivalent exercises`);
+      }
       
       // Ensure we have 4-5 exercises
       if (validatedExercises.length < 4) {
         console.log(`   ⚠️  Only ${validatedExercises.length} exercises, adding fallbacks...`);
         addFallbackExercises(validatedExercises, validExercises, day.muscle_groups);
+        // Remove duplicates again after adding fallbacks
+        validatedExercises = removeDuplicateExercises(validatedExercises);
       }
       
       day.exercises = validatedExercises;
@@ -278,7 +336,7 @@ export async function generateProgram(ai, { user, days_per_week, goal, exercises
 /**
  * Step 1: Generate program structure using few-shot learning
  */
-async function generateProgramStructureWithFewShot(ai, days_per_week, goal, user) {
+async function generateProgramStructureWithFewShot(ai, days_per_week, goal, user, custom_instructions = '') {
   // Get example program for few-shot learning
   const exampleProgram = EXAMPLE_PROGRAMS[days_per_week] || EXAMPLE_PROGRAMS[4];
   
@@ -292,7 +350,7 @@ Now create a similar ${days_per_week}-day ${goal} program structure for this use
 - Gender: ${user.gender === 'male' ? 'Male' : user.gender === 'female' ? 'Female' : 'Not specified'}
 - Weight: ${user.weight_kg ? user.weight_kg + ' kg' : 'Not specified'}
 - Goal: ${goal}
-
+${custom_instructions ? `\nUSER'S CUSTOM INSTRUCTIONS (incorporate these into the program):\n${custom_instructions}\n` : ''}
 ${user.gender === 'female' ? 'Note: Consider typical female training preferences - may benefit from higher rep ranges, emphasis on glutes/legs, and appropriate exercise selection.' : user.gender === 'male' ? 'Note: Consider typical male training preferences - balanced upper/lower split, compound movements, progressive overload focus.' : ''}
 
 IMPORTANT: Return ONLY the structure with name, description, and days array (WITHOUT exercises). Follow this exact format:
@@ -335,7 +393,7 @@ Return valid JSON only:`;
 /**
  * Step 2: Generate exercises for a specific day
  */
-async function generateExercisesForDay(ai, day, validExercises, formatExerciseList) {
+async function generateExercisesForDay(ai, day, validExercises, formatExerciseList, custom_instructions = '') {
   const exercisePrompt = `You are selecting exercises for: ${day.name}
 Focus: ${day.focus}
 Muscle Groups: ${day.muscle_groups.join(', ')}
@@ -349,6 +407,8 @@ Select EXACTLY 5 exercises that:
 3. Include 2-3 isolation exercises (higher reps, shorter rest)
 4. Provide variety in movement patterns
 5. Use exercise names EXACTLY as listed above
+6. DO NOT include two exercises that are functionally the same (e.g., don't include both Barbell Squat AND Smith Machine Squat - pick one)
+${custom_instructions ? `7. Consider user's preferences: ${custom_instructions}` : ''}
 
 Return valid JSON array only:
 [
