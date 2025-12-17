@@ -2074,8 +2074,44 @@ async function loadWorkoutInterface() {
   }
 }
 
+// Check if exercise is cardio
+function isCardioExercise(exercise) {
+  return exercise.muscle_group === 'Cardio';
+}
+
+// Estimate calories burned for cardio based on user profile and duration
+function estimateCaloriesBurned(durationMinutes, intensity = 'moderate') {
+  const user = state.user || {};
+  const weightKg = user.weight_kg || 70;
+  
+  // MET values for different intensities
+  const metValues = {
+    light: 3.5,      // Walking
+    moderate: 6,     // Jogging, cycling
+    vigorous: 9,     // Running, HIIT
+    intense: 12      // Sprinting, intense intervals
+  };
+  
+  const met = metValues[intensity] || metValues.moderate;
+  // Calories = MET × weight(kg) × duration(hours)
+  return Math.round(met * weightKg * (durationMinutes / 60));
+}
+
+// Format duration for display
+function formatCardioTime(seconds) {
+  if (!seconds) return '0:00';
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
 // Render exercise with enhanced UI
 function renderExerciseEnhanced(exercise, index) {
+  // Check if this is a cardio exercise
+  if (isCardioExercise(exercise)) {
+    return renderCardioExercise(exercise, index);
+  }
+  
   const system = (state.user && state.user.measurement_system) || 'metric';
   const isImperial = system === 'imperial';
   const weightUnit = isImperial ? 'lbs' : 'kg';
@@ -2204,6 +2240,193 @@ function renderExerciseEnhanced(exercise, index) {
       </div>
     </div>
   `;
+}
+
+// Render cardio exercise with duration/calorie tracking
+function renderCardioExercise(exercise, index) {
+  const system = (state.user && state.user.measurement_system) || 'metric';
+  const isImperial = system === 'imperial';
+  const distanceUnit = isImperial ? 'mi' : 'km';
+  
+  // Calculate totals from logged sessions
+  const totalDuration = (exercise.sets || []).reduce((sum, s) => sum + (s.duration_seconds || 0), 0);
+  const totalCalories = (exercise.sets || []).reduce((sum, s) => sum + (s.calories_burned || 0), 0);
+  const totalDistance = (exercise.sets || []).reduce((sum, s) => sum + (s.distance_meters || 0), 0);
+  const sessionsCount = (exercise.sets || []).length;
+  
+  return `
+    <div style="background: var(--white); border: 2px solid var(--border); border-radius: 16px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);" id="exercise-${exercise.id}">
+      <!-- Exercise Header -->
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+        <div style="flex: 1;">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+            <div style="background: linear-gradient(135deg, #ef4444 0%, #f97316 100%); color: white; width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px;">
+              <i class="fas fa-heartbeat"></i>
+            </div>
+            <h4 style="margin: 0; font-size: 18px; font-weight: 600;">${exercise.name}</h4>
+          </div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;">
+            <span style="background: linear-gradient(135deg, #ef4444 0%, #f97316 100%); color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">
+              <i class="fas fa-fire"></i> Cardio
+            </span>
+            <span style="background: var(--primary-light); color: var(--primary); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">
+              <i class="fas fa-dumbbell"></i> ${exercise.equipment}
+            </span>
+          </div>
+        </div>
+        <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
+          <button onclick="deleteExerciseFromWorkout(${exercise.id}, '${exercise.name.replace(/'/g, "\\'")}')" 
+            style="background: none; border: none; color: var(--danger); cursor: pointer; font-size: 14px; padding: 4px 8px; opacity: 0.6; transition: opacity 0.2s;"
+            onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'"
+            title="Remove exercise">
+            <i class="fas fa-trash"></i>
+          </button>
+          <div>
+            <div style="font-size: 24px; font-weight: bold; color: #ef4444;">${sessionsCount}</div>
+            <div style="font-size: 11px; color: var(--gray); text-transform: uppercase; letter-spacing: 0.5px;">Sessions</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cardio Stats Summary -->
+      ${sessionsCount > 0 ? `
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;">
+        <div style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; padding: 12px; border-radius: 10px; text-align: center;">
+          <div style="font-size: 11px; opacity: 0.9; margin-bottom: 4px;"><i class="fas fa-clock"></i> Duration</div>
+          <div style="font-size: 18px; font-weight: bold;">${formatCardioTime(totalDuration)}</div>
+        </div>
+        <div style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 12px; border-radius: 10px; text-align: center;">
+          <div style="font-size: 11px; opacity: 0.9; margin-bottom: 4px;"><i class="fas fa-fire"></i> Calories</div>
+          <div style="font-size: 18px; font-weight: bold;">${totalCalories}</div>
+        </div>
+        <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 12px; border-radius: 10px; text-align: center;">
+          <div style="font-size: 11px; opacity: 0.9; margin-bottom: 4px;"><i class="fas fa-route"></i> Distance</div>
+          <div style="font-size: 18px; font-weight: bold;">${totalDistance > 0 ? (isImperial ? (totalDistance / 1609.34).toFixed(2) : (totalDistance / 1000).toFixed(2)) : '-'} ${totalDistance > 0 ? distanceUnit : ''}</div>
+        </div>
+      </div>
+      ` : ''}
+
+      <!-- Logged Sessions -->
+      ${sessionsCount > 0 ? `
+      <div style="margin-bottom: 16px;">
+        <div style="font-size: 13px; font-weight: 600; color: var(--gray); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">
+          <i class="fas fa-check-circle"></i> Logged Sessions
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          ${exercise.sets.map((set, setIdx) => `
+            <div style="background: linear-gradient(135deg, #ef4444 0%, #f97316 100%); color: white; padding: 12px 16px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center;">
+              <div style="display: flex; gap: 16px; align-items: center;">
+                <span style="font-weight: bold;">Session ${set.set_number}</span>
+                <span><i class="fas fa-clock"></i> ${formatCardioTime(set.duration_seconds)}</span>
+                ${set.calories_burned ? `<span><i class="fas fa-fire"></i> ${set.calories_burned} cal</span>` : ''}
+                ${set.distance_meters ? `<span><i class="fas fa-route"></i> ${isImperial ? (set.distance_meters / 1609.34).toFixed(2) + ' mi' : (set.distance_meters / 1000).toFixed(2) + ' km'}</span>` : ''}
+                ${set.avg_heart_rate ? `<span><i class="fas fa-heartbeat"></i> ${set.avg_heart_rate} bpm</span>` : ''}
+              </div>
+              <button onclick="deleteSet(${exercise.id}, ${set.id})" 
+                style="background: rgba(0,0,0,0.2); border: none; color: white; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; font-size: 12px;"
+                title="Delete session">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      ` : ''}
+
+      <!-- Add Cardio Session Form -->
+      <div style="background: var(--light); border-radius: 12px; padding: 16px;">
+        <div style="font-size: 13px; font-weight: 600; color: var(--gray); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
+          <i class="fas fa-plus-circle"></i> Log Cardio Session
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px;">
+          <div>
+            <label style="font-size: 12px; color: var(--gray); display: block; margin-bottom: 4px; font-weight: 600;">Duration (minutes)</label>
+            <input type="number" id="cardio-duration-${exercise.id}" placeholder="30" min="1" step="1"
+                   style="width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 16px; font-weight: 600;">
+          </div>
+          <div>
+            <label style="font-size: 12px; color: var(--gray); display: block; margin-bottom: 4px; font-weight: 600;">Intensity</label>
+            <select id="cardio-intensity-${exercise.id}" style="width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 16px; font-weight: 600;">
+              <option value="light">Light (Walking)</option>
+              <option value="moderate" selected>Moderate (Jogging)</option>
+              <option value="vigorous">Vigorous (Running)</option>
+              <option value="intense">Intense (HIIT/Sprint)</option>
+            </select>
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px;">
+          <div>
+            <label style="font-size: 12px; color: var(--gray); display: block; margin-bottom: 4px; font-weight: 600;">Distance (${distanceUnit}) - optional</label>
+            <input type="number" id="cardio-distance-${exercise.id}" placeholder="0" min="0" step="0.1"
+                   style="width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 16px; font-weight: 600;">
+          </div>
+          <div>
+            <label style="font-size: 12px; color: var(--gray); display: block; margin-bottom: 4px; font-weight: 600;">Avg Heart Rate - optional</label>
+            <input type="number" id="cardio-hr-${exercise.id}" placeholder="140" min="40" max="220"
+                   style="width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 16px; font-weight: 600;">
+          </div>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-primary" onclick="recordCardioSession(${exercise.id})" style="flex: 1; padding: 12px 24px; font-size: 16px; background: linear-gradient(135deg, #ef4444 0%, #f97316 100%); border: none;">
+            <i class="fas fa-fire"></i> Log Session
+          </button>
+        </div>
+        <p style="font-size: 11px; color: var(--gray); margin-top: 8px; text-align: center;">
+          <i class="fas fa-info-circle"></i> Calories will be estimated based on your profile and intensity
+        </p>
+      </div>
+    </div>
+  `;
+}
+
+// Record cardio session
+async function recordCardioSession(exerciseId) {
+  const durationInput = document.getElementById(`cardio-duration-${exerciseId}`);
+  const intensitySelect = document.getElementById(`cardio-intensity-${exerciseId}`);
+  const distanceInput = document.getElementById(`cardio-distance-${exerciseId}`);
+  const hrInput = document.getElementById(`cardio-hr-${exerciseId}`);
+  
+  const durationMinutes = parseFloat(durationInput?.value);
+  if (!durationMinutes || durationMinutes <= 0) {
+    showNotification('Please enter a valid duration', 'warning');
+    return;
+  }
+  
+  const intensity = intensitySelect?.value || 'moderate';
+  const durationSeconds = Math.round(durationMinutes * 60);
+  const caloriesBurned = estimateCaloriesBurned(durationMinutes, intensity);
+  
+  // Convert distance to meters
+  const system = (state.user && state.user.measurement_system) || 'metric';
+  const isImperial = system === 'imperial';
+  let distanceMeters = null;
+  if (distanceInput?.value) {
+    const distanceValue = parseFloat(distanceInput.value);
+    distanceMeters = isImperial ? distanceValue * 1609.34 : distanceValue * 1000;
+  }
+  
+  const avgHeartRate = hrInput?.value ? parseInt(hrInput.value) : null;
+  
+  try {
+    await api(`/workouts/${state.currentWorkout.id}/exercises/${exerciseId}/sets`, {
+      method: 'POST',
+      body: JSON.stringify({
+        duration_seconds: durationSeconds,
+        calories_burned: caloriesBurned,
+        distance_meters: distanceMeters,
+        avg_heart_rate: avgHeartRate
+      })
+    });
+    
+    showNotification(`Cardio logged! ~${caloriesBurned} calories burned`, 'success');
+    
+    // Refresh workout data
+    const data = await api(`/workouts/${state.currentWorkout.id}`);
+    state.currentWorkout = data.workout;
+    loadWorkoutInterface();
+  } catch (error) {
+    showNotification('Error logging cardio: ' + error.message, 'error');
+  }
 }
 
 // Render exercise (legacy - keep for compatibility)

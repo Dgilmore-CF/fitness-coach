@@ -240,13 +240,13 @@ workouts.post('/:id/exercises', async (c) => {
   return c.json({ workout_exercise: workoutExercise });
 });
 
-// Record set
+// Record set (supports both strength and cardio)
 workouts.post('/:workoutId/exercises/:exerciseId/sets', async (c) => {
   const user = requireAuth(c);
   const workoutId = c.req.param('workoutId');
   const exerciseId = c.req.param('exerciseId');
   const body = await c.req.json();
-  const { weight_kg, reps, rest_seconds } = body;
+  const { weight_kg, reps, rest_seconds, duration_seconds, calories_burned, distance_meters, avg_heart_rate } = body;
   const db = c.env.DB;
 
   // Verify workout belongs to user
@@ -258,9 +258,11 @@ workouts.post('/:workoutId/exercises/:exerciseId/sets', async (c) => {
     return c.json({ error: 'Workout not found' }, 404);
   }
 
-  // Get workout exercise
+  // Get workout exercise with exercise details
   const workoutExercise = await db.prepare(
-    'SELECT * FROM workout_exercises WHERE id = ? AND workout_id = ?'
+    `SELECT we.*, e.muscle_group FROM workout_exercises we
+     JOIN exercises e ON we.exercise_id = e.id
+     WHERE we.id = ? AND we.workout_id = ?`
   ).bind(exerciseId, workoutId).first();
 
   if (!workoutExercise) {
@@ -272,14 +274,26 @@ workouts.post('/:workoutId/exercises/:exerciseId/sets', async (c) => {
     'SELECT COUNT(*) as count FROM sets WHERE workout_exercise_id = ?'
   ).bind(exerciseId).first();
 
-  // Calculate 1RM
-  const oneRepMax = calculateOneRepMax(weight_kg, reps);
+  // Check if this is a cardio exercise
+  const isCardio = workoutExercise.muscle_group === 'Cardio';
 
-  const set = await db.prepare(
-    `INSERT INTO sets (workout_exercise_id, set_number, weight_kg, reps, one_rep_max_kg, rest_seconds)
-     VALUES (?, ?, ?, ?, ?, ?)
-     RETURNING *`
-  ).bind(exerciseId, setCount.count + 1, weight_kg, reps, oneRepMax, rest_seconds).first();
+  let set;
+  if (isCardio) {
+    // For cardio, store duration and calories instead of weight/reps
+    set = await db.prepare(
+      `INSERT INTO sets (workout_exercise_id, set_number, weight_kg, reps, duration_seconds, calories_burned, distance_meters, avg_heart_rate, rest_seconds)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       RETURNING *`
+    ).bind(exerciseId, setCount.count + 1, weight_kg || 0, reps || 1, duration_seconds, calories_burned, distance_meters, avg_heart_rate, rest_seconds || 0).first();
+  } else {
+    // For strength exercises, calculate 1RM
+    const oneRepMax = calculateOneRepMax(weight_kg, reps);
+    set = await db.prepare(
+      `INSERT INTO sets (workout_exercise_id, set_number, weight_kg, reps, one_rep_max_kg, rest_seconds)
+       VALUES (?, ?, ?, ?, ?, ?)
+       RETURNING *`
+    ).bind(exerciseId, setCount.count + 1, weight_kg, reps, oneRepMax, rest_seconds).first();
+  }
 
   return c.json({ set });
 });
