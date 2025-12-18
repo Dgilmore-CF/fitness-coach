@@ -4305,7 +4305,14 @@ async function saveEditedSet(exerciseId, setId) {
     // Refresh workout data
     const data = await api(`/workouts/${state.currentWorkout.id}`);
     state.currentWorkout = data.workout;
-    loadWorkoutInterface();
+    
+    // Refresh the appropriate view
+    const workoutModal = document.getElementById('workout-modal');
+    if (workoutModal && workoutModal.style.display !== 'none') {
+      renderWorkoutExerciseTabs();
+    } else {
+      loadWorkoutInterface();
+    }
   } catch (error) {
     showNotification('Error updating set: ' + error.message, 'error');
   }
@@ -4745,6 +4752,9 @@ async function startWorkoutExercises() {
     const data = await api(`/workouts/${state.currentWorkout.id}`);
     state.currentWorkout = data.workout;
     
+    // Fetch historical data for all exercises (last set from previous workouts)
+    await fetchHistoricalExerciseData();
+    
     // Start workout timer (use workout's actual start_time)
     if (!state.workoutTimer) {
       startWorkoutTimer(state.currentWorkout);
@@ -4756,6 +4766,27 @@ async function startWorkoutExercises() {
   } catch (error) {
     showNotification('Error loading workout: ' + error.message, 'error');
   }
+}
+
+// Fetch historical exercise data for pre-population
+async function fetchHistoricalExerciseData() {
+  if (!state.currentWorkout || !state.currentWorkout.exercises) return;
+  
+  state.exerciseHistory = {};
+  
+  // Fetch last set data for each exercise in parallel
+  const promises = state.currentWorkout.exercises.map(async (exercise) => {
+    try {
+      const data = await api(`/workouts/exercises/${exercise.exercise_id}/last-set?currentWorkoutId=${state.currentWorkout.id}`);
+      if (data.lastSet) {
+        state.exerciseHistory[exercise.exercise_id] = data.lastSet;
+      }
+    } catch (error) {
+      console.log(`No history for exercise ${exercise.exercise_id}`);
+    }
+  });
+  
+  await Promise.all(promises);
 }
 
 // Render tabbed exercise interface
@@ -4926,17 +4957,24 @@ function renderExerciseContent(exercise, index) {
   const targetSets = exercise.target_sets || 3;
   const showNewSetRow = completedSets < targetSets && completedSets < 10;
   
-  // Pre-populate from last set
-  const lastSet = exercise.sets && exercise.sets.length > 0 ? exercise.sets[exercise.sets.length - 1] : null;
+  // Pre-populate from historical data (previous workout) or current workout's last set
   let defaultWeight = '';
   let defaultReps = exercise.target_reps || '';
-  if (lastSet) {
-    if (lastSet.weight_kg) {
-      const weightValue = isImperial ? kgToLbs(lastSet.weight_kg) : lastSet.weight_kg;
+  
+  // First priority: use last set from current workout if exists
+  const currentLastSet = exercise.sets && exercise.sets.length > 0 ? exercise.sets[exercise.sets.length - 1] : null;
+  // Second priority: use historical data from previous workouts
+  const historicalSet = state.exerciseHistory && state.exerciseHistory[exercise.exercise_id];
+  
+  const sourceSet = currentLastSet || historicalSet;
+  
+  if (sourceSet) {
+    if (sourceSet.weight_kg) {
+      const weightValue = isImperial ? kgToLbs(sourceSet.weight_kg) : sourceSet.weight_kg;
       defaultWeight = weightValue % 1 === 0 ? String(weightValue) : weightValue.toFixed(1);
     }
-    if (lastSet.reps) {
-      defaultReps = lastSet.reps;
+    if (sourceSet.reps) {
+      defaultReps = sourceSet.reps;
     }
   }
   
