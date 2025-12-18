@@ -31,6 +31,31 @@ workouts.get('/', async (c) => {
   return c.json({ workouts: workoutsList.results });
 });
 
+// Get last recorded set for an exercise from previous workouts
+// NOTE: This route must be before /:id to avoid route conflicts
+workouts.get('/exercises/:exerciseId/last-set', async (c) => {
+  const user = requireAuth(c);
+  const exerciseId = c.req.param('exerciseId');
+  const currentWorkoutId = c.req.query('currentWorkoutId');
+  const db = c.env.DB;
+
+  // Find the most recent set for this exercise from a completed workout (not the current one)
+  const lastSet = await db.prepare(
+    `SELECT s.weight_kg, s.reps, s.set_number, w.start_time
+     FROM sets s
+     JOIN workout_exercises we ON s.workout_exercise_id = we.id
+     JOIN workouts w ON we.workout_id = w.id
+     WHERE we.exercise_id = ? 
+       AND w.user_id = ?
+       AND w.id != ?
+       AND w.end_time IS NOT NULL
+     ORDER BY w.start_time DESC, s.set_number DESC
+     LIMIT 1`
+  ).bind(exerciseId, user.id, currentWorkoutId || 0).first();
+
+  return c.json({ lastSet });
+});
+
 // Get specific workout
 workouts.get('/:id', async (c) => {
   const user = requireAuth(c);
@@ -645,30 +670,6 @@ workouts.put('/:id/cardio', async (c) => {
   ).first();
 
   return c.json({ workout: updated });
-});
-
-// Get last recorded set for an exercise from previous workouts
-workouts.get('/exercises/:exerciseId/last-set', async (c) => {
-  const user = requireAuth(c);
-  const exerciseId = c.req.param('exerciseId');
-  const currentWorkoutId = c.req.query('currentWorkoutId');
-  const db = c.env.DB;
-
-  // Find the most recent set for this exercise from a completed workout (not the current one)
-  const lastSet = await db.prepare(
-    `SELECT s.weight_kg, s.reps, s.set_number, w.start_time
-     FROM sets s
-     JOIN workout_exercises we ON s.workout_exercise_id = we.id
-     JOIN workouts w ON we.workout_id = w.id
-     WHERE we.exercise_id = ? 
-       AND w.user_id = ?
-       AND w.id != ?
-       AND w.end_time IS NOT NULL
-     ORDER BY w.start_time DESC, s.set_number DESC
-     LIMIT 1`
-  ).bind(exerciseId, user.id, currentWorkoutId || 0).first();
-
-  return c.json({ lastSet });
 });
 
 export default workouts;

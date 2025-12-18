@@ -4244,7 +4244,47 @@ function editSet(exerciseId, setId, currentWeightKg, currentReps) {
   const isImperial = system === 'imperial';
   const weightUnit = isImperial ? 'lbs' : 'kg';
   const currentWeight = isImperial ? kgToLbs(currentWeightKg) : currentWeightKg;
+  const displayWeight = currentWeight % 1 === 0 ? String(currentWeight) : currentWeight.toFixed(1);
   
+  // Create inline edit overlay for workout modal
+  const workoutModal = document.getElementById('workout-modal');
+  if (workoutModal && workoutModal.style.display !== 'none') {
+    // Create overlay within workout modal
+    let overlay = document.getElementById('edit-set-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'edit-set-overlay';
+      workoutModal.appendChild(overlay);
+    }
+    
+    overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10000;';
+    overlay.innerHTML = `
+      <div style="background: var(--bg-primary); border-radius: 16px; padding: 24px; max-width: 400px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,0.3);">
+        <h3 style="margin: 0 0 20px 0; color: var(--text-primary);">Edit Set</h3>
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          <div>
+            <label style="display: block; margin-bottom: 6px; font-weight: 600; color: var(--text-secondary);">Weight (${weightUnit})</label>
+            <input type="number" id="editSetWeight" value="${displayWeight}" step="${isImperial ? '5' : '2.5'}" 
+                   style="width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 18px; background: var(--bg-secondary); color: var(--text-primary);">
+          </div>
+          <div>
+            <label style="display: block; margin-bottom: 6px; font-weight: 600; color: var(--text-secondary);">Reps</label>
+            <input type="number" id="editSetReps" value="${currentReps}" min="1"
+                   style="width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 18px; background: var(--bg-secondary); color: var(--text-primary);">
+          </div>
+          <div style="display: flex; gap: 12px; margin-top: 8px;">
+            <button class="btn btn-outline" onclick="closeEditSetOverlay()" style="flex: 1; padding: 12px;">Cancel</button>
+            <button class="btn btn-primary" onclick="saveEditedSet(${exerciseId}, ${setId})" style="flex: 1; padding: 12px;">
+              <i class="fas fa-save"></i> Save
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+  
+  // Fallback to standard modal for non-workout views
   const modal = document.getElementById('modal');
   const modalTitle = document.getElementById('modalTitle');
   const modalBody = document.getElementById('modalBody');
@@ -4254,7 +4294,7 @@ function editSet(exerciseId, setId, currentWeightKg, currentReps) {
     <div style="display: flex; flex-direction: column; gap: 16px;">
       <div class="form-group">
         <label>Weight (${weightUnit})</label>
-        <input type="number" id="editSetWeight" value="${currentWeight}" step="${isImperial ? '5' : '2.5'}" 
+        <input type="number" id="editSetWeight" value="${displayWeight}" step="${isImperial ? '5' : '2.5'}" 
                style="width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 16px;">
       </div>
       <div class="form-group">
@@ -4272,6 +4312,14 @@ function editSet(exerciseId, setId, currentWeightKg, currentReps) {
   `;
   
   modal.classList.add('active');
+}
+
+// Close edit set overlay
+function closeEditSetOverlay() {
+  const overlay = document.getElementById('edit-set-overlay');
+  if (overlay) {
+    overlay.remove();
+  }
 }
 
 // Save edited set
@@ -4299,7 +4347,10 @@ async function saveEditedSet(exerciseId, setId) {
       body: JSON.stringify({ weight_kg: weight, reps, rest_seconds: 90 })
     });
     
+    // Close any open overlays/modals
+    closeEditSetOverlay();
     closeModal();
+    
     showNotification('Set updated!', 'success');
     
     // Refresh workout data
