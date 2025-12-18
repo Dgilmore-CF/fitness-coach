@@ -4248,7 +4248,7 @@ function editSet(exerciseId, setId, currentWeightKg, currentReps) {
   
   // Create inline edit overlay for workout modal
   const workoutModal = document.getElementById('workout-modal');
-  if (workoutModal && workoutModal.style.display !== 'none') {
+  if (workoutModal) {
     // Create overlay within workout modal
     let overlay = document.getElementById('edit-set-overlay');
     if (!overlay) {
