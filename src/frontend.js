@@ -4406,6 +4406,54 @@ async function deleteExerciseFromWorkout(exerciseId, exerciseName) {
   }
 }
 
+// Delete exercise from workout modal view
+async function deleteExerciseFromWorkoutModal(exerciseId, exerciseName) {
+  if (!confirm(\`Remove "\${exerciseName}" from this workout? Any logged sets will be deleted.\`)) return;
+  
+  try {
+    // Track the deletion for program update prompt
+    if (!state.workoutModifications) {
+      state.workoutModifications = { added: [], deleted: [] };
+    }
+    
+    // Find the exercise to get its details before deleting
+    const exercise = state.currentWorkout.exercises.find(ex => ex.id === exerciseId);
+    if (exercise && exercise.program_exercise_id) {
+      // This was a program exercise, track it as deleted
+      state.workoutModifications.deleted.push({
+        exercise_id: exercise.exercise_id,
+        name: exerciseName,
+        program_exercise_id: exercise.program_exercise_id
+      });
+    }
+    
+    await api(\`/workouts/\${state.currentWorkout.id}/exercises/\${exerciseId}\`, {
+      method: 'DELETE'
+    });
+    
+    showNotification('Exercise removed!', 'success');
+    
+    // Refresh workout data
+    const data = await api(\`/workouts/\${state.currentWorkout.id}\`);
+    state.currentWorkout = data.workout;
+    
+    // If we deleted the current exercise, adjust the index
+    if (state.workoutExercise && state.workoutExercise.currentIndex >= state.currentWorkout.exercises.length) {
+      state.workoutExercise.currentIndex = Math.max(0, state.currentWorkout.exercises.length - 1);
+    }
+    
+    // Re-render the workout modal
+    if (state.currentWorkout.exercises.length === 0) {
+      // No exercises left, show summary
+      showWorkoutSummary();
+    } else {
+      renderWorkoutExerciseTabs();
+    }
+  } catch (error) {
+    showNotification('Error removing exercise: ' + error.message, 'error');
+  }
+}
+
 // Delete entire workout
 async function deleteWorkout() {
   if (!confirm('Are you sure you want to delete this entire workout? This cannot be undone.')) return;
@@ -4799,6 +4847,9 @@ async function startWorkoutExercises() {
     };
   }
   
+  // Initialize modifications tracking
+  state.workoutModifications = { added: [], deleted: [] };
+  
   // Fetch full workout data first
   try {
     const data = await api(\`/workouts/\${state.currentWorkout.id}\`);
@@ -5035,7 +5086,15 @@ function renderExerciseContent(exercise, index) {
     <div class="card" style="margin-bottom: 20px;">
       <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 16px; flex-wrap: wrap; gap: 16px;">
         <div style="flex: 1; min-width: 200px;">
-          <h2 style="margin: 0 0 12px 0; font-size: clamp(18px, 4vw, 24px);">\${exercise.name}</h2>
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+            <h2 style="margin: 0; font-size: clamp(18px, 4vw, 24px);">\${exercise.name}</h2>
+            \${exercise.is_added ? '<span style="background: var(--warning); color: var(--white); padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600;">ADDED</span>' : ''}
+            <button onclick="deleteExerciseFromWorkoutModal(\${exercise.id}, '\${exercise.name.replace(/'/g, "\\\\'")}')" 
+              style="background: none; border: none; color: var(--danger); cursor: pointer; font-size: 14px; padding: 4px 8px; opacity: 0.6; margin-left: auto;"
+              title="Remove exercise">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
           <div style="display: flex; gap: 8px; flex-wrap: wrap;">
             <span style="background: var(--secondary-light); color: var(--secondary); padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: 600;">
               <i class="fas fa-bullseye"></i> \${exercise.muscle_group}
@@ -5583,6 +5642,21 @@ async function addSelectedExercises() {
       body: JSON.stringify({ exercise_ids: exerciseIds })
     });
     
+    // Track the additions for program update prompt
+    if (!state.workoutModifications) {
+      state.workoutModifications = { added: [], deleted: [] };
+    }
+    
+    // Get exercise names for the added exercises
+    if (result.exercises) {
+      result.exercises.forEach(ex => {
+        state.workoutModifications.added.push({
+          exercise_id: ex.exercise_id,
+          name: ex.name
+        });
+      });
+    }
+    
     // Refresh workout data
     const data = await api(\`/workouts/\${state.currentWorkout.id}\`);
     state.currentWorkout = data.workout;
@@ -5714,18 +5788,47 @@ async function showWorkoutSummary() {
         </div>
         
         <!-- Save to Program (if modified) -->
-        \${state.workoutModified && workout.program_day_id ? \`
+        \${(state.workoutModifications && (state.workoutModifications.added.length > 0 || state.workoutModifications.deleted.length > 0) && workout.program_day_id) ? \`
         <div class="card" style="margin-bottom: 24px; border: 2px solid var(--primary); background: var(--primary-light);">
-          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-            <div style="font-size: 32px;">💾</div>
-            <div style="flex: 1; min-width: 150px;">
-              <h4 style="margin: 0 0 4px 0; color: var(--text-primary); font-size: 15px;">Save Changes to Program?</h4>
-              <p style="margin: 0; color: var(--text-secondary); font-size: 13px;">
-                Save added exercises to your program for next time.
-              </p>
+          <h4 style="margin: 0 0 12px 0; color: var(--text-primary); font-size: 15px;">
+            <i class="fas fa-sync-alt" style="color: var(--primary);"></i> Update Program?
+          </h4>
+          <p style="margin: 0 0 12px 0; color: var(--text-secondary); font-size: 13px;">
+            You made changes to this workout. Would you like to update your program to reflect these changes for future workouts?
+          </p>
+          
+          \${state.workoutModifications.added.length > 0 ? \`
+          <div style="margin-bottom: 8px;">
+            <div style="font-size: 12px; color: var(--secondary); font-weight: 600; margin-bottom: 4px;">
+              <i class="fas fa-plus-circle"></i> Added Exercises:
             </div>
-            <button class="btn btn-primary" onclick="saveWorkoutToProgram()" id="saveToProgramBtn" style="white-space: nowrap;">
-              <i class="fas fa-save"></i> Save
+            <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+              \${state.workoutModifications.added.map(ex => \`
+                <span style="background: var(--secondary-light); color: var(--secondary); padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 500;">\${ex.name}</span>
+              \`).join('')}
+            </div>
+          </div>
+          \` : ''}
+          
+          \${state.workoutModifications.deleted.length > 0 ? \`
+          <div style="margin-bottom: 12px;">
+            <div style="font-size: 12px; color: var(--danger); font-weight: 600; margin-bottom: 4px;">
+              <i class="fas fa-minus-circle"></i> Removed Exercises:
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+              \${state.workoutModifications.deleted.map(ex => \`
+                <span style="background: rgba(220, 53, 69, 0.1); color: var(--danger); padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 500;">\${ex.name}</span>
+              \`).join('')}
+            </div>
+          </div>
+          \` : ''}
+          
+          <div style="display: flex; gap: 8px; margin-top: 12px;">
+            <button class="btn btn-outline" onclick="skipProgramUpdate()" style="flex: 1;">
+              Skip
+            </button>
+            <button class="btn btn-primary" onclick="saveWorkoutToProgram()" id="saveToProgramBtn" style="flex: 1;">
+              <i class="fas fa-save"></i> Update Program
             </button>
           </div>
         </div>
@@ -5867,6 +5970,17 @@ async function saveWorkoutToProgram() {
   }
 }
 
+// Skip program update and continue
+function skipProgramUpdate() {
+  state.workoutModifications = null;
+  // Re-render summary without the update prompt
+  const updateCard = document.querySelector('.card[style*="border: 2px solid var(--primary)"]');
+  if (updateCard) {
+    updateCard.style.display = 'none';
+  }
+  showNotification('Program not updated', 'info');
+}
+
 // Finish workout summary and return to dashboard
 async function finishWorkoutSummary() {
   // Save perceived exertion if set
@@ -5889,6 +6003,7 @@ async function finishWorkoutSummary() {
   state.workoutExercise = null;
   state.workoutNotes = '';
   state.workoutModified = false;
+  state.workoutModifications = null;
   state.keyboardShortcutsEnabled = false;
   state.perceivedExertion = null;
   

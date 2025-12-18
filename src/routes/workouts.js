@@ -75,9 +75,12 @@ workouts.get('/:id', async (c) => {
   }
 
   // Get workout exercises with program exercise details
+  // Prefer workout_exercises.target_sets over program_exercises.target_sets (user customizations)
   const exercises = await db.prepare(
     `SELECT we.*, e.name, e.muscle_group, e.equipment, e.description, e.tips, e.is_unilateral,
-            pe.target_sets, pe.target_reps
+            COALESCE(we.target_sets, pe.target_sets, 3) as target_sets, 
+            pe.target_reps,
+            CASE WHEN we.program_exercise_id IS NULL THEN 1 ELSE 0 END as is_added
      FROM workout_exercises we
      JOIN exercises e ON we.exercise_id = e.id
      LEFT JOIN program_exercises pe ON we.program_exercise_id = pe.id
