@@ -5004,9 +5004,24 @@ function renderWorkoutExerciseTabs() {
     const repsInput = document.getElementById('newSetReps');
     const logButton = document.getElementById('logSetButton');
     
+    // Helper to clear pre-populated styling when user types
+    function clearPrePopulatedStyle(input) {
+      if (input && input.dataset.prepopulated === 'true') {
+        input.style.color = 'var(--text-primary)';
+        input.style.fontStyle = 'normal';
+        input.style.borderColor = 'var(--border)';
+        input.dataset.prepopulated = 'false';
+      }
+    }
+    
     // Focus on weight input
     if (weightInput) {
       weightInput.focus();
+      
+      // Clear pre-populated style on input
+      weightInput.oninput = function() {
+        clearPrePopulatedStyle(this);
+      };
       
       // Simple Enter key navigation (no need to clone - this element is fresh from render)
       weightInput.onkeydown = function(e) {
@@ -5020,6 +5035,11 @@ function renderWorkoutExerciseTabs() {
     
     // Handle Enter key in reps field
     if (repsInput) {
+      // Clear pre-populated style on input
+      repsInput.oninput = function() {
+        clearPrePopulatedStyle(this);
+      };
+      
       repsInput.onkeydown = function(e) {
         if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
           e.preventDefault();
@@ -5063,7 +5083,6 @@ function renderExerciseContent(exercise, index) {
   // Pre-populate from historical data (previous workout) or current workout's last set
   let defaultWeight = '';
   let defaultReps = exercise.target_reps || '';
-  let isPrePopulated = false;
   
   // First priority: use last set from current workout if exists
   const currentLastSet = exercise.sets && exercise.sets.length > 0 ? exercise.sets[exercise.sets.length - 1] : null;
@@ -5071,6 +5090,14 @@ function renderExerciseContent(exercise, index) {
   const historicalSet = state.exerciseHistory && state.exerciseHistory[exercise.exercise_id];
   
   const sourceSet = currentLastSet || historicalSet;
+  
+  // Determine styling: 
+  // - First set (no sets logged yet) + historical data = light grey italic (pre-populated from history)
+  // - Subsequent sets (sets already logged) = black italic (from current workout)
+  // - No source data = black normal
+  const isFirstSet = !currentLastSet;
+  const hasHistoricalData = isFirstSet && historicalSet;
+  const hasCurrentData = currentLastSet;
   
   if (sourceSet) {
     if (sourceSet.weight_kg) {
@@ -5080,12 +5107,18 @@ function renderExerciseContent(exercise, index) {
     if (sourceSet.reps) {
       defaultReps = sourceSet.reps;
     }
-    // Mark as pre-populated only if using historical data (not current workout's set)
-    isPrePopulated = !currentLastSet && historicalSet;
   }
   
-  // Style for pre-populated values (grey to indicate they're suggestions from history)
-  const prePopulatedStyle = isPrePopulated ? 'color: var(--text-secondary); font-style: italic;' : 'color: var(--text-primary);';
+  // Style for input values:
+  // - Historical pre-populated (first set): very light grey, italic
+  // - Current workout data (subsequent sets): black, italic  
+  // - No data: black, normal
+  let inputTextStyle = 'color: var(--text-primary);';
+  if (hasHistoricalData) {
+    inputTextStyle = 'color: #999; font-style: italic;'; // Light grey italic for historical
+  } else if (hasCurrentData) {
+    inputTextStyle = 'color: var(--text-primary); font-style: italic;'; // Black italic for current workout
+  }
   
   return \`
     <!-- Exercise Header -->
@@ -5205,14 +5238,16 @@ function renderExerciseContent(exercise, index) {
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
               <div>
-                <label style="font-size: 12px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Weight (\${weightUnit})\${isPrePopulated ? ' <span style="font-size: 10px; opacity: 0.7;">(from last workout)</span>' : ''}</label>
+                <label style="font-size: 12px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Weight (\${weightUnit})\${hasHistoricalData ? ' <span style="font-size: 10px; opacity: 0.7;">(from last workout)</span>' : ''}</label>
                 <input type="number" id="newSetWeight" value="\${defaultWeight}" placeholder="0" step="\${isImperial ? '5' : '2.5'}" 
-                  style="width: 100%; padding: 12px; border: 2px solid \${isPrePopulated ? 'var(--primary)' : 'var(--border)'}; border-radius: 8px; font-size: 18px; font-weight: bold; background: var(--bg-secondary); \${prePopulatedStyle}">
+                  data-prepopulated="\${hasHistoricalData}"
+                  style="width: 100%; padding: 12px; border: 2px solid \${hasHistoricalData ? 'var(--primary)' : 'var(--border)'}; border-radius: 8px; font-size: 18px; font-weight: bold; background: var(--bg-secondary); \${inputTextStyle}">
               </div>
               <div>
-                <label style="font-size: 12px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Reps\${isPrePopulated ? ' <span style="font-size: 10px; opacity: 0.7;">(from last workout)</span>' : ''}</label>
+                <label style="font-size: 12px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Reps\${hasHistoricalData ? ' <span style="font-size: 10px; opacity: 0.7;">(from last workout)</span>' : ''}</label>
                 <input type="number" id="newSetReps" value="\${defaultReps}" placeholder="0" min="1"
-                  style="width: 100%; padding: 12px; border: 2px solid \${isPrePopulated ? 'var(--primary)' : 'var(--border)'}; border-radius: 8px; font-size: 18px; font-weight: bold; background: var(--bg-secondary); \${prePopulatedStyle}">
+                  data-prepopulated="\${hasHistoricalData}"
+                  style="width: 100%; padding: 12px; border: 2px solid \${hasHistoricalData ? 'var(--primary)' : 'var(--border)'}; border-radius: 8px; font-size: 18px; font-weight: bold; background: var(--bg-secondary); \${inputTextStyle}">
               </div>
             </div>
             <button class="btn btn-primary" id="logSetButton" data-exercise-id="\${exercise.id}" style="width: 100%; padding: 14px; font-size: 16px;">
