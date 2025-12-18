@@ -5063,6 +5063,7 @@ function renderExerciseContent(exercise, index) {
   // Pre-populate from historical data (previous workout) or current workout's last set
   let defaultWeight = '';
   let defaultReps = exercise.target_reps || '';
+  let isPrePopulated = false;
   
   // First priority: use last set from current workout if exists
   const currentLastSet = exercise.sets && exercise.sets.length > 0 ? exercise.sets[exercise.sets.length - 1] : null;
@@ -5079,7 +5080,12 @@ function renderExerciseContent(exercise, index) {
     if (sourceSet.reps) {
       defaultReps = sourceSet.reps;
     }
+    // Mark as pre-populated only if using historical data (not current workout's set)
+    isPrePopulated = !currentLastSet && historicalSet;
   }
+  
+  // Style for pre-populated values (grey to indicate they're suggestions from history)
+  const prePopulatedStyle = isPrePopulated ? 'color: var(--text-secondary); font-style: italic;' : 'color: var(--text-primary);';
   
   return \`
     <!-- Exercise Header -->
@@ -5199,14 +5205,14 @@ function renderExerciseContent(exercise, index) {
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
               <div>
-                <label style="font-size: 12px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Weight (\${weightUnit})</label>
+                <label style="font-size: 12px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Weight (\${weightUnit})\${isPrePopulated ? ' <span style="font-size: 10px; opacity: 0.7;">(from last workout)</span>' : ''}</label>
                 <input type="number" id="newSetWeight" value="\${defaultWeight}" placeholder="0" step="\${isImperial ? '5' : '2.5'}" 
-                  style="width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 18px; font-weight: bold; background: var(--bg-secondary); color: var(--text-primary);">
+                  style="width: 100%; padding: 12px; border: 2px solid \${isPrePopulated ? 'var(--primary)' : 'var(--border)'}; border-radius: 8px; font-size: 18px; font-weight: bold; background: var(--bg-secondary); \${prePopulatedStyle}">
               </div>
               <div>
-                <label style="font-size: 12px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Reps</label>
+                <label style="font-size: 12px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Reps\${isPrePopulated ? ' <span style="font-size: 10px; opacity: 0.7;">(from last workout)</span>' : ''}</label>
                 <input type="number" id="newSetReps" value="\${defaultReps}" placeholder="0" min="1"
-                  style="width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 18px; font-weight: bold; background: var(--bg-secondary); color: var(--text-primary);">
+                  style="width: 100%; padding: 12px; border: 2px solid \${isPrePopulated ? 'var(--primary)' : 'var(--border)'}; border-radius: 8px; font-size: 18px; font-weight: bold; background: var(--bg-secondary); \${prePopulatedStyle}">
               </div>
             </div>
             <button class="btn btn-primary" id="logSetButton" data-exercise-id="\${exercise.id}" style="width: 100%; padding: 14px; font-size: 16px;">
@@ -5647,14 +5653,25 @@ async function addSelectedExercises() {
       state.workoutModifications = { added: [], deleted: [] };
     }
     
-    // Get exercise names for the added exercises
+    // Get exercise names for the added exercises and fetch historical data
     if (result.exercises) {
-      result.exercises.forEach(ex => {
+      for (const ex of result.exercises) {
         state.workoutModifications.added.push({
           exercise_id: ex.exercise_id,
           name: ex.name
         });
-      });
+        
+        // Fetch historical data for newly added exercises
+        try {
+          const histData = await api(\`/workouts/exercises/\${ex.exercise_id}/last-set?currentWorkoutId=\${state.currentWorkout.id}\`);
+          if (histData.lastSet) {
+            if (!state.exerciseHistory) state.exerciseHistory = {};
+            state.exerciseHistory[ex.exercise_id] = histData.lastSet;
+          }
+        } catch (e) {
+          console.log(\`No history for added exercise \${ex.exercise_id}\`);
+        }
+      }
     }
     
     // Refresh workout data

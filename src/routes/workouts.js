@@ -199,12 +199,21 @@ workouts.post('/:id/complete', async (c) => {
     return c.json({ error: 'Workout not found' }, 404);
   }
 
-  // Generate AI recommendations
-  const ai = c.env.AI;
-  await getAIRecommendations(db, ai, user.id, workoutId);
+  // Generate AI recommendations (non-blocking, don't fail workout completion)
+  try {
+    const ai = c.env.AI;
+    await getAIRecommendations(db, ai, user.id, workoutId);
+  } catch (error) {
+    console.error('Error generating AI recommendations:', error);
+  }
 
-  // Check and award achievements
-  const newAchievements = await checkAndAwardAchievements(db, user.id, workoutId);
+  // Check and award achievements (non-blocking)
+  let newAchievements = [];
+  try {
+    newAchievements = await checkAndAwardAchievements(db, user.id, workoutId);
+  } catch (error) {
+    console.error('Error checking achievements:', error);
+  }
 
   return c.json({ 
     workout, 
