@@ -104,8 +104,16 @@ function formatWeight(kg, system) {
   system = system || (state.user && state.user.measurement_system) || 'metric';
   if (system === 'imperial') {
     const lbs = kgToLbs(kg);
+    // For large totals (>1000), round to whole number for cleaner display
+    if (lbs >= 1000) {
+      return \`\${Math.round(lbs).toLocaleString()} lbs\`;
+    }
     // Show decimal only if it's not a whole number
     return lbs % 1 === 0 ? \`\${lbs} lbs\` : \`\${lbs.toFixed(1)} lbs\`;
+  }
+  // For large totals (>1000), round to whole number for cleaner display
+  if (kg >= 1000) {
+    return \`\${Math.round(kg).toLocaleString()} kg\`;
   }
   // Show decimal only if it's not a whole number
   return kg % 1 === 0 ? \`\${kg} kg\` : \`\${parseFloat(kg).toFixed(1)} kg\`;
