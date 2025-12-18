@@ -73,11 +73,14 @@ function applyTheme(theme) {
 
 // Measurement conversion utilities
 function kgToLbs(kg) {
-  return kg * 2.20462;
+  // Round to 1 decimal place for clean display values
+  return Math.round(kg * 2.20462 * 10) / 10;
 }
 
 function lbsToKg(lbs) {
-  return lbs / 2.20462;
+  // Round to 2 decimal places to eliminate floating-point drift
+  // This ensures clean round-trip conversion (lbs -> kg -> lbs)
+  return Math.round((lbs / 2.20462) * 100) / 100;
 }
 
 function cmToInches(cm) {
