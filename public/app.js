@@ -1976,7 +1976,8 @@ async function loadWorkoutInterface() {
 
     const totalSets = workout.exercises.reduce((sum, ex) => sum + (ex.sets?.length || 0), 0);
     const totalVolume = workout.exercises.reduce((sum, ex) => {
-      return sum + (ex.sets || []).reduce((exSum, set) => exSum + (set.weight_kg * set.reps), 0);
+      const multiplier = ex.is_unilateral ? 2 : 1;
+      return sum + (ex.sets || []).reduce((exSum, set) => exSum + (set.weight_kg * set.reps * multiplier), 0);
     }, 0);
 
     container.innerHTML = `
@@ -5753,7 +5754,8 @@ async function showWorkoutSummary() {
     // Calculate stats
     const totalSets = workout.exercises.reduce((sum, ex) => sum + (ex.sets?.length || 0), 0);
     const totalVolume = workout.exercises.reduce((sum, ex) => {
-      return sum + (ex.sets || []).reduce((exSum, set) => exSum + (set.weight_kg * set.reps), 0);
+      const multiplier = ex.is_unilateral ? 2 : 1;
+      return sum + (ex.sets || []).reduce((exSum, set) => exSum + (set.weight_kg * set.reps * multiplier), 0);
     }, 0);
     const duration = workout.total_duration_seconds || 0;
     
