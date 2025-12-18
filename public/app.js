@@ -4920,10 +4920,25 @@ function renderWorkoutExerciseTabs() {
 // Render exercise content with set table
 function renderExerciseContent(exercise, index) {
   const system = (state.user && state.user.measurement_system) || 'metric';
-  const weightUnit = system === 'imperial' ? 'lbs' : 'kg';
+  const isImperial = system === 'imperial';
+  const weightUnit = isImperial ? 'lbs' : 'kg';
   const completedSets = (exercise.sets || []).length;
   const targetSets = exercise.target_sets || 3;
   const showNewSetRow = completedSets < targetSets && completedSets < 10;
+  
+  // Pre-populate from last set
+  const lastSet = exercise.sets && exercise.sets.length > 0 ? exercise.sets[exercise.sets.length - 1] : null;
+  let defaultWeight = '';
+  let defaultReps = exercise.target_reps || '';
+  if (lastSet) {
+    if (lastSet.weight_kg) {
+      const weightValue = isImperial ? kgToLbs(lastSet.weight_kg) : lastSet.weight_kg;
+      defaultWeight = weightValue % 1 === 0 ? String(weightValue) : weightValue.toFixed(1);
+    }
+    if (lastSet.reps) {
+      defaultReps = lastSet.reps;
+    }
+  }
   
   return `
     <!-- Exercise Header -->
@@ -5014,7 +5029,9 @@ function renderExerciseContent(exercise, index) {
               </div>
             </div>
             <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="color: var(--secondary); font-size: 20px;"><i class="fas fa-check-circle"></i></span>
+              <button class="btn btn-outline" onclick="editSet(${exercise.id}, ${set.id}, ${set.weight_kg || 0}, ${set.reps || 0})" style="padding: 6px 10px; font-size: 12px; color: var(--primary); border-color: var(--primary);">
+                <i class="fas fa-pencil-alt"></i>
+              </button>
               <button class="btn btn-outline" data-delete-set="true" data-exercise-id="${exercise.id}" data-set-id="${set.id}" style="padding: 6px 10px; font-size: 12px; color: var(--danger); border-color: var(--danger);">
                 <i class="fas fa-trash"></i>
               </button>
@@ -5034,12 +5051,12 @@ function renderExerciseContent(exercise, index) {
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
               <div>
                 <label style="font-size: 12px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Weight (${weightUnit})</label>
-                <input type="number" id="newSetWeight" placeholder="0" step="${system === 'imperial' ? '5' : '2.5'}" 
+                <input type="number" id="newSetWeight" value="${defaultWeight}" placeholder="0" step="${isImperial ? '5' : '2.5'}" 
                   style="width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 18px; font-weight: bold; background: var(--bg-secondary); color: var(--text-primary);">
               </div>
               <div>
                 <label style="font-size: 12px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Reps</label>
-                <input type="number" id="newSetReps" placeholder="0" min="1"
+                <input type="number" id="newSetReps" value="${defaultReps}" placeholder="0" min="1"
                   style="width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 18px; font-weight: bold; background: var(--bg-secondary); color: var(--text-primary);">
               </div>
             </div>
