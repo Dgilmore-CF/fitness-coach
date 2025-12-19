@@ -4826,6 +4826,11 @@ async function resumeWorkoutModal() {
     const data = await api(`/workouts/${state.currentWorkout.id}`);
     state.currentWorkout = data.workout;
     
+    // Fetch historical data if not already loaded
+    if (!state.exerciseHistory || Object.keys(state.exerciseHistory).length === 0) {
+      await fetchHistoricalExerciseData();
+    }
+    
     // Start workout timer if not already started (use workout's actual start_time)
     if (!state.workoutTimer) {
       startWorkoutTimer(state.currentWorkout);
@@ -5247,15 +5252,16 @@ function renderExerciseContent(exercise, index) {
               </div>
               <div style="font-weight: 600; color: var(--text-primary);">Log Next Set</div>
             </div>
+            ${hasHistoricalData ? '<div style="font-size: 11px; color: var(--primary); margin-bottom: 8px; text-align: center;"><i class="fas fa-history"></i> Pre-filled from last workout</div>' : ''}
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
               <div>
-                <label style="font-size: 12px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Weight (${weightUnit})${hasHistoricalData ? ' <span style="font-size: 10px; opacity: 0.7;">(from last workout)</span>' : ''}</label>
+                <label style="font-size: 12px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Weight (${weightUnit})</label>
                 <input type="number" id="newSetWeight" value="${defaultWeight}" placeholder="0" step="${isImperial ? '5' : '2.5'}" 
                   data-prepopulated="${hasHistoricalData}"
                   style="width: 100%; padding: 12px; border: 2px solid ${hasHistoricalData ? 'var(--primary)' : 'var(--border)'}; border-radius: 8px; font-size: 18px; font-weight: bold; background: var(--bg-secondary); ${inputTextStyle}">
               </div>
               <div>
-                <label style="font-size: 12px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Reps${hasHistoricalData ? ' <span style="font-size: 10px; opacity: 0.7;">(from last workout)</span>' : ''}</label>
+                <label style="font-size: 12px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Reps</label>
                 <input type="number" id="newSetReps" value="${defaultReps}" placeholder="0" min="1"
                   data-prepopulated="${hasHistoricalData}"
                   style="width: 100%; padding: 12px; border: 2px solid ${hasHistoricalData ? 'var(--primary)' : 'var(--border)'}; border-radius: 8px; font-size: 18px; font-weight: bold; background: var(--bg-secondary); ${inputTextStyle}">
