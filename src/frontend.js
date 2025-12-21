@@ -5807,7 +5807,7 @@ async function showWorkoutSummary() {
           </div>
           <div class="card" style="text-align: center; padding: 16px;">
             <div style="font-size: 12px; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 4px;">Volume</div>
-            <div style="font-size: clamp(20px, 5vw, 32px); font-weight: bold; color: var(--primary);">\${Math.round(totalVolume)}kg</div>
+            <div style="font-size: clamp(20px, 5vw, 32px); font-weight: bold; color: var(--primary);">\${formatWeight(totalVolume)}</div>
           </div>
         </div>
         
