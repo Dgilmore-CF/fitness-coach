@@ -31,6 +31,9 @@ function getIndexHTML() {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Fitness Coach</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
@@ -386,6 +389,81 @@ function getIndexHTML() {
             margin-bottom: 6px;
             font-weight: 600;
             color: var(--dark);
+        }
+        
+        .equipment-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 8px;
+            padding: 12px;
+            background: var(--light);
+            border-radius: 8px;
+        }
+        
+        .equipment-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 6px 8px;
+            border-radius: 6px;
+            transition: background 0.2s;
+        }
+        
+        .equipment-checkbox:hover {
+            background: var(--border);
+        }
+        
+        .equipment-checkbox input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+        }
+        
+        .progress-comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+        
+        .progress-comparison-card {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+        
+        .progress-comparison-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        
+        .progress-comparison-values {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            margin-bottom: 8px;
+        }
+        
+        .progress-comparison-current {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        
+        .progress-comparison-previous {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        
+        .progress-comparison-change {
+            font-size: 14px;
         }
         
         .form-group input,
@@ -889,6 +967,30 @@ function getIndexHTML() {
                 padding: 8px;
             }
             
+            .equipment-grid {
+                grid-template-columns: 1fr;
+                gap: 6px;
+                padding: 10px;
+            }
+            
+            .equipment-checkbox {
+                font-size: 13px;
+                padding: 8px 10px;
+            }
+            
+            .progress-comparison-grid {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+            
+            .progress-comparison-card {
+                padding: 14px;
+            }
+            
+            .progress-comparison-current {
+                font-size: 18px;
+            }
+            
             .header {
                 padding: 16px;
                 border-radius: 12px;
@@ -1082,7 +1184,7 @@ function getIndexHTML() {
                 <i class="fas fa-chart-line"></i> Analytics
             </button>
             <button class="tab" onclick="switchTab('insights')">
-                <i class="fas fa-brain"></i> AI Insights
+                <i class="fas fa-robot"></i> AI Coach
             </button>
             <button class="tab" onclick="switchTab('achievements')">
                 <i class="fas fa-trophy"></i> Achievements

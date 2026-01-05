@@ -118,6 +118,24 @@ workouts.post('/', async (c) => {
 
   // If program day specified, copy exercises from program
   if (program_day_id) {
+    // Get the user's last completed workout for this program day to use their customized set counts
+    const lastWorkout = await db.prepare(
+      `SELECT id FROM workouts 
+       WHERE user_id = ? AND program_day_id = ? AND completed = 1 
+       ORDER BY end_time DESC LIMIT 1`
+    ).bind(user.id, program_day_id).first();
+    
+    // Get target_sets from last workout if available
+    let lastWorkoutSets = {};
+    if (lastWorkout) {
+      const lastExercises = await db.prepare(
+        `SELECT exercise_id, target_sets FROM workout_exercises WHERE workout_id = ?`
+      ).bind(lastWorkout.id).all();
+      for (const ex of lastExercises.results || []) {
+        lastWorkoutSets[ex.exercise_id] = ex.target_sets;
+      }
+    }
+    
     const programExercises = await db.prepare(
       `SELECT pe.*, e.id as exercise_id
        FROM program_exercises pe
@@ -128,14 +146,97 @@ workouts.post('/', async (c) => {
 
     for (let i = 0; i < programExercises.results.length; i++) {
       const pe = programExercises.results[i];
+      // Use target_sets from last workout if available, otherwise use program default
+      const targetSets = lastWorkoutSets[pe.exercise_id] || pe.target_sets || 3;
       await db.prepare(
-        `INSERT INTO workout_exercises (workout_id, exercise_id, program_exercise_id, order_index)
-         VALUES (?, ?, ?, ?)`
-      ).bind(workout.id, pe.exercise_id, pe.id, i).run();
+        `INSERT INTO workout_exercises (workout_id, exercise_id, program_exercise_id, order_index, target_sets)
+         VALUES (?, ?, ?, ?, ?)`
+      ).bind(workout.id, pe.exercise_id, pe.id, i, targetSets).run();
     }
   }
 
   return c.json({ workout, message: 'Workout started' });
+});
+
+// Record cardio workout session
+workouts.post('/cardio', async (c) => {
+  const user = requireAuth(c);
+  const body = await c.req.json();
+  const { 
+    program_id, 
+    program_day_id, 
+    activity_type, 
+    duration_minutes, 
+    distance_km, 
+    avg_heart_rate, 
+    calories_burned,
+    intensity,
+    notes 
+  } = body;
+  const db = c.env.DB;
+
+  if (!duration_minutes || duration_minutes < 1) {
+    return c.json({ error: 'Duration is required' }, 400);
+  }
+
+  // Create a cardio workout record
+  const workout = await db.prepare(
+    `INSERT INTO workouts (
+      user_id, program_id, program_day_id, start_time, end_time,
+      total_duration_seconds, total_weight_kg, completed, notes, perceived_exertion
+    ) VALUES (?, ?, ?, datetime('now', '-' || ? || ' minutes'), CURRENT_TIMESTAMP, ?, 0, 1, ?, ?)
+    RETURNING *`
+  ).bind(
+    user.id, 
+    program_id || null, 
+    program_day_id || null, 
+    duration_minutes,
+    duration_minutes * 60,
+    notes || null,
+    intensity === 'high' ? 8 : intensity === 'moderate' ? 5 : 3
+  ).first();
+
+  // Store cardio session details in a separate table or as JSON in notes
+  // For now, we'll store as a cardio_sessions record if table exists
+  try {
+    await db.prepare(
+      `INSERT INTO cardio_sessions (
+        workout_id, activity_type, duration_minutes, distance_km, 
+        avg_heart_rate, calories_burned, intensity
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).bind(
+      workout.id,
+      activity_type,
+      duration_minutes,
+      distance_km || null,
+      avg_heart_rate || null,
+      calories_burned || null,
+      intensity
+    ).run();
+  } catch (e) {
+    // Table might not exist, that's okay - the workout is still recorded
+    console.log('Cardio sessions table not available, workout still recorded');
+  }
+
+  // Check for achievements
+  try {
+    await checkAndAwardAchievements(db, user.id, workout.id);
+  } catch (e) {
+    console.error('Error checking achievements:', e);
+  }
+
+  return c.json({ 
+    workout, 
+    message: 'Cardio session recorded',
+    cardio: {
+      activity_type,
+      duration_minutes,
+      distance_km,
+      avg_heart_rate,
+      calories_burned,
+      intensity
+    }
+  });
 });
 
 // Update workout
@@ -494,6 +595,43 @@ workouts.put('/:workoutId/exercises/:exerciseId/notes', async (c) => {
   }
 
   return c.json({ workout_exercise: workoutExercise });
+});
+
+// Reorder exercises within a workout
+workouts.patch('/:workoutId/reorder', async (c) => {
+  const user = requireAuth(c);
+  const workoutId = c.req.param('workoutId');
+  const db = c.env.DB;
+
+  try {
+    const body = await c.req.json();
+    const { exerciseOrders } = body; // Array of { id, order_index }
+
+    if (!exerciseOrders || !Array.isArray(exerciseOrders)) {
+      return c.json({ error: 'exerciseOrders array is required' }, 400);
+    }
+
+    // Verify workout belongs to user
+    const workout = await db.prepare(
+      'SELECT * FROM workouts WHERE id = ? AND user_id = ?'
+    ).bind(workoutId, user.id).first();
+
+    if (!workout) {
+      return c.json({ error: 'Workout not found' }, 404);
+    }
+
+    // Update order_index for each exercise
+    for (const item of exerciseOrders) {
+      await db.prepare(
+        'UPDATE workout_exercises SET order_index = ? WHERE id = ? AND workout_id = ?'
+      ).bind(item.order_index, item.id, workoutId).run();
+    }
+
+    return c.json({ success: true, message: 'Exercise order updated' });
+  } catch (error) {
+    console.error('Error reordering workout exercises:', error);
+    return c.json({ error: 'Failed to reorder exercises' }, 500);
+  }
 });
 
 // Delete workout

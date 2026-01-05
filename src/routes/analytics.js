@@ -1,5 +1,14 @@
 import { Hono } from 'hono';
 import { requireAuth } from '../middleware/auth';
+import { 
+  analyzeConsistency, 
+  analyzeMuscleBalance, 
+  calculateRecoveryScore,
+  generateStrengthPredictions,
+  generateVolumePredictions,
+  getAIWorkoutInsights,
+  estimateTimeToGoal
+} from '../services/advanced-analytics';
 
 const analytics = new Hono();
 
@@ -103,6 +112,102 @@ analytics.get('/1rm', async (c) => {
   return c.json({ one_rep_max_history: history.results });
 });
 
+// Get exercise history with progression data for charts and history table
+analytics.get('/exercise-history/:exerciseId', async (c) => {
+  const user = requireAuth(c);
+  const exerciseId = c.req.param('exerciseId');
+  const db = c.env.DB;
+
+  // Get exercise details
+  const exercise = await db.prepare(
+    'SELECT * FROM exercises WHERE id = ?'
+  ).bind(exerciseId).first();
+
+  if (!exercise) {
+    return c.json({ error: 'Exercise not found' }, 404);
+  }
+
+  // Get all sets for this exercise grouped by workout date
+  const setsHistory = await db.prepare(`
+    SELECT 
+      w.id as workout_id,
+      date(w.start_time) as workout_date,
+      w.start_time,
+      s.set_number,
+      s.weight_kg,
+      s.reps,
+      s.one_rep_max_kg,
+      s.rpe
+    FROM sets s
+    JOIN workout_exercises we ON s.workout_exercise_id = we.id
+    JOIN workouts w ON we.workout_id = w.id
+    WHERE we.exercise_id = ? AND w.user_id = ? AND w.completed = 1
+    ORDER BY w.start_time DESC, s.set_number ASC
+    LIMIT 500
+  `).bind(exerciseId, user.id).all();
+
+  // Get progression data (best set per workout for charting)
+  const progressionData = await db.prepare(`
+    SELECT 
+      date(w.start_time) as workout_date,
+      MAX(s.weight_kg) as max_weight,
+      MAX(s.one_rep_max_kg) as max_1rm,
+      MAX(s.reps) as max_reps,
+      SUM(s.weight_kg * s.reps) as total_volume,
+      COUNT(s.id) as set_count
+    FROM sets s
+    JOIN workout_exercises we ON s.workout_exercise_id = we.id
+    JOIN workouts w ON we.workout_id = w.id
+    WHERE we.exercise_id = ? AND w.user_id = ? AND w.completed = 1
+    GROUP BY date(w.start_time)
+    ORDER BY workout_date ASC
+  `).bind(exerciseId, user.id).all();
+
+  // Get personal records
+  const pr = await db.prepare(`
+    SELECT 
+      MAX(s.weight_kg) as max_weight,
+      MAX(s.one_rep_max_kg) as max_1rm,
+      MAX(s.reps) as max_reps
+    FROM sets s
+    JOIN workout_exercises we ON s.workout_exercise_id = we.id
+    JOIN workouts w ON we.workout_id = w.id
+    WHERE we.exercise_id = ? AND w.user_id = ? AND w.completed = 1
+  `).bind(exerciseId, user.id).first();
+
+  // Group sets by workout date for the history table
+  const historyByDate = {};
+  for (const set of setsHistory.results) {
+    const date = set.workout_date;
+    if (!historyByDate[date]) {
+      historyByDate[date] = {
+        date: date,
+        start_time: set.start_time,
+        sets: []
+      };
+    }
+    historyByDate[date].sets.push({
+      set_number: set.set_number,
+      weight_kg: set.weight_kg,
+      reps: set.reps,
+      one_rep_max_kg: set.one_rep_max_kg,
+      rpe: set.rpe
+    });
+  }
+
+  return c.json({
+    exercise: {
+      id: exercise.id,
+      name: exercise.name,
+      muscle_group: exercise.muscle_group,
+      equipment: exercise.equipment
+    },
+    personal_records: pr,
+    progression: progressionData.results,
+    history: Object.values(historyByDate)
+  });
+});
+
 // Get volume trends
 analytics.get('/volume', async (c) => {
   const user = requireAuth(c);
@@ -199,6 +304,120 @@ analytics.get('/bodymap', async (c) => {
   return c.json({ body_map: normalized });
 });
 
+// Get week-to-week and month-to-month progress comparison
+analytics.get('/progress-comparison', async (c) => {
+  const user = requireAuth(c);
+  const db = c.env.DB;
+
+  // Get date ranges for display
+  const dateRanges = await db.prepare(`
+    SELECT 
+      date('now', 'weekday 0', '-6 days') as this_week_start,
+      date('now') as this_week_end,
+      date('now', 'weekday 0', '-13 days') as last_week_start,
+      date('now', 'weekday 0', '-7 days') as last_week_end,
+      date('now', 'start of month') as this_month_start,
+      date('now') as this_month_end,
+      date('now', 'start of month', '-1 month') as last_month_start,
+      date('now', 'start of month', '-1 day') as last_month_end
+  `).first();
+
+  // This week vs last week
+  const thisWeek = await db.prepare(`
+    SELECT 
+      COUNT(*) as workout_count,
+      COALESCE(SUM(total_weight_kg), 0) as total_volume,
+      COALESCE(SUM(total_duration_seconds), 0) as total_time
+    FROM workouts
+    WHERE user_id = ? AND completed = 1 
+      AND start_time >= datetime('now', 'weekday 0', '-6 days')
+  `).bind(user.id).first();
+
+  const lastWeek = await db.prepare(`
+    SELECT 
+      COUNT(*) as workout_count,
+      COALESCE(SUM(total_weight_kg), 0) as total_volume,
+      COALESCE(SUM(total_duration_seconds), 0) as total_time
+    FROM workouts
+    WHERE user_id = ? AND completed = 1 
+      AND start_time >= datetime('now', 'weekday 0', '-13 days')
+      AND start_time < datetime('now', 'weekday 0', '-6 days')
+  `).bind(user.id).first();
+
+  // This month vs last month
+  const thisMonth = await db.prepare(`
+    SELECT 
+      COUNT(*) as workout_count,
+      COALESCE(SUM(total_weight_kg), 0) as total_volume,
+      COALESCE(SUM(total_duration_seconds), 0) as total_time
+    FROM workouts
+    WHERE user_id = ? AND completed = 1 
+      AND start_time >= datetime('now', 'start of month')
+  `).bind(user.id).first();
+
+  const lastMonth = await db.prepare(`
+    SELECT 
+      COUNT(*) as workout_count,
+      COALESCE(SUM(total_weight_kg), 0) as total_volume,
+      COALESCE(SUM(total_duration_seconds), 0) as total_time
+    FROM workouts
+    WHERE user_id = ? AND completed = 1 
+      AND start_time >= datetime('now', 'start of month', '-1 month')
+      AND start_time < datetime('now', 'start of month')
+  `).bind(user.id).first();
+
+  // Calculate percentage changes
+  const calcChange = (current, previous) => {
+    if (!previous || previous === 0) return current > 0 ? 100 : 0;
+    return ((current - previous) / previous) * 100;
+  };
+
+  return c.json({
+    weekly: {
+      current: {
+        workout_count: thisWeek.workout_count,
+        total_volume: thisWeek.total_volume,
+        total_time: thisWeek.total_time,
+        start_date: dateRanges.this_week_start,
+        end_date: dateRanges.this_week_end
+      },
+      previous: {
+        workout_count: lastWeek.workout_count,
+        total_volume: lastWeek.total_volume,
+        total_time: lastWeek.total_time,
+        start_date: dateRanges.last_week_start,
+        end_date: dateRanges.last_week_end
+      },
+      changes: {
+        workout_count: calcChange(thisWeek.workout_count, lastWeek.workout_count),
+        total_volume: calcChange(thisWeek.total_volume, lastWeek.total_volume),
+        total_time: calcChange(thisWeek.total_time, lastWeek.total_time)
+      }
+    },
+    monthly: {
+      current: {
+        workout_count: thisMonth.workout_count,
+        total_volume: thisMonth.total_volume,
+        total_time: thisMonth.total_time,
+        start_date: dateRanges.this_month_start,
+        end_date: dateRanges.this_month_end
+      },
+      previous: {
+        workout_count: lastMonth.workout_count,
+        total_volume: lastMonth.total_volume,
+        total_time: lastMonth.total_time,
+        start_date: dateRanges.last_month_start,
+        end_date: dateRanges.last_month_end
+      },
+      changes: {
+        workout_count: calcChange(thisMonth.workout_count, lastMonth.workout_count),
+        total_volume: calcChange(thisMonth.total_volume, lastMonth.total_volume),
+        total_time: calcChange(thisMonth.total_time, lastMonth.total_time)
+      }
+    }
+  });
+});
+
 // Get AI recommendations
 analytics.get('/recommendations', async (c) => {
   const user = requireAuth(c);
@@ -234,6 +453,240 @@ analytics.post('/recommendations/:id/respond', async (c) => {
   }
 
   return c.json({ recommendation });
+});
+
+// ============================================
+// ADVANCED ANALYTICS ENDPOINTS
+// ============================================
+
+// Get comprehensive advanced analytics dashboard
+analytics.get('/advanced', async (c) => {
+  const user = requireAuth(c);
+  const db = c.env.DB;
+  const ai = c.env.AI;
+
+  try {
+    // Get workout dates for consistency analysis
+    const workoutDatesResult = await db.prepare(`
+      SELECT date(start_time) as workout_date
+      FROM workouts
+      WHERE user_id = ? AND completed = 1
+      ORDER BY start_time DESC
+      LIMIT 100
+    `).bind(user.id).all();
+    
+    const workoutDates = (workoutDatesResult.results || []).map(w => w.workout_date).reverse();
+    const consistency = analyzeConsistency(workoutDates);
+
+    // Get volume by muscle for balance analysis
+    const volumeResult = await db.prepare(`
+      SELECT 
+        e.muscle_group,
+        SUM(CASE WHEN e.is_unilateral THEN s.weight_kg * s.reps * 2 ELSE s.weight_kg * s.reps END) as volume
+      FROM sets s
+      JOIN workout_exercises we ON s.workout_exercise_id = we.id
+      JOIN exercises e ON we.exercise_id = e.id
+      JOIN workouts w ON we.workout_id = w.id
+      WHERE w.user_id = ? AND w.completed = 1 AND w.start_time >= datetime('now', '-30 days')
+      GROUP BY e.muscle_group
+      ORDER BY volume DESC
+    `).bind(user.id).all();
+    
+    const muscleBalance = analyzeMuscleBalance(volumeResult.results || []);
+
+    // Get recent workouts for recovery analysis
+    const recentWorkoutsResult = await db.prepare(`
+      SELECT start_time, perceived_exertion, total_weight_kg
+      FROM workouts
+      WHERE user_id = ? AND completed = 1
+      ORDER BY start_time DESC
+      LIMIT 20
+    `).bind(user.id).all();
+    
+    const recovery = calculateRecoveryScore(recentWorkoutsResult.results || []);
+
+    // Get strength predictions
+    const strengthPredictions = await generateStrengthPredictions(db, user.id);
+
+    // Get volume predictions
+    const volumePredictions = await generateVolumePredictions(db, user.id);
+
+    // Prepare data for AI insights
+    const totalWorkouts = workoutDates.length;
+    const totalVolume = (volumeResult.results || []).reduce((sum, m) => sum + (m.volume || 0), 0);
+    const topMuscles = (volumeResult.results || []).slice(0, 3).map(m => m.muscle_group);
+    const bottomMuscles = (volumeResult.results || []).slice(-3).map(m => m.muscle_group);
+
+    // Get AI-powered insights
+    const aiInsights = await getAIWorkoutInsights(ai, {
+      totalWorkouts,
+      weeklyAverage: Math.round(totalWorkouts / 4.3 * 10) / 10,
+      totalVolume: Math.round(totalVolume),
+      topMuscles,
+      bottomMuscles,
+      consistency: consistency.consistency,
+      recoveryStatus: recovery.status,
+      currentStreak: consistency.currentStreak
+    });
+
+    return c.json({
+      consistency,
+      muscle_balance: muscleBalance,
+      recovery,
+      strength_predictions: strengthPredictions.slice(0, 10),
+      volume_predictions: volumePredictions,
+      ai_insights: aiInsights,
+      summary: {
+        total_workouts_analyzed: totalWorkouts,
+        total_volume_30_days: Math.round(totalVolume),
+        training_age_days: workoutDates.length > 0 
+          ? Math.round((new Date() - new Date(workoutDates[0])) / (1000 * 60 * 60 * 24))
+          : 0
+      }
+    });
+  } catch (error) {
+    console.error('Advanced analytics error:', error);
+    return c.json({ error: 'Failed to generate advanced analytics: ' + error.message }, 500);
+  }
+});
+
+// Get strength predictions for specific exercise or all
+analytics.get('/predictions/strength', async (c) => {
+  const user = requireAuth(c);
+  const db = c.env.DB;
+  const exerciseId = c.req.query('exercise_id');
+
+  try {
+    const predictions = await generateStrengthPredictions(db, user.id, exerciseId);
+    return c.json({ predictions });
+  } catch (error) {
+    console.error('Strength predictions error:', error);
+    return c.json({ error: 'Failed to generate predictions' }, 500);
+  }
+});
+
+// Get volume trend predictions
+analytics.get('/predictions/volume', async (c) => {
+  const user = requireAuth(c);
+  const db = c.env.DB;
+
+  try {
+    const predictions = await generateVolumePredictions(db, user.id);
+    return c.json(predictions);
+  } catch (error) {
+    console.error('Volume predictions error:', error);
+    return c.json({ error: 'Failed to generate volume predictions' }, 500);
+  }
+});
+
+// Calculate time to reach a strength goal
+analytics.get('/predictions/goal', async (c) => {
+  const user = requireAuth(c);
+  const db = c.env.DB;
+  const exerciseId = c.req.query('exercise_id');
+  const goalWeight = parseFloat(c.req.query('goal_weight') || '0');
+
+  if (!exerciseId || !goalWeight) {
+    return c.json({ error: 'exercise_id and goal_weight are required' }, 400);
+  }
+
+  try {
+    const predictions = await generateStrengthPredictions(db, user.id, exerciseId);
+    
+    if (predictions.length === 0) {
+      return c.json({ error: 'Not enough data for this exercise' }, 400);
+    }
+
+    const prediction = predictions[0];
+    const weeklyIncrease = prediction.weekly_increase || 0;
+    const estimate = estimateTimeToGoal(prediction.current_max, goalWeight, weeklyIncrease);
+
+    return c.json({
+      exercise: prediction.exercise_name,
+      current_max: prediction.current_max,
+      goal_weight: goalWeight,
+      ...estimate
+    });
+  } catch (error) {
+    console.error('Goal prediction error:', error);
+    return c.json({ error: 'Failed to calculate goal prediction' }, 500);
+  }
+});
+
+// Get workout consistency analysis
+analytics.get('/consistency', async (c) => {
+  const user = requireAuth(c);
+  const db = c.env.DB;
+
+  try {
+    const workoutDatesResult = await db.prepare(`
+      SELECT date(start_time) as workout_date
+      FROM workouts
+      WHERE user_id = ? AND completed = 1
+      ORDER BY start_time
+    `).bind(user.id).all();
+    
+    const workoutDates = (workoutDatesResult.results || []).map(w => w.workout_date);
+    const analysis = analyzeConsistency(workoutDates);
+
+    return c.json(analysis);
+  } catch (error) {
+    console.error('Consistency analysis error:', error);
+    return c.json({ error: 'Failed to analyze consistency' }, 500);
+  }
+});
+
+// Get muscle balance analysis
+analytics.get('/balance', async (c) => {
+  const user = requireAuth(c);
+  const db = c.env.DB;
+  const days = c.req.query('days') || 30;
+
+  try {
+    const volumeResult = await db.prepare(`
+      SELECT 
+        e.muscle_group,
+        SUM(CASE WHEN e.is_unilateral THEN s.weight_kg * s.reps * 2 ELSE s.weight_kg * s.reps END) as volume
+      FROM sets s
+      JOIN workout_exercises we ON s.workout_exercise_id = we.id
+      JOIN exercises e ON we.exercise_id = e.id
+      JOIN workouts w ON we.workout_id = w.id
+      WHERE w.user_id = ? AND w.completed = 1 AND w.start_time >= datetime('now', '-' || ? || ' days')
+      GROUP BY e.muscle_group
+      ORDER BY volume DESC
+    `).bind(user.id, days).all();
+    
+    const analysis = analyzeMuscleBalance(volumeResult.results || []);
+    analysis.volume_distribution = volumeResult.results;
+
+    return c.json(analysis);
+  } catch (error) {
+    console.error('Balance analysis error:', error);
+    return c.json({ error: 'Failed to analyze muscle balance' }, 500);
+  }
+});
+
+// Get recovery status
+analytics.get('/recovery', async (c) => {
+  const user = requireAuth(c);
+  const db = c.env.DB;
+
+  try {
+    const workoutsResult = await db.prepare(`
+      SELECT start_time, perceived_exertion, total_weight_kg
+      FROM workouts
+      WHERE user_id = ? AND completed = 1
+      ORDER BY start_time DESC
+      LIMIT 20
+    `).bind(user.id).all();
+    
+    const analysis = calculateRecoveryScore(workoutsResult.results || []);
+
+    return c.json(analysis);
+  } catch (error) {
+    console.error('Recovery analysis error:', error);
+    return c.json({ error: 'Failed to analyze recovery' }, 500);
+  }
 });
 
 export default analytics;

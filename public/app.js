@@ -243,7 +243,7 @@ function showMobileMoreMenu() {
   modalBody.innerHTML = `
     <div style="display: flex; flex-direction: column; gap: 8px;">
       <button class="btn btn-outline" onclick="closeModal(); switchTab('insights')" style="justify-content: flex-start; padding: 16px;">
-        <i class="fas fa-brain" style="width: 24px;"></i> AI Insights
+        <i class="fas fa-robot" style="width: 24px;"></i> AI Coach
       </button>
       <button class="btn btn-outline" onclick="closeModal(); switchTab('achievements')" style="justify-content: flex-start; padding: 16px;">
         <i class="fas fa-trophy" style="width: 24px;"></i> Achievements
@@ -475,56 +475,133 @@ async function viewProgram(programId) {
     const data = await api(`/programs/${programId}`);
     const program = data.program;
     
+    // Format creation date
+    const createdDate = program.created_at ? new Date(program.created_at).toLocaleDateString('en-US', {
+      year: 'numeric', month: 'short', day: 'numeric'
+    }) : 'Unknown';
+    
     const modalBody = document.getElementById('modalBody');
     modalBody.innerHTML = `
-      <h3>${program.name}</h3>
-      <p>${program.days_per_week} days per week | ${program.goal}</p>
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+        <h3 id="programNameDisplay" style="margin: 0;">${program.name}</h3>
+        <button class="btn btn-outline" onclick="showRenameProgramModal(${program.id}, '${program.name.replace(/'/g, "\\'")}')" style="padding: 6px 12px; font-size: 12px;">
+          <i class="fas fa-edit"></i> Rename
+        </button>
+      </div>
+      <p style="color: var(--gray); font-size: 13px; margin-bottom: 8px;">
+        <i class="fas fa-calendar"></i> Created ${createdDate} | ${program.days_per_week} days/week | ${program.goal}
+      </p>
       <p><em>${program.equipment}</em></p>
+      ${program.description ? `<p style="color: var(--text-secondary); margin-top: 8px; font-style: italic;">${program.description}</p>` : ''}
+      ${program.custom_instructions ? `
+        <div style="margin: 16px 0; padding: 12px 16px; background: linear-gradient(135deg, rgba(124, 58, 237, 0.1) 0%, rgba(91, 33, 182, 0.1) 100%); border-radius: 8px; border-left: 3px solid #7c3aed;">
+          <div style="font-size: 12px; color: #7c3aed; font-weight: 600; margin-bottom: 4px;">
+            <i class="fas fa-magic"></i> Custom Instructions Used
+          </div>
+          <div style="font-size: 14px; color: var(--text-primary);">${program.custom_instructions}</div>
+        </div>
+      ` : ''}
 
       ${program.days.map(day => `
         <div style="margin: 20px 0; padding: 20px; background: var(--light); border-radius: 12px;">
-          <h4 style="margin-bottom: 12px;">Day ${day.day_number}: ${day.name}</h4>
+          <h4 style="margin-bottom: 12px;">
+            Day ${day.day_number}: ${day.name}
+            ${day.is_cardio_day ? '<span style="background: linear-gradient(135deg, #ef4444 0%, #f97316 100%); color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; margin-left: 8px;"><i class="fas fa-heartbeat"></i> Cardio</span>' : ''}
+          </h4>
           <p style="color: var(--gray); margin-bottom: 16px; font-weight: 500;">${day.focus}</p>
           
-          <strong style="display: block; margin-bottom: 8px;">Warm-up Stretches:</strong>
-          <ul style="margin: 0 0 16px 20px; line-height: 1.8;">
-            ${day.stretches.map(s => `
-              <li>${s.name} - ${s.duration_seconds}s (${s.muscle_group})</li>
-            `).join('')}
-          </ul>
-
-          <strong style="display: block; margin-bottom: 8px;">Exercises:</strong>
-          <ol style="margin: 0 0 0 20px; line-height: 1.8;">
-            ${day.exercises.map(ex => `
-              <li style="margin-bottom: 16px;">
-                <div style="margin-bottom: 6px;">
-                  <strong style="font-size: 15px;">${ex.name}</strong> - ${ex.target_sets} sets x ${ex.target_reps} reps
-                </div>
-                <div style="font-size: 13px; color: var(--gray); margin-bottom: 8px;">
-                  Rest: ${ex.rest_seconds}s | ${ex.muscle_group} | ${ex.equipment}
-                </div>
-                ${ex.tips ? `
-                  <details style="margin-top: 8px; padding: 12px; background: var(--white); border-radius: 8px; border: 1px solid var(--border);">
-                    <summary style="cursor: pointer; color: var(--primary); font-weight: 600; font-size: 13px;">
-                      <i class="fas fa-info-circle"></i> Exercise Tips & Form Cues
-                    </summary>
-                    <div style="margin-top: 12px; font-size: 13px; line-height: 1.6; color: var(--dark);">
-                      ${ex.tips}
-                      <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
-                        <strong style="display: block; margin-bottom: 6px; color: var(--primary);">Key Points:</strong>
-                        <ul style="margin: 0 0 0 20px;">
-                          <li>Focus on controlled movement throughout the entire range of motion</li>
-                          <li>Maintain proper breathing: exhale on exertion, inhale on the negative</li>
-                          <li>Keep core engaged and maintain neutral spine alignment</li>
-                          <li>Use a weight that allows you to complete all reps with good form</li>
-                        </ul>
-                      </div>
+          ${day.is_cardio_day ? `
+            <!-- Cardio Day Content -->
+            <div style="margin-bottom: 16px;">
+              <strong style="display: block; margin-bottom: 12px; color: #ef4444;">
+                <i class="fas fa-fire"></i> Cardio Sessions
+              </strong>
+              <div style="display: flex; flex-direction: column; gap: 12px;">
+                ${(day.cardio_sessions || []).map((session, idx) => `
+                  <div style="background: ${session.heart_rate_zone <= 2 ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : session.heart_rate_zone <= 3 ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'}; color: white; padding: 16px; border-radius: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                      <strong style="font-size: 16px;">${session.name}</strong>
+                      <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 14px; font-weight: 600;">
+                        <i class="fas fa-clock"></i> ${session.duration_minutes} min
+                      </span>
                     </div>
-                  </details>
-                ` : ''}
-              </li>
-            `).join('')}
-          </ol>
+                    <div style="display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 8px;">
+                      <span style="font-size: 13px;">
+                        <i class="fas fa-heartbeat"></i> Zone ${session.heart_rate_zone}: ${session.zone_name || ''}
+                      </span>
+                    </div>
+                    <div style="font-size: 13px; opacity: 0.9; margin-bottom: 8px;">
+                      ${session.zone_description || ''}
+                    </div>
+                    ${session.activity_suggestions ? `
+                      <div style="font-size: 12px; background: rgba(255,255,255,0.15); padding: 8px 12px; border-radius: 6px; margin-top: 8px;">
+                        <i class="fas fa-lightbulb"></i> ${session.activity_suggestions}
+                      </div>
+                    ` : ''}
+                    ${session.interval_structure ? `
+                      <div style="font-size: 12px; background: rgba(255,255,255,0.15); padding: 8px 12px; border-radius: 6px; margin-top: 8px;">
+                        <i class="fas fa-stopwatch"></i> ${session.interval_structure}
+                      </div>
+                    ` : ''}
+                  </div>
+                `).join('')}
+              </div>
+              <div style="margin-top: 16px; padding: 12px; background: var(--white); border-radius: 8px; border: 1px solid var(--border);">
+                <strong style="display: block; margin-bottom: 8px; font-size: 13px; color: var(--gray);">
+                  <i class="fas fa-info-circle"></i> Heart Rate Zone Guide
+                </strong>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; font-size: 12px;">
+                  <div><span style="color: #10b981; font-weight: 600;">Zone 1-2:</span> 50-70% max HR - Recovery/Fat burn</div>
+                  <div><span style="color: #f59e0b; font-weight: 600;">Zone 3:</span> 70-80% max HR - Aerobic endurance</div>
+                  <div><span style="color: #ef4444; font-weight: 600;">Zone 4-5:</span> 80-100% max HR - Threshold/Maximum</div>
+                </div>
+                <div style="margin-top: 8px; font-size: 11px; color: var(--gray);">
+                  Max HR ≈ 220 - your age
+                </div>
+              </div>
+            </div>
+          ` : `
+            <!-- Strength Training Day Content -->
+            <strong style="display: block; margin-bottom: 8px;">Warm-up Stretches:</strong>
+            <ul style="margin: 0 0 16px 20px; line-height: 1.8;">
+              ${(day.stretches || []).map(s => `
+                <li>${s.name} - ${s.duration_seconds}s (${s.muscle_group})</li>
+              `).join('')}
+            </ul>
+
+            <strong style="display: block; margin-bottom: 8px;">Exercises:</strong>
+            <ol style="margin: 0 0 0 20px; line-height: 1.8;">
+              ${(day.exercises || []).map(ex => `
+                <li style="margin-bottom: 16px;">
+                  <div style="margin-bottom: 6px;">
+                    <strong style="font-size: 15px;">${ex.name}</strong> - ${ex.target_sets} sets x ${ex.target_reps} reps
+                  </div>
+                  <div style="font-size: 13px; color: var(--gray); margin-bottom: 8px;">
+                    Rest: ${ex.rest_seconds}s | ${ex.muscle_group} | ${ex.equipment}
+                  </div>
+                  ${ex.tips ? `
+                    <details style="margin-top: 8px; padding: 12px; background: var(--white); border-radius: 8px; border: 1px solid var(--border);">
+                      <summary style="cursor: pointer; color: var(--primary); font-weight: 600; font-size: 13px;">
+                        <i class="fas fa-info-circle"></i> Exercise Tips & Form Cues
+                      </summary>
+                      <div style="margin-top: 12px; font-size: 13px; line-height: 1.6; color: var(--dark);">
+                        ${ex.tips}
+                        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
+                          <strong style="display: block; margin-bottom: 6px; color: var(--primary);">Key Points:</strong>
+                          <ul style="margin: 0 0 0 20px;">
+                            <li>Focus on controlled movement throughout the entire range of motion</li>
+                            <li>Maintain proper breathing: exhale on exertion, inhale on the negative</li>
+                            <li>Keep core engaged and maintain neutral spine alignment</li>
+                            <li>Use a weight that allows you to complete all reps with good form</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </details>
+                  ` : ''}
+                </li>
+              `).join('')}
+            </ol>
+          `}
         </div>
       `).join('')}
 
@@ -1001,18 +1078,51 @@ function showGenerateProgram() {
     </div>
 
     <div class="form-group">
+      <label>Available Equipment:</label>
+      <div id="equipmentCheckboxes" class="equipment-grid">
+        <label class="equipment-checkbox">
+          <input type="checkbox" name="equipment" value="Smith Machine" checked> Smith Machine
+        </label>
+        <label class="equipment-checkbox">
+          <input type="checkbox" name="equipment" value="Olympic Bar" checked> Olympic Bar
+        </label>
+        <label class="equipment-checkbox">
+          <input type="checkbox" name="equipment" value="Cable Trainer" checked> Cable Machine
+        </label>
+        <label class="equipment-checkbox">
+          <input type="checkbox" name="equipment" value="Leg Extension/Curl" checked> Leg Ext/Curl
+        </label>
+        <label class="equipment-checkbox">
+          <input type="checkbox" name="equipment" value="Pull-up Bar"> Pull-up Bar
+        </label>
+        <label class="equipment-checkbox">
+          <input type="checkbox" name="equipment" value="Landmine"> Landmine
+        </label>
+        <label class="equipment-checkbox">
+          <input type="checkbox" name="equipment" value="Dip Bars"> Dip Bars
+        </label>
+        <label class="equipment-checkbox">
+          <input type="checkbox" name="equipment" value="Rower"> Rower
+        </label>
+        <label class="equipment-checkbox">
+          <input type="checkbox" name="equipment" value="Treadmill"> Treadmill
+        </label>
+        <label class="equipment-checkbox">
+          <input type="checkbox" name="equipment" value="Stationary Bike"> Bike
+        </label>
+      </div>
+      <small style="color: var(--gray); font-size: 12px; margin-top: 8px; display: block;">Equipment exercises prioritized over bodyweight</small>
+    </div>
+
+    <div class="form-group">
       <label>Custom Instructions (optional):</label>
       <textarea id="customInstructions" class="form-control" rows="3" 
-        placeholder="E.g., Include a cardio day, add core exercises to each day, focus on upper body, include HIIT sessions..."
+        placeholder="E.g., Include 2 push days, 2 pull days, 1 leg day, and a cardio day. Include core workouts on relevant days."
         style="resize: vertical; min-height: 80px;"></textarea>
       <small style="color: var(--gray); font-size: 12px;">Tell the AI any specific preferences for your program</small>
     </div>
 
-    <p style="font-size: 14px; color: var(--gray); margin: 16px 0;">
-      AI will generate a personalized program based on your profile and available equipment.
-    </p>
-
-    <button class="btn btn-primary" onclick="generateProgram()">
+    <button class="btn btn-primary" onclick="generateProgram()" style="margin-top: 16px;">
       <i class="fas fa-magic"></i> Generate Program
     </button>
   `;
@@ -1026,6 +1136,10 @@ async function generateProgram() {
   const days = document.getElementById('daysPerWeek').value;
   const goal = document.getElementById('programGoal').value;
   const customInstructions = document.getElementById('customInstructions')?.value || '';
+  
+  // Collect selected equipment
+  const equipmentCheckboxes = document.querySelectorAll('input[name="equipment"]:checked');
+  const available_equipment = Array.from(equipmentCheckboxes).map(cb => cb.value);
 
   // Show loading state in modal
   const modalBody = document.getElementById('modalBody');
@@ -1060,7 +1174,8 @@ async function generateProgram() {
       body: JSON.stringify({
         days_per_week: parseInt(days),
         goal,
-        custom_instructions: customInstructions
+        custom_instructions: customInstructions,
+        available_equipment
       })
     });
 
@@ -1211,7 +1326,19 @@ async function startWorkoutDay(programId, programDayId) {
   try {
     showLoadingOverlay('Starting your workout...');
     
-    // Create the workout
+    // First check if this is a cardio day by fetching program details
+    const programData = await api(`/programs/${programId}`);
+    const programDay = programData.program.days.find(d => d.id === programDayId);
+    
+    // If it's a cardio day, show cardio workout interface instead
+    if (programDay && programDay.is_cardio_day) {
+      hideLoadingOverlay();
+      closeModal();
+      showCardioWorkoutInterface(programDay, programId);
+      return;
+    }
+    
+    // Create the workout for strength training days
     const data = await api('/workouts', {
       method: 'POST',
       body: JSON.stringify({
@@ -1234,6 +1361,268 @@ async function startWorkoutDay(programId, programDayId) {
     hideLoadingOverlay();
     showNotification('Error starting workout: ' + error.message, 'error');
     console.error('Start workout error:', error);
+  }
+}
+
+// Cardio Workout Interface
+function showCardioWorkoutInterface(programDay, programId) {
+  const cardioSessions = programDay.cardio_sessions || [];
+  
+  // Create full-screen modal for cardio
+  const modal = document.createElement('div');
+  modal.id = 'cardio-workout-modal';
+  modal.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--bg-secondary);
+    z-index: 10000;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  `;
+  
+  // Prevent background scrolling
+  document.body.style.overflow = 'hidden';
+  document.body.style.position = 'fixed';
+  document.body.style.width = '100%';
+  document.body.style.top = `-${window.scrollY}px`;
+  
+  // Start timer
+  const startTime = Date.now();
+  
+  modal.innerHTML = `
+    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+      <!-- Header -->
+      <div style="background: linear-gradient(135deg, #ef4444 0%, #f97316 100%); border-radius: 16px; padding: 24px; color: white; margin-bottom: 24px; text-align: center;">
+        <div style="width: 70px; height: 70px; background: rgba(255,255,255,0.2); border-radius: 50%; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center;">
+          <i class="fas fa-heartbeat" style="font-size: 32px;"></i>
+        </div>
+        <h1 style="margin: 0 0 8px 0; font-size: 24px; color: white;">${programDay.name}</h1>
+        <p style="margin: 0; opacity: 0.9;">${programDay.focus}</p>
+        <div id="cardio-timer" style="font-size: 32px; font-weight: bold; margin-top: 16px; font-family: monospace;">00:00:00</div>
+      </div>
+      
+      <!-- Planned Sessions -->
+      ${cardioSessions.length > 0 ? `
+        <div class="card" style="margin-bottom: 20px;">
+          <h3 style="margin: 0 0 16px 0;"><i class="fas fa-list-check" style="color: #ef4444;"></i> Planned Sessions</h3>
+          <div style="display: grid; gap: 12px;">
+            ${cardioSessions.map((session, idx) => `
+              <div style="background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 10px; padding: 14px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div>
+                    <strong>${session.name}</strong>
+                    <div style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">
+                      ${session.duration_minutes} min • Zone ${session.target_hr_zone || 'N/A'}
+                    </div>
+                  </div>
+                  <span style="background: ${session.target_hr_zone <= 2 ? '#22c55e' : session.target_hr_zone <= 3 ? '#f59e0b' : '#ef4444'}; color: white; padding: 4px 10px; border-radius: 12px; font-size: 12px;">
+                    ${session.intensity || 'Moderate'}
+                  </span>
+                </div>
+                ${session.notes ? `<p style="margin: 8px 0 0 0; font-size: 13px; color: var(--text-secondary);">${session.notes}</p>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+      
+      <!-- Record Cardio Form -->
+      <div class="card" style="margin-bottom: 20px;">
+        <h3 style="margin: 0 0 16px 0;"><i class="fas fa-edit" style="color: var(--primary);"></i> Record Your Session</h3>
+        
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label style="display: block; margin-bottom: 6px; font-weight: 500;">Activity Type</label>
+          <select id="cardio-activity-type" class="form-control">
+            <option value="running">🏃 Running</option>
+            <option value="cycling">🚴 Cycling</option>
+            <option value="rowing">🚣 Rowing</option>
+            <option value="elliptical">⭕ Elliptical</option>
+            <option value="stairmaster">🪜 Stair Climber</option>
+            <option value="swimming">🏊 Swimming</option>
+            <option value="walking">🚶 Walking</option>
+            <option value="hiit">⚡ HIIT</option>
+            <option value="jump_rope">🪢 Jump Rope</option>
+            <option value="other">📋 Other</option>
+          </select>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+          <div class="form-group" style="margin: 0;">
+            <label style="display: block; margin-bottom: 6px; font-weight: 500;">Duration (min)</label>
+            <input type="number" id="cardio-duration" class="form-control" placeholder="30" min="1" value="">
+          </div>
+          <div class="form-group" style="margin: 0;">
+            <label style="display: block; margin-bottom: 6px; font-weight: 500;">Distance (optional)</label>
+            <input type="number" id="cardio-distance" class="form-control" placeholder="km or mi" step="0.1" min="0">
+          </div>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+          <div class="form-group" style="margin: 0;">
+            <label style="display: block; margin-bottom: 6px; font-weight: 500;">Avg Heart Rate (bpm)</label>
+            <input type="number" id="cardio-heart-rate" class="form-control" placeholder="140" min="40" max="220">
+          </div>
+          <div class="form-group" style="margin: 0;">
+            <label style="display: block; margin-bottom: 6px; font-weight: 500;">Calories Burned</label>
+            <input type="number" id="cardio-calories" class="form-control" placeholder="300" min="0">
+          </div>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label style="display: block; margin-bottom: 6px; font-weight: 500;">Intensity</label>
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
+            <label class="cardio-intensity-option" style="display: flex; flex-direction: column; align-items: center; padding: 12px; border: 2px solid var(--border); border-radius: 10px; cursor: pointer; transition: all 0.2s;">
+              <input type="radio" name="cardio-intensity" value="low" style="display: none;">
+              <span style="font-size: 24px; margin-bottom: 4px;">😊</span>
+              <span style="font-size: 12px;">Low</span>
+            </label>
+            <label class="cardio-intensity-option" style="display: flex; flex-direction: column; align-items: center; padding: 12px; border: 2px solid var(--border); border-radius: 10px; cursor: pointer; transition: all 0.2s;">
+              <input type="radio" name="cardio-intensity" value="moderate" checked style="display: none;">
+              <span style="font-size: 24px; margin-bottom: 4px;">💪</span>
+              <span style="font-size: 12px;">Moderate</span>
+            </label>
+            <label class="cardio-intensity-option" style="display: flex; flex-direction: column; align-items: center; padding: 12px; border: 2px solid var(--border); border-radius: 10px; cursor: pointer; transition: all 0.2s;">
+              <input type="radio" name="cardio-intensity" value="high" style="display: none;">
+              <span style="font-size: 24px; margin-bottom: 4px;">🔥</span>
+              <span style="font-size: 12px;">High</span>
+            </label>
+          </div>
+        </div>
+        
+        <div class="form-group" style="margin: 0;">
+          <label style="display: block; margin-bottom: 6px; font-weight: 500;">Notes (optional)</label>
+          <textarea id="cardio-notes" class="form-control" rows="2" placeholder="How did the session feel?"></textarea>
+        </div>
+      </div>
+      
+      <!-- Actions -->
+      <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <button class="btn btn-outline" onclick="cancelCardioWorkout()" style="flex: 1; min-width: 120px;">
+          <i class="fas fa-times"></i> Cancel
+        </button>
+        <button class="btn btn-primary" onclick="saveCardioWorkout(${programId}, ${programDay.id})" style="flex: 2; min-width: 200px; background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);">
+          <i class="fas fa-check"></i> Complete Cardio Session
+        </button>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+  
+  // Start timer update
+  window.cardioTimerInterval = setInterval(() => {
+    const elapsed = Date.now() - startTime;
+    const hours = Math.floor(elapsed / 3600000);
+    const minutes = Math.floor((elapsed % 3600000) / 60000);
+    const seconds = Math.floor((elapsed % 60000) / 1000);
+    document.getElementById('cardio-timer').textContent = 
+      `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  }, 1000);
+  
+  // Store start time for duration calculation
+  window.cardioStartTime = startTime;
+  
+  // Add intensity selection styling
+  setTimeout(() => {
+    document.querySelectorAll('.cardio-intensity-option').forEach(option => {
+      const radio = option.querySelector('input[type="radio"]');
+      if (radio.checked) {
+        option.style.borderColor = 'var(--primary)';
+        option.style.background = 'var(--primary-light)';
+      }
+      option.addEventListener('click', () => {
+        document.querySelectorAll('.cardio-intensity-option').forEach(o => {
+          o.style.borderColor = 'var(--border)';
+          o.style.background = 'transparent';
+        });
+        option.style.borderColor = 'var(--primary)';
+        option.style.background = 'var(--primary-light)';
+      });
+    });
+  }, 100);
+}
+
+// Cancel cardio workout
+function cancelCardioWorkout() {
+  if (window.cardioTimerInterval) {
+    clearInterval(window.cardioTimerInterval);
+  }
+  const modal = document.getElementById('cardio-workout-modal');
+  if (modal) {
+    modal.remove();
+  }
+  // Restore scrolling
+  const scrollY = document.body.style.top;
+  document.body.style.overflow = '';
+  document.body.style.position = '';
+  document.body.style.width = '';
+  document.body.style.top = '';
+  window.scrollTo(0, parseInt(scrollY || '0') * -1);
+}
+
+// Save cardio workout
+async function saveCardioWorkout(programId, programDayId) {
+  try {
+    const activityType = document.getElementById('cardio-activity-type').value;
+    const duration = document.getElementById('cardio-duration').value;
+    const distance = document.getElementById('cardio-distance').value;
+    const heartRate = document.getElementById('cardio-heart-rate').value;
+    const calories = document.getElementById('cardio-calories').value;
+    const intensity = document.querySelector('input[name="cardio-intensity"]:checked')?.value || 'moderate';
+    const notes = document.getElementById('cardio-notes').value;
+    
+    // Calculate duration from timer if not entered
+    const actualDuration = duration || Math.round((Date.now() - window.cardioStartTime) / 60000);
+    
+    if (!actualDuration || actualDuration < 1) {
+      showNotification('Please enter a duration', 'error');
+      return;
+    }
+    
+    // Save cardio session
+    const response = await api('/workouts/cardio', {
+      method: 'POST',
+      body: JSON.stringify({
+        program_id: programId,
+        program_day_id: programDayId,
+        activity_type: activityType,
+        duration_minutes: parseInt(actualDuration),
+        distance_km: distance ? parseFloat(distance) : null,
+        avg_heart_rate: heartRate ? parseInt(heartRate) : null,
+        calories_burned: calories ? parseInt(calories) : null,
+        intensity: intensity,
+        notes: notes || null
+      })
+    });
+    
+    // Stop timer
+    if (window.cardioTimerInterval) {
+      clearInterval(window.cardioTimerInterval);
+    }
+    
+    // Close modal
+    const modal = document.getElementById('cardio-workout-modal');
+    if (modal) {
+      modal.remove();
+    }
+    
+    // Restore scrolling
+    const scrollY = document.body.style.top;
+    document.body.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.width = '';
+    document.body.style.top = '';
+    window.scrollTo(0, parseInt(scrollY || '0') * -1);
+    
+    showNotification('Cardio session recorded!', 'success');
+    switchTab('analytics');
+    
+  } catch (error) {
+    showNotification('Error saving cardio: ' + error.message, 'error');
+    console.error('Save cardio error:', error);
   }
 }
 
@@ -1472,10 +1861,18 @@ function renderWorkoutDayDetails(program) {
       </div>
 
       <!-- Exercise List -->
-      <div style="display: flex; flex-direction: column; gap: 12px;">
+      <div style="display: flex; flex-direction: column; gap: 12px;" id="exercise-list-${day.id}">
         ${day.exercises && day.exercises.length > 0 ? day.exercises.map((ex, idx) => `
-          <div style="background: var(--light); border-radius: 12px; padding: 16px; border-left: 4px solid var(--primary);">
+          <div style="background: var(--light); border-radius: 12px; padding: 16px; border-left: 4px solid var(--primary);" data-exercise-id="${ex.id}">
             <div style="display: flex; justify-content: space-between; align-items: start;">
+              <div style="display: flex; flex-direction: column; gap: 4px; margin-right: 8px;">
+                <button onclick="moveExercise(${day.id}, ${ex.id}, 'up')" class="btn btn-outline" style="padding: 4px 8px; font-size: 12px; ${idx === 0 ? 'opacity: 0.3; pointer-events: none;' : ''}" ${idx === 0 ? 'disabled' : ''}>
+                  <i class="fas fa-chevron-up"></i>
+                </button>
+                <button onclick="moveExercise(${day.id}, ${ex.id}, 'down')" class="btn btn-outline" style="padding: 4px 8px; font-size: 12px; ${idx === day.exercises.length - 1 ? 'opacity: 0.3; pointer-events: none;' : ''}" ${idx === day.exercises.length - 1 ? 'disabled' : ''}>
+                  <i class="fas fa-chevron-down"></i>
+                </button>
+              </div>
               <div style="flex: 1;">
                 <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
                   <div style="background: var(--primary); color: white; width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: bold;">
@@ -1515,6 +1912,46 @@ function renderWorkoutDayDetails(program) {
       </div>
     </div>
   `;
+}
+
+// Move exercise up or down within a program day
+async function moveExercise(dayId, exerciseId, direction) {
+  // Find the current program and day
+  const program = state.program;
+  if (!program) return;
+  
+  const day = program.days.find(d => d.id === dayId);
+  if (!day || !day.exercises) return;
+  
+  const currentIndex = day.exercises.findIndex(ex => ex.id === exerciseId);
+  if (currentIndex === -1) return;
+  
+  const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+  if (newIndex < 0 || newIndex >= day.exercises.length) return;
+  
+  // Swap exercises in local state
+  const temp = day.exercises[currentIndex];
+  day.exercises[currentIndex] = day.exercises[newIndex];
+  day.exercises[newIndex] = temp;
+  
+  // Get new order of exercise IDs
+  const exerciseOrder = day.exercises.map(ex => ex.id);
+  
+  try {
+    await api(`/programs/days/${dayId}/reorder`, {
+      method: 'PATCH',
+      body: JSON.stringify({ exercise_order: exerciseOrder })
+    });
+    
+    // Re-render the day view
+    renderDayDetail(program, day);
+    showNotification('Exercise order updated', 'success');
+  } catch (error) {
+    // Revert local state on error
+    day.exercises[newIndex] = day.exercises[currentIndex];
+    day.exercises[currentIndex] = temp;
+    showNotification('Failed to reorder exercises: ' + error.message, 'error');
+  }
 }
 
 // Helper: Estimate workout duration
@@ -2255,6 +2692,9 @@ function renderExerciseEnhanced(exercise, index) {
           <button class="btn btn-primary" onclick="recordSet(${exercise.id})" style="padding: 12px 24px; font-size: 16px;">
             <i class="fas fa-check"></i> Add
           </button>
+          <button class="btn btn-outline" onclick="showExerciseHistory(${exercise.exercise_id || exercise.id}, '${exercise.name.replace(/'/g, "\\'")}')" style="padding: 12px 16px;" title="View History">
+            <i class="fas fa-chart-line"></i>
+          </button>
           <button class="btn btn-outline" onclick="showExerciseNotes(${exercise.id})" style="padding: 12px 16px;">
             <i class="fas fa-sticky-note"></i>
           </button>
@@ -2653,15 +3093,120 @@ async function loadAnalytics() {
   const container = document.getElementById('analytics');
   
   try {
-    const [progress, volumeData, bodyMap] = await Promise.all([
+    const [progress, volumeData, bodyMap, prsData, progressComparison] = await Promise.all([
       api('/analytics/progress?days=90'),
       api('/analytics/volume?days=90&group_by=week'),
-      api('/analytics/bodymap?days=7')
+      api('/analytics/bodymap?days=7'),
+      api('/achievements/prs?limit=10'),
+      api('/analytics/progress-comparison')
     ]);
+    
+    const prs = prsData.prs || [];
+    const weekly = progressComparison.weekly;
+    const monthly = progressComparison.monthly;
+
+    // Helper to format change with arrow and color
+    const formatChange = (change) => {
+      if (change === 0) return '<span style="color: var(--text-secondary);">—</span>';
+      const isPositive = change > 0;
+      const arrow = isPositive ? '↑' : '↓';
+      const color = isPositive ? 'var(--secondary)' : 'var(--danger)';
+      return `<span style="color: ${color}; font-weight: 600;">${arrow} ${Math.abs(change).toFixed(1)}%</span>`;
+    };
+
+    // Helper to format date range
+    const formatDateRange = (start, end) => {
+      const formatDate = (dateStr) => {
+        const date = new Date(dateStr + 'T00:00:00');
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      };
+      return `${formatDate(start)} - ${formatDate(end)}`;
+    };
 
     container.innerHTML = `
+      <!-- Progress Comparison Section -->
       <div class="card">
-        <h2><i class="fas fa-chart-line"></i> 90-Day Progress</h2>
+        <h2><i class="fas fa-chart-line"></i> Progress Comparison</h2>
+        
+        <!-- Weekly Comparison -->
+        <div style="margin-bottom: 24px;">
+          <h3 style="font-size: 16px; margin-bottom: 4px; color: var(--text-secondary);">
+            <i class="fas fa-calendar-week"></i> This Week vs Last Week
+          </h3>
+          <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px;">
+            <span style="color: var(--primary); font-weight: 500;">${formatDateRange(weekly.current.start_date, weekly.current.end_date)}</span>
+            vs
+            <span>${formatDateRange(weekly.previous.start_date, weekly.previous.end_date)}</span>
+          </div>
+          <div class="progress-comparison-grid">
+            <div class="progress-comparison-card">
+              <div class="progress-comparison-label">Total Volume</div>
+              <div class="progress-comparison-values">
+                <span class="progress-comparison-current">${formatWeight(weekly.current.total_volume)}</span>
+                <span class="progress-comparison-previous">vs ${formatWeight(weekly.previous.total_volume)}</span>
+              </div>
+              <div class="progress-comparison-change">${formatChange(weekly.changes.total_volume)}</div>
+            </div>
+            <div class="progress-comparison-card">
+              <div class="progress-comparison-label">Workout Time</div>
+              <div class="progress-comparison-values">
+                <span class="progress-comparison-current">${formatDuration(weekly.current.total_time)}</span>
+                <span class="progress-comparison-previous">vs ${formatDuration(weekly.previous.total_time)}</span>
+              </div>
+              <div class="progress-comparison-change">${formatChange(weekly.changes.total_time)}</div>
+            </div>
+            <div class="progress-comparison-card">
+              <div class="progress-comparison-label">Workouts</div>
+              <div class="progress-comparison-values">
+                <span class="progress-comparison-current">${weekly.current.workout_count}</span>
+                <span class="progress-comparison-previous">vs ${weekly.previous.workout_count}</span>
+              </div>
+              <div class="progress-comparison-change">${formatChange(weekly.changes.workout_count)}</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Monthly Comparison -->
+        <div>
+          <h3 style="font-size: 16px; margin-bottom: 4px; color: var(--text-secondary);">
+            <i class="fas fa-calendar-alt"></i> This Month vs Last Month
+          </h3>
+          <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px;">
+            <span style="color: var(--primary); font-weight: 500;">${formatDateRange(monthly.current.start_date, monthly.current.end_date)}</span>
+            vs
+            <span>${formatDateRange(monthly.previous.start_date, monthly.previous.end_date)}</span>
+          </div>
+          <div class="progress-comparison-grid">
+            <div class="progress-comparison-card">
+              <div class="progress-comparison-label">Total Volume</div>
+              <div class="progress-comparison-values">
+                <span class="progress-comparison-current">${formatWeight(monthly.current.total_volume)}</span>
+                <span class="progress-comparison-previous">vs ${formatWeight(monthly.previous.total_volume)}</span>
+              </div>
+              <div class="progress-comparison-change">${formatChange(monthly.changes.total_volume)}</div>
+            </div>
+            <div class="progress-comparison-card">
+              <div class="progress-comparison-label">Workout Time</div>
+              <div class="progress-comparison-values">
+                <span class="progress-comparison-current">${formatDuration(monthly.current.total_time)}</span>
+                <span class="progress-comparison-previous">vs ${formatDuration(monthly.previous.total_time)}</span>
+              </div>
+              <div class="progress-comparison-change">${formatChange(monthly.changes.total_time)}</div>
+            </div>
+            <div class="progress-comparison-card">
+              <div class="progress-comparison-label">Workouts</div>
+              <div class="progress-comparison-values">
+                <span class="progress-comparison-current">${monthly.current.workout_count}</span>
+                <span class="progress-comparison-previous">vs ${monthly.previous.workout_count}</span>
+              </div>
+              <div class="progress-comparison-change">${formatChange(monthly.changes.workout_count)}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2><i class="fas fa-chart-bar"></i> 90-Day Overview</h2>
         <div class="stats-grid">
           <div class="stat-card">
             <div class="stat-label">Total Workouts</div>
@@ -2695,6 +3240,9 @@ async function loadAnalytics() {
           </div>
         ` : '<p>No volume data yet.</p>'}
       </div>
+      
+      <!-- Calendar placeholder - will be populated by loadWorkoutHistory -->
+      <div id="workoutCalendarContainer"></div>
 
       <div class="card">
         <h2><i class="fas fa-body"></i> Body Map (Last 7 Days)</h2>
@@ -2733,6 +3281,40 @@ async function loadAnalytics() {
           </div>
         ` : '<p>No exercise data yet.</p>'}
       </div>
+      
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h2 style="margin: 0;"><i class="fas fa-medal" style="color: var(--warning);"></i> Personal Records</h2>
+          <button class="btn btn-outline" onclick="recalculatePRs()" style="font-size: 12px; padding: 8px 12px;">
+            <i class="fas fa-sync"></i> Recalculate PRs
+          </button>
+        </div>
+        ${prs.length > 0 ? `
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px;">
+            ${prs.map(pr => `
+              <div style="padding: 16px; background: var(--bg-secondary); border-radius: 12px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid var(--warning);">
+                <div>
+                  <strong style="display: block; font-size: 15px;">${pr.exercise_name}</strong>
+                  <span style="font-size: 12px; color: var(--text-secondary);">${pr.record_type.toUpperCase()} • ${new Date(pr.achieved_at).toLocaleDateString()}</span>
+                </div>
+                <div style="text-align: right;">
+                  <div style="font-size: 20px; font-weight: bold; color: var(--primary);">${formatWeight(pr.record_value)}</div>
+                  ${pr.previous_value ? `<div style="font-size: 12px; color: var(--secondary);">+${((pr.record_value - pr.previous_value) / pr.previous_value * 100).toFixed(1)}%</div>` : ''}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        ` : '<p style="color: var(--text-secondary);">No personal records yet. Complete workouts to set new PRs!</p>'}
+      </div>
+      
+      <div class="card" id="export-section">
+        <h2><i class="fas fa-download"></i> Export & Reports</h2>
+        <p style="color: var(--text-secondary); margin-bottom: 20px;">Export your fitness data or generate professional PDF reports.</p>
+        
+        <button class="btn btn-primary" onclick="openUnifiedExporter()" style="width: 100%; padding: 16px; font-size: 16px; background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%);">
+          <i class="fas fa-file-export"></i> Open Export Center
+        </button>
+      </div>
     `;
 
     // Load and display workout history
@@ -2743,211 +3325,1413 @@ async function loadAnalytics() {
   }
 }
 
-// Load workout history for analytics
+// Recalculate PRs from actual workout data
+async function recalculatePRs() {
+  if (!confirm('This will recalculate all your Personal Records from your workout history. Continue?')) {
+    return;
+  }
+  
+  try {
+    showNotification('Recalculating PRs...', 'info');
+    const result = await api('/achievements/prs/recalculate', { method: 'POST' });
+    showNotification(result.message, 'success');
+    loadAnalytics(); // Refresh the page
+  } catch (error) {
+    showNotification('Error recalculating PRs: ' + error.message, 'error');
+  }
+}
+
+// Export data function
+async function exportData(type) {
+  const startDate = document.getElementById('exportStartDate')?.value || '';
+  const endDate = document.getElementById('exportEndDate')?.value || '';
+  const format = document.getElementById('exportFormat')?.value || 'csv';
+  
+  // Build query params
+  const params = new URLSearchParams();
+  if (startDate) params.append('start', startDate);
+  if (endDate) params.append('end', endDate);
+  if (type !== 'all') params.append('format', format);
+  
+  const queryString = params.toString() ? `?${params.toString()}` : '';
+  const url = `/api/exports/${type}${queryString}`;
+  
+  showNotification(`Preparing ${type} export...`, 'info');
+  
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Cf-Access-Jwt-Assertion': token
+      }
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Export failed');
+    }
+    
+    const contentType = response.headers.get('content-type');
+    
+    if (contentType?.includes('text/csv')) {
+      // Handle CSV download
+      const blob = await response.blob();
+      const filename = response.headers.get('content-disposition')?.match(/filename="(.+)"/)?.[1] 
+        || `${type}_export_${new Date().toISOString().split('T')[0]}.csv`;
+      downloadBlob(blob, filename);
+      showNotification(`${type} data exported successfully!`, 'success');
+    } else {
+      // Handle JSON
+      const data = await response.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const filename = `${type}_export_${new Date().toISOString().split('T')[0]}.json`;
+      downloadBlob(blob, filename);
+      showNotification(`${type} data exported successfully!`, 'success');
+    }
+  } catch (error) {
+    console.error('Export error:', error);
+    showNotification('Export failed: ' + error.message, 'error');
+  }
+}
+
+// Helper to trigger file download
+function downloadBlob(blob, filename) {
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.style.display = 'none';
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+}
+
+// ============================================
+// UNIFIED EXPORT CENTER
+// ============================================
+
+// Open the unified Export Center modal
+function openUnifiedExporter() {
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  
+  const modal = document.getElementById('modal');
+  const modalContent = modal.querySelector('.modal-content');
+  modalContent.classList.add('wide');
+  
+  document.getElementById('modalTitle').innerHTML = '<i class="fas fa-file-export" style="color: #7c3aed;"></i> Export Center';
+  document.getElementById('modalBody').innerHTML = `
+    <div style="display: grid; gap: 20px;">
+      <!-- Export Type Tabs -->
+      <div style="display: flex; gap: 8px; border-bottom: 2px solid var(--border); padding-bottom: 0;">
+        <button class="export-tab active" onclick="switchExportTab('data')" data-tab="data" style="padding: 12px 20px; border: none; background: none; font-weight: 600; color: var(--primary); border-bottom: 2px solid var(--primary); margin-bottom: -2px; cursor: pointer;">
+          <i class="fas fa-database"></i> Data Export
+        </button>
+        <button class="export-tab" onclick="switchExportTab('pdf')" data-tab="pdf" style="padding: 12px 20px; border: none; background: none; font-weight: 600; color: var(--text-secondary); border-bottom: 2px solid transparent; margin-bottom: -2px; cursor: pointer;">
+          <i class="fas fa-file-pdf"></i> PDF Report
+        </button>
+      </div>
+      
+      <!-- Shared Date Range -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px; background: var(--bg-secondary); border-radius: 12px;">
+        <div>
+          <label style="display: block; font-weight: 600; margin-bottom: 8px; font-size: 13px;">Start Date</label>
+          <input type="date" id="exportStartDate" class="form-control" value="${thirtyDaysAgo.toISOString().split('T')[0]}" style="padding: 12px;">
+        </div>
+        <div>
+          <label style="display: block; font-weight: 600; margin-bottom: 8px; font-size: 13px;">End Date</label>
+          <input type="date" id="exportEndDate" class="form-control" value="${new Date().toISOString().split('T')[0]}" style="padding: 12px;">
+        </div>
+      </div>
+      
+      <!-- Data Export Panel -->
+      <div id="dataExportPanel">
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; font-weight: 600; margin-bottom: 12px;">Select Data to Export</label>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;">
+            <label style="display: flex; align-items: center; gap: 10px; padding: 14px; background: var(--bg-secondary); border-radius: 10px; cursor: pointer; border: 2px solid var(--border); transition: all 0.2s;" onchange="updateExportSelection()">
+              <input type="checkbox" id="exportWorkouts" checked style="width: 18px; height: 18px; accent-color: var(--primary);">
+              <i class="fas fa-dumbbell" style="color: var(--primary);"></i>
+              <span>Workouts</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 10px; padding: 14px; background: var(--bg-secondary); border-radius: 10px; cursor: pointer; border: 2px solid var(--border); transition: all 0.2s;">
+              <input type="checkbox" id="exportNutrition" checked style="width: 18px; height: 18px; accent-color: var(--secondary);">
+              <i class="fas fa-utensils" style="color: var(--secondary);"></i>
+              <span>Nutrition</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 10px; padding: 14px; background: var(--bg-secondary); border-radius: 10px; cursor: pointer; border: 2px solid var(--border); transition: all 0.2s;">
+              <input type="checkbox" id="exportRecords" checked style="width: 18px; height: 18px; accent-color: var(--warning);">
+              <i class="fas fa-trophy" style="color: var(--warning);"></i>
+              <span>Personal Records</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 10px; padding: 14px; background: var(--bg-secondary); border-radius: 10px; cursor: pointer; border: 2px solid var(--border); transition: all 0.2s;">
+              <input type="checkbox" id="exportHealth" checked style="width: 18px; height: 18px; accent-color: #ec4899;">
+              <i class="fas fa-heartbeat" style="color: #ec4899;"></i>
+              <span>Health Data</span>
+            </label>
+          </div>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+          <label style="display: block; font-weight: 600; margin-bottom: 8px;">Export Format</label>
+          <div style="display: flex; gap: 12px;">
+            <label style="display: flex; align-items: center; gap: 8px; padding: 12px 20px; background: var(--primary-light); border: 2px solid var(--primary); border-radius: 10px; cursor: pointer;">
+              <input type="radio" name="exportFormat" value="csv" checked style="display: none;">
+              <i class="fas fa-file-csv" style="color: var(--primary);"></i>
+              <span style="font-weight: 600; color: var(--primary);">CSV</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; padding: 12px 20px; background: var(--bg-secondary); border: 2px solid var(--border); border-radius: 10px; cursor: pointer;" onclick="selectExportFormat(this, 'json')">
+              <input type="radio" name="exportFormat" value="json" style="display: none;">
+              <i class="fas fa-file-code" style="color: var(--text-secondary);"></i>
+              <span style="font-weight: 600;">JSON</span>
+            </label>
+          </div>
+        </div>
+        
+        <button class="btn btn-primary" onclick="executeDataExport()" style="width: 100%; padding: 14px; font-size: 15px;">
+          <i class="fas fa-download"></i> Download Data
+        </button>
+      </div>
+      
+      <!-- PDF Report Panel (Hidden by default) -->
+      <div id="pdfExportPanel" style="display: none;">
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; font-weight: 600; margin-bottom: 12px;">Report Type</label>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px;">
+            <label style="display: flex; align-items: center; gap: 10px; padding: 14px; border: 2px solid var(--primary); background: var(--primary-light); border-radius: 10px; cursor: pointer;" onclick="selectReportType(this, 'progress')">
+              <input type="radio" name="reportType" value="progress" checked style="display: none;">
+              <i class="fas fa-chart-line" style="color: var(--primary);"></i>
+              <span style="font-weight: 500;">Progress</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 10px; padding: 14px; border: 2px solid var(--border); border-radius: 10px; cursor: pointer;" onclick="selectReportType(this, 'workout')">
+              <input type="radio" name="reportType" value="workout" style="display: none;">
+              <i class="fas fa-dumbbell" style="color: var(--text-secondary);"></i>
+              <span>Workouts</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 10px; padding: 14px; border: 2px solid var(--border); border-radius: 10px; cursor: pointer;" onclick="selectReportType(this, 'analytics')">
+              <input type="radio" name="reportType" value="analytics" style="display: none;">
+              <i class="fas fa-brain" style="color: var(--text-secondary);"></i>
+              <span>Analytics</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 10px; padding: 14px; border: 2px solid var(--border); border-radius: 10px; cursor: pointer;" onclick="selectReportType(this, 'comprehensive')">
+              <input type="radio" name="reportType" value="comprehensive" style="display: none;">
+              <i class="fas fa-file-alt" style="color: var(--text-secondary);"></i>
+              <span>Full Report</span>
+            </label>
+          </div>
+        </div>
+        
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; font-weight: 600; margin-bottom: 12px;">Include in Report</label>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px;">
+            <label style="display: flex; align-items: center; gap: 8px; padding: 10px; background: var(--bg-secondary); border-radius: 8px; cursor: pointer; font-size: 14px;">
+              <input type="checkbox" id="chartVolume" checked style="width: 16px; height: 16px; accent-color: var(--primary);">
+              <span>Volume Chart</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; padding: 10px; background: var(--bg-secondary); border-radius: 8px; cursor: pointer; font-size: 14px;">
+              <input type="checkbox" id="chartMuscle" checked style="width: 16px; height: 16px; accent-color: var(--primary);">
+              <span>Muscle Chart</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; padding: 10px; background: var(--bg-secondary); border-radius: 8px; cursor: pointer; font-size: 14px;">
+              <input type="checkbox" id="sectionPRs" checked style="width: 16px; height: 16px; accent-color: var(--primary);">
+              <span>PRs Table</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; padding: 10px; background: var(--bg-secondary); border-radius: 8px; cursor: pointer; font-size: 14px;">
+              <input type="checkbox" id="sectionRecovery" checked style="width: 16px; height: 16px; accent-color: var(--primary);">
+              <span>Recovery</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; padding: 10px; background: var(--bg-secondary); border-radius: 8px; cursor: pointer; font-size: 14px;">
+              <input type="checkbox" id="sectionPredictions" checked style="width: 16px; height: 16px; accent-color: var(--primary);">
+              <span>Predictions</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; padding: 10px; background: var(--bg-secondary); border-radius: 8px; cursor: pointer; font-size: 14px;">
+              <input type="checkbox" id="sectionNutrition" checked style="width: 16px; height: 16px; accent-color: var(--primary);">
+              <span>Nutrition</span>
+            </label>
+          </div>
+        </div>
+        
+        <div id="reportPreviewArea" style="display: none; border: 1px solid var(--border); border-radius: 12px; padding: 16px; background: white; margin-bottom: 16px; max-height: 300px; overflow-y: auto;">
+          <div id="reportPreviewContent"></div>
+        </div>
+        
+        <div style="display: flex; gap: 12px;">
+          <button class="btn btn-outline" onclick="previewPDFReport()" style="flex: 1;">
+            <i class="fas fa-eye"></i> Preview
+          </button>
+          <button class="btn btn-primary" onclick="generatePDFReport()" style="flex: 2; background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%);">
+            <i class="fas fa-file-pdf"></i> Generate PDF
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  modal.classList.add('active');
+}
+
+// Switch between export tabs
+function switchExportTab(tab) {
+  document.querySelectorAll('.export-tab').forEach(t => {
+    t.style.color = 'var(--text-secondary)';
+    t.style.borderBottomColor = 'transparent';
+    t.classList.remove('active');
+  });
+  const activeTab = document.querySelector(`.export-tab[data-tab="${tab}"]`);
+  if (activeTab) {
+    activeTab.style.color = 'var(--primary)';
+    activeTab.style.borderBottomColor = 'var(--primary)';
+    activeTab.classList.add('active');
+  }
+  
+  document.getElementById('dataExportPanel').style.display = tab === 'data' ? 'block' : 'none';
+  document.getElementById('pdfExportPanel').style.display = tab === 'pdf' ? 'block' : 'none';
+}
+
+// Select export format (CSV/JSON)
+function selectExportFormat(element, format) {
+  document.querySelectorAll('label:has(input[name="exportFormat"])').forEach(label => {
+    label.style.background = 'var(--bg-secondary)';
+    label.style.borderColor = 'var(--border)';
+    label.querySelector('i').style.color = 'var(--text-secondary)';
+    label.querySelector('span').style.color = 'var(--text-primary)';
+  });
+  element.style.background = 'var(--primary-light)';
+  element.style.borderColor = 'var(--primary)';
+  element.querySelector('i').style.color = 'var(--primary)';
+  element.querySelector('span').style.color = 'var(--primary)';
+  element.querySelector('input').checked = true;
+}
+
+// Execute data export based on selections
+async function executeDataExport() {
+  const startDate = document.getElementById('exportStartDate')?.value || '';
+  const endDate = document.getElementById('exportEndDate')?.value || '';
+  const format = document.querySelector('input[name="exportFormat"]:checked')?.value || 'csv';
+  
+  const exportWorkouts = document.getElementById('exportWorkouts')?.checked;
+  const exportNutrition = document.getElementById('exportNutrition')?.checked;
+  const exportRecords = document.getElementById('exportRecords')?.checked;
+  const exportHealth = document.getElementById('exportHealth')?.checked;
+  
+  // If all selected, do a full export
+  if (exportWorkouts && exportNutrition && exportRecords && exportHealth) {
+    await exportData('all');
+    return;
+  }
+  
+  // Export selected types
+  const exports = [];
+  if (exportWorkouts) exports.push(exportData('workouts'));
+  if (exportNutrition) exports.push(exportData('nutrition'));
+  if (exportRecords) exports.push(exportData('records'));
+  if (exportHealth) exports.push(exportData('measurements'));
+  
+  if (exports.length === 0) {
+    showNotification('Please select at least one data type to export', 'error');
+    return;
+  }
+  
+  await Promise.all(exports);
+}
+
+// Keep old function name for compatibility
+function openReportBuilder() {
+  openUnifiedExporter();
+  setTimeout(() => switchExportTab('pdf'), 100);
+}
+
+// Select report type in the builder
+function selectReportType(element, type) {
+  document.querySelectorAll('label[onclick*="selectReportType"]').forEach(label => {
+    label.style.borderColor = 'var(--border)';
+    label.style.background = 'transparent';
+  });
+  element.style.borderColor = 'var(--primary)';
+  element.style.background = 'var(--primary-light)';
+  element.querySelector('input').checked = true;
+}
+
+// Preview the PDF report before generating
+async function previewPDFReport() {
+  const previewArea = document.getElementById('reportPreviewArea');
+  const previewContent = document.getElementById('reportPreviewContent');
+  
+  previewArea.style.display = 'block';
+  previewContent.innerHTML = `
+    <div style="text-align: center; padding: 40px;">
+      <i class="fas fa-spinner fa-spin" style="font-size: 32px; color: var(--primary);"></i>
+      <p style="margin-top: 12px; color: var(--text-secondary);">Generating preview...</p>
+    </div>
+  `;
+  
+  try {
+    const reportData = await fetchReportData();
+    previewContent.innerHTML = generateReportHTML(reportData);
+    
+    // Render charts in preview
+    setTimeout(() => renderPreviewCharts(reportData), 100);
+  } catch (error) {
+    previewContent.innerHTML = `<p style="color: var(--danger);">Error generating preview: ${error.message}</p>`;
+  }
+}
+
+// Fetch all data needed for the report
+async function fetchReportData() {
+  const startDate = document.getElementById('reportStartDate').value;
+  const endDate = document.getElementById('reportEndDate').value;
+  const reportType = document.querySelector('input[name="reportType"]:checked').value;
+  
+  const [progressData, advancedData, workoutsData, nutritionData, prsData] = await Promise.all([
+    api(`/analytics/progress?days=90`),
+    api('/analytics/advanced'),
+    api(`/workouts?limit=100`),
+    api('/nutrition/logs?limit=30'),
+    api('/achievements/prs')
+  ]);
+  
+  // Filter workouts by date range
+  const workouts = (workoutsData.workouts || []).filter(w => {
+    const date = w.start_time.split('T')[0];
+    return date >= startDate && date <= endDate;
+  });
+  
+  return {
+    reportType,
+    startDate,
+    endDate,
+    progress: progressData,
+    advanced: advancedData,
+    workouts,
+    nutrition: nutritionData.logs || [],
+    prs: prsData.records || [],
+    user: state.user,
+    options: {
+      chartVolume: document.getElementById('chartVolume')?.checked,
+      chartMuscle: document.getElementById('chartMuscle')?.checked,
+      chartStrength: document.getElementById('chartStrength')?.checked,
+      chartFrequency: document.getElementById('chartFrequency')?.checked,
+      sectionPRs: document.getElementById('sectionPRs')?.checked,
+      sectionNutrition: document.getElementById('sectionNutrition')?.checked,
+      sectionRecovery: document.getElementById('sectionRecovery')?.checked,
+      sectionPredictions: document.getElementById('sectionPredictions')?.checked
+    }
+  };
+}
+
+// Generate HTML for the report
+function generateReportHTML(data) {
+  const dateRangeText = `${new Date(data.startDate).toLocaleDateString()} - ${new Date(data.endDate).toLocaleDateString()}`;
+  
+  return `
+    <div id="pdfReportContent" style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: white; color: #111;">
+      <!-- Header -->
+      <div style="text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 3px solid #7c3aed;">
+        <h1 style="margin: 0; color: #7c3aed; font-size: 28px;">AI Fitness Coach</h1>
+        <h2 style="margin: 8px 0 0 0; color: #666; font-weight: normal; font-size: 18px;">
+          ${data.reportType === 'progress' ? 'Progress Report' : 
+            data.reportType === 'workout' ? 'Workout Summary' :
+            data.reportType === 'analytics' ? 'Analytics Report' : 'Comprehensive Fitness Report'}
+        </h2>
+        <p style="margin: 8px 0 0 0; color: #999; font-size: 14px;">${dateRangeText}</p>
+        <p style="margin: 4px 0 0 0; color: #999; font-size: 12px;">Generated for ${data.user?.name || 'User'} on ${new Date().toLocaleDateString()}</p>
+      </div>
+      
+      <!-- Summary Stats -->
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 30px;">
+        <div style="text-align: center; padding: 20px; background: #f3f4f6; border-radius: 12px;">
+          <div style="font-size: 28px; font-weight: bold; color: #2563eb;">${data.workouts.length}</div>
+          <div style="font-size: 12px; color: #666; text-transform: uppercase;">Workouts</div>
+        </div>
+        <div style="text-align: center; padding: 20px; background: #f3f4f6; border-radius: 12px;">
+          <div style="font-size: 28px; font-weight: bold; color: #059669;">${formatWeight(data.progress?.overview?.total_volume_kg || 0)}</div>
+          <div style="font-size: 12px; color: #666; text-transform: uppercase;">Total Volume</div>
+        </div>
+        <div style="text-align: center; padding: 20px; background: #f3f4f6; border-radius: 12px;">
+          <div style="font-size: 28px; font-weight: bold; color: #7c3aed;">${Math.round((data.progress?.overview?.total_time_seconds || 0) / 60)}m</div>
+          <div style="font-size: 12px; color: #666; text-transform: uppercase;">Total Time</div>
+        </div>
+        <div style="text-align: center; padding: 20px; background: #f3f4f6; border-radius: 12px;">
+          <div style="font-size: 28px; font-weight: bold; color: #f59e0b;">${data.prs.length}</div>
+          <div style="font-size: 12px; color: #666; text-transform: uppercase;">PRs Set</div>
+        </div>
+      </div>
+      
+      ${data.options.chartVolume ? `
+      <!-- Volume Chart -->
+      <div style="margin-bottom: 30px;">
+        <h3 style="color: #111; margin-bottom: 16px; font-size: 18px; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px;">
+          <span style="color: #2563eb;">📊</span> Volume Trend
+        </h3>
+        <div style="height: 250px; background: #fafafa; border-radius: 8px; padding: 10px;">
+          <canvas id="previewVolumeChart"></canvas>
+        </div>
+      </div>
+      ` : ''}
+      
+      ${data.options.chartMuscle ? `
+      <!-- Muscle Distribution -->
+      <div style="margin-bottom: 30px;">
+        <h3 style="color: #111; margin-bottom: 16px; font-size: 18px; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px;">
+          <span style="color: #059669;">💪</span> Muscle Group Distribution
+        </h3>
+        <div style="display: flex; justify-content: center;">
+          <div style="width: 300px; height: 300px;">
+            <canvas id="previewMuscleChart"></canvas>
+          </div>
+        </div>
+      </div>
+      ` : ''}
+      
+      ${data.options.sectionRecovery && data.advanced ? `
+      <!-- Recovery & Balance -->
+      <div style="margin-bottom: 30px;">
+        <h3 style="color: #111; margin-bottom: 16px; font-size: 18px; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px;">
+          <span style="color: #7c3aed;">⚡</span> Recovery & Balance
+        </h3>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
+          <div style="text-align: center; padding: 20px; background: ${data.advanced.recovery?.score >= 70 ? '#d1fae5' : data.advanced.recovery?.score >= 40 ? '#fef3c7' : '#fee2e2'}; border-radius: 12px;">
+            <div style="font-size: 32px; font-weight: bold;">${data.advanced.recovery?.score || 0}</div>
+            <div style="font-size: 13px; color: #666;">Recovery Score</div>
+          </div>
+          <div style="text-align: center; padding: 20px; background: ${data.advanced.consistency?.consistency >= 70 ? '#d1fae5' : '#fef3c7'}; border-radius: 12px;">
+            <div style="font-size: 32px; font-weight: bold;">${data.advanced.consistency?.consistency || 0}%</div>
+            <div style="font-size: 13px; color: #666;">Consistency</div>
+          </div>
+          <div style="text-align: center; padding: 20px; background: ${data.advanced.muscle_balance?.balance >= 70 ? '#d1fae5' : '#fef3c7'}; border-radius: 12px;">
+            <div style="font-size: 32px; font-weight: bold;">${data.advanced.muscle_balance?.balance || 0}%</div>
+            <div style="font-size: 13px; color: #666;">Muscle Balance</div>
+          </div>
+        </div>
+      </div>
+      ` : ''}
+      
+      ${data.options.sectionPRs && data.prs.length > 0 ? `
+      <!-- Personal Records -->
+      <div style="margin-bottom: 30px;">
+        <h3 style="color: #111; margin-bottom: 16px; font-size: 18px; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px;">
+          <span style="color: #f59e0b;">🏆</span> Personal Records
+        </h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+          <thead>
+            <tr style="background: #f3f4f6;">
+              <th style="text-align: left; padding: 12px; border-bottom: 2px solid #e5e7eb;">Exercise</th>
+              <th style="text-align: right; padding: 12px; border-bottom: 2px solid #e5e7eb;">Record</th>
+              <th style="text-align: right; padding: 12px; border-bottom: 2px solid #e5e7eb;">Type</th>
+              <th style="text-align: right; padding: 12px; border-bottom: 2px solid #e5e7eb;">Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.prs.slice(0, 10).map(pr => `
+              <tr>
+                <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${pr.exercise_name}</td>
+                <td style="text-align: right; padding: 12px; border-bottom: 1px solid #e5e7eb; font-weight: bold; color: #2563eb;">${formatWeight(pr.record_value)}</td>
+                <td style="text-align: right; padding: 12px; border-bottom: 1px solid #e5e7eb;">${pr.record_type}</td>
+                <td style="text-align: right; padding: 12px; border-bottom: 1px solid #e5e7eb; color: #666;">${new Date(pr.achieved_at).toLocaleDateString()}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+      ` : ''}
+      
+      ${data.options.sectionPredictions && data.advanced?.strength_predictions?.length > 0 ? `
+      <!-- Strength Predictions -->
+      <div style="margin-bottom: 30px;">
+        <h3 style="color: #111; margin-bottom: 16px; font-size: 18px; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px;">
+          <span style="color: #7c3aed;">🔮</span> Strength Predictions (4 Weeks)
+        </h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+          <thead>
+            <tr style="background: #f3f4f6;">
+              <th style="text-align: left; padding: 12px; border-bottom: 2px solid #e5e7eb;">Exercise</th>
+              <th style="text-align: right; padding: 12px; border-bottom: 2px solid #e5e7eb;">Current</th>
+              <th style="text-align: right; padding: 12px; border-bottom: 2px solid #e5e7eb;">Predicted</th>
+              <th style="text-align: center; padding: 12px; border-bottom: 2px solid #e5e7eb;">Trend</th>
+              <th style="text-align: right; padding: 12px; border-bottom: 2px solid #e5e7eb;">Confidence</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.advanced.strength_predictions.slice(0, 8).map(pred => `
+              <tr>
+                <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${pred.exercise_name}</td>
+                <td style="text-align: right; padding: 12px; border-bottom: 1px solid #e5e7eb;">${formatWeight(pred.current_max)}</td>
+                <td style="text-align: right; padding: 12px; border-bottom: 1px solid #e5e7eb; font-weight: bold; color: #7c3aed;">${formatWeight(pred.predicted_max_4_weeks)}</td>
+                <td style="text-align: center; padding: 12px; border-bottom: 1px solid #e5e7eb;">${pred.trend === 'increasing' ? '📈' : pred.trend === 'decreasing' ? '📉' : '➡️'}</td>
+                <td style="text-align: right; padding: 12px; border-bottom: 1px solid #e5e7eb;">${pred.confidence}%</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+      ` : ''}
+      
+      <!-- Footer -->
+      <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #999; font-size: 12px;">
+        <p>Generated by AI Fitness Coach • ${new Date().toLocaleString()}</p>
+      </div>
+    </div>
+  `;
+}
+
+// Render charts in the preview
+function renderPreviewCharts(data) {
+  // Volume Chart
+  if (data.options.chartVolume && document.getElementById('previewVolumeChart')) {
+    const volumeData = data.progress?.volume_trends || [];
+    new Chart(document.getElementById('previewVolumeChart'), {
+      type: 'line',
+      data: {
+        labels: volumeData.map(v => v.period),
+        datasets: [{
+          label: 'Volume (kg)',
+          data: volumeData.map(v => v.total_volume),
+          borderColor: '#2563eb',
+          backgroundColor: 'rgba(37, 99, 235, 0.1)',
+          fill: true,
+          tension: 0.4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: true }
+        }
+      }
+    });
+  }
+  
+  // Muscle Distribution Chart
+  if (data.options.chartMuscle && document.getElementById('previewMuscleChart')) {
+    const muscleData = data.progress?.volume_by_muscle || [];
+    new Chart(document.getElementById('previewMuscleChart'), {
+      type: 'doughnut',
+      data: {
+        labels: muscleData.map(m => m.muscle_group),
+        datasets: [{
+          data: muscleData.map(m => m.volume),
+          backgroundColor: [
+            '#2563eb', '#059669', '#7c3aed', '#f59e0b', '#ec4899',
+            '#06b6d4', '#84cc16', '#f97316', '#6366f1', '#14b8a6'
+          ]
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } }
+        }
+      }
+    });
+  }
+}
+
+// Generate and download the PDF
+async function generatePDFReport() {
+  showNotification('Generating PDF report...', 'info');
+  
+  try {
+    const reportData = await fetchReportData();
+    
+    // Create a temporary container for the report
+    const container = document.createElement('div');
+    container.style.position = 'absolute';
+    container.style.left = '-9999px';
+    container.style.top = '0';
+    container.style.width = '800px';
+    container.style.background = 'white';
+    container.innerHTML = generateReportHTML(reportData);
+    document.body.appendChild(container);
+    
+    // Wait for content to render
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Render charts
+    await renderPDFCharts(container, reportData);
+    
+    // Wait for charts to render
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Generate PDF using html2canvas and jsPDF
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = pdf.internal.pageSize.getHeight();
+    
+    const canvas = await html2canvas(container, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      backgroundColor: '#ffffff'
+    });
+    
+    const imgWidth = pdfWidth;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    let heightLeft = imgHeight;
+    let position = 0;
+    
+    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, position, imgWidth, imgHeight);
+    heightLeft -= pdfHeight;
+    
+    while (heightLeft > 0) {
+      position = heightLeft - imgHeight;
+      pdf.addPage();
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pdfHeight;
+    }
+    
+    // Clean up
+    document.body.removeChild(container);
+    
+    // Download PDF
+    const filename = `fitness_report_${reportData.startDate}_to_${reportData.endDate}.pdf`;
+    pdf.save(filename);
+    
+    showNotification('PDF report generated successfully!', 'success');
+    closeModal();
+    
+  } catch (error) {
+    console.error('PDF generation error:', error);
+    showNotification('Error generating PDF: ' + error.message, 'error');
+  }
+}
+
+// Render charts for PDF generation
+async function renderPDFCharts(container, data) {
+  const volumeCanvas = container.querySelector('#previewVolumeChart');
+  const muscleCanvas = container.querySelector('#previewMuscleChart');
+  
+  if (volumeCanvas && data.options.chartVolume) {
+    const volumeData = data.progress?.volume_trends || [];
+    new Chart(volumeCanvas, {
+      type: 'line',
+      data: {
+        labels: volumeData.map(v => v.period),
+        datasets: [{
+          label: 'Volume (kg)',
+          data: volumeData.map(v => v.total_volume),
+          borderColor: '#2563eb',
+          backgroundColor: 'rgba(37, 99, 235, 0.1)',
+          fill: true,
+          tension: 0.4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+  }
+  
+  if (muscleCanvas && data.options.chartMuscle) {
+    const muscleData = data.progress?.volume_by_muscle || [];
+    new Chart(muscleCanvas, {
+      type: 'doughnut',
+      data: {
+        labels: muscleData.map(m => m.muscle_group),
+        datasets: [{
+          data: muscleData.map(m => m.volume),
+          backgroundColor: [
+            '#2563eb', '#059669', '#7c3aed', '#f59e0b', '#ec4899',
+            '#06b6d4', '#84cc16', '#f97316', '#6366f1', '#14b8a6'
+          ]
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+          legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } }
+        }
+      }
+    });
+  }
+}
+
+// Load workout history calendar for analytics
 async function loadWorkoutHistory(container) {
   try {
-    const workoutsData = await api('/workouts?limit=20');
+    // Fetch more workouts for calendar view (last 90 days worth)
+    const workoutsData = await api('/workouts?limit=100');
+    
+    // Store workouts globally for calendar interaction
+    state.calendarWorkouts = workoutsData.workouts || [];
+    
+    // Build workout lookup by date
+    const workoutsByDate = {};
+    for (const w of state.calendarWorkouts) {
+      const dateKey = new Date(w.start_time).toISOString().split('T')[0];
+      if (!workoutsByDate[dateKey]) workoutsByDate[dateKey] = [];
+      workoutsByDate[dateKey].push(w);
+    }
+    state.workoutsByDate = workoutsByDate;
+    
+    // Initialize to current month
+    const now = new Date();
+    state.calendarMonth = now.getMonth();
+    state.calendarYear = now.getFullYear();
     
     const historyHTML = `
       <div class="card">
-        <h2><i class="fas fa-history"></i> Workout History</h2>
-        ${workoutsData.workouts.length > 0 ? `
-          <div style="overflow-x: auto;">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Workout</th>
-                  <th>Duration</th>
-                  <th>Volume</th>
-                  <th>Sets</th>
-                  <th>Effort</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${workoutsData.workouts.map(w => `
-                  <tr>
-                    <td>${new Date(w.start_time).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
-                    <td><strong>${w.day_name || 'Custom Workout'}</strong></td>
-                    <td>${formatDuration(w.total_duration_seconds)}</td>
-                    <td>${w.total_weight_kg ? formatWeight(w.total_weight_kg) : 'N/A'}</td>
-                    <td>${w.total_sets || 0}</td>
-                    <td>${w.perceived_exertion ? `${w.perceived_exertion}/10 ${getExertionEmoji(w.perceived_exertion)}` : '-'}</td>
-                    <td>
-                      ${w.completed 
-                        ? '<span style="background: var(--secondary-light); color: var(--secondary); padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600;">✓ Complete</span>' 
-                        : '<span style="background: var(--warning); color: white; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600;">In Progress</span>'}
-                    </td>
-                    <td>
-                      <button class="btn btn-outline" onclick="viewWorkout(${w.id})" style="padding: 6px 12px; font-size: 12px; margin-right: 4px;">
-                        <i class="fas fa-eye"></i>
-                      </button>
-                      <button class="btn btn-danger" onclick="deleteAnalyticsWorkout(${w.id})" style="padding: 6px 12px; font-size: 12px;">
-                        <i class="fas fa-trash"></i>
-                      </button>
-                    </td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h2 style="margin: 0;"><i class="fas fa-calendar-alt"></i> Workout Calendar</h2>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <button class="btn btn-outline" onclick="changeCalendarMonth(-1)" style="padding: 8px 12px;">
+              <i class="fas fa-chevron-left"></i>
+            </button>
+            <span id="calendarMonthLabel" style="min-width: 140px; text-align: center; font-weight: 600; font-size: 16px;">
+              ${new Date(state.calendarYear, state.calendarMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+            </span>
+            <button class="btn btn-outline" onclick="changeCalendarMonth(1)" style="padding: 8px 12px;">
+              <i class="fas fa-chevron-right"></i>
+            </button>
           </div>
-        ` : '<p>No workout history yet.</p>'}
+        </div>
+        <div id="workoutCalendar">
+          ${renderWorkoutCalendar()}
+        </div>
+        <div id="calendarWorkoutDetail" style="margin-top: 20px;"></div>
       </div>
     `;
     
-    container.insertAdjacentHTML('beforeend', historyHTML);
+    // Insert into the placeholder container if it exists, otherwise append
+    const calendarContainer = document.getElementById('workoutCalendarContainer');
+    if (calendarContainer) {
+      calendarContainer.innerHTML = historyHTML;
+    } else {
+      container.insertAdjacentHTML('beforeend', historyHTML);
+    }
   } catch (error) {
     console.error('Error loading workout history:', error);
   }
+}
+
+// Render workout calendar grid
+function renderWorkoutCalendar() {
+  const year = state.calendarYear;
+  const month = state.calendarMonth;
+  const workoutsByDate = state.workoutsByDate || {};
+  
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const startPadding = firstDay.getDay(); // 0 = Sunday
+  const totalDays = lastDay.getDate();
+  
+  const today = new Date();
+  const todayKey = today.toISOString().split('T')[0];
+  
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  
+  let html = `
+    <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center;">
+      ${dayNames.map(d => `<div style="padding: 8px; font-weight: 600; color: var(--text-secondary); font-size: 12px;">${d}</div>`).join('')}
+  `;
+  
+  // Empty cells for start padding
+  for (let i = 0; i < startPadding; i++) {
+    html += `<div style="padding: 8px;"></div>`;
+  }
+  
+  // Day cells
+  for (let day = 1; day <= totalDays; day++) {
+    const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const hasWorkout = workoutsByDate[dateKey] && workoutsByDate[dateKey].length > 0;
+    const isToday = dateKey === todayKey;
+    const workoutCount = hasWorkout ? workoutsByDate[dateKey].length : 0;
+    
+    html += `
+      <div 
+        onclick="${hasWorkout ? `showCalendarWorkouts('${dateKey}')` : ''}"
+        style="
+          padding: 8px;
+          min-height: 50px;
+          border-radius: 8px;
+          cursor: ${hasWorkout ? 'pointer' : 'default'};
+          background: ${isToday ? 'var(--primary-light)' : 'var(--bg-secondary)'};
+          border: ${isToday ? '2px solid var(--primary)' : '1px solid var(--border)'};
+          position: relative;
+          transition: transform 0.1s;
+          ${hasWorkout ? 'box-shadow: 0 2px 4px rgba(0,0,0,0.1);' : ''}
+        "
+        ${hasWorkout ? 'onmouseover="this.style.transform=\'scale(1.05)\'" onmouseout="this.style.transform=\'scale(1)\'"' : ''}
+      >
+        <div style="font-size: 14px; ${isToday ? 'font-weight: bold; color: var(--primary);' : ''}">${day}</div>
+        ${hasWorkout ? `
+          <div style="
+            width: 24px; 
+            height: 24px; 
+            background: var(--secondary); 
+            border-radius: 50%; 
+            margin: 4px auto 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 11px;
+            font-weight: bold;
+          ">${workoutCount > 1 ? workoutCount : '<i class="fas fa-dumbbell" style="font-size: 10px;"></i>'}</div>
+        ` : ''}
+      </div>
+    `;
+  }
+  
+  html += '</div>';
+  
+  // Legend
+  html += `
+    <div style="display: flex; gap: 20px; margin-top: 16px; justify-content: center; font-size: 13px; color: var(--text-secondary);">
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <div style="width: 20px; height: 20px; background: var(--secondary); border-radius: 50%;"></div>
+        <span>Workout completed</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <div style="width: 20px; height: 20px; background: var(--primary-light); border: 2px solid var(--primary); border-radius: 4px;"></div>
+        <span>Today</span>
+      </div>
+    </div>
+  `;
+  
+  return html;
+}
+
+// Change calendar month
+function changeCalendarMonth(delta) {
+  state.calendarMonth += delta;
+  if (state.calendarMonth > 11) {
+    state.calendarMonth = 0;
+    state.calendarYear++;
+  } else if (state.calendarMonth < 0) {
+    state.calendarMonth = 11;
+    state.calendarYear--;
+  }
+  
+  // Update label
+  document.getElementById('calendarMonthLabel').textContent = 
+    new Date(state.calendarYear, state.calendarMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  
+  // Re-render calendar
+  document.getElementById('workoutCalendar').innerHTML = renderWorkoutCalendar();
+  
+  // Clear workout detail
+  document.getElementById('calendarWorkoutDetail').innerHTML = '';
+}
+
+// Show workouts for a specific date
+function showCalendarWorkouts(dateKey) {
+  const workouts = state.workoutsByDate[dateKey] || [];
+  if (workouts.length === 0) return;
+  
+  const dateDisplay = new Date(dateKey + 'T12:00:00').toLocaleDateString('en-US', { 
+    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' 
+  });
+  
+  const detailHTML = `
+    <div style="border-top: 1px solid var(--border); padding-top: 20px;">
+      <h3 style="margin-bottom: 16px;"><i class="fas fa-calendar-day"></i> ${dateDisplay}</h3>
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        ${workouts.map(w => `
+          <div style="background: var(--bg-secondary); border-radius: 12px; padding: 16px; border-left: 4px solid ${w.completed ? 'var(--secondary)' : 'var(--warning)'};">
+            <div style="display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 12px;">
+              <div>
+                <strong style="font-size: 16px;">${w.day_name || 'Custom Workout'}</strong>
+                <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; font-size: 13px; color: var(--text-secondary);">
+                  <span><i class="fas fa-clock"></i> ${formatDuration(w.total_duration_seconds)}</span>
+                  <span><i class="fas fa-weight-hanging"></i> ${w.total_weight_kg ? formatWeight(w.total_weight_kg) : 'N/A'}</span>
+                  <span><i class="fas fa-layer-group"></i> ${w.total_sets || 0} sets</span>
+                  ${w.perceived_exertion ? `<span><i class="fas fa-fire"></i> ${w.perceived_exertion}/10 ${getExertionEmoji(w.perceived_exertion)}</span>` : ''}
+                </div>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <button class="btn btn-primary" onclick="viewWorkout(${w.id})" style="padding: 8px 16px; font-size: 13px;">
+                  <i class="fas fa-eye"></i> View Details
+                </button>
+                <button class="btn btn-danger" onclick="deleteAnalyticsWorkout(${w.id})" style="padding: 8px 12px; font-size: 13px;">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+  
+  document.getElementById('calendarWorkoutDetail').innerHTML = detailHTML;
 }
 
 // AI Insights & Recommendations
 async function loadInsights() {
   const container = document.getElementById('insights');
   
+  // Show loading state
+  container.innerHTML = `
+    <div class="card" style="text-align: center; padding: 60px;">
+      <i class="fas fa-robot fa-spin" style="font-size: 48px; color: var(--primary); margin-bottom: 16px;"></i>
+      <h3>Analyzing your training data...</h3>
+      <p style="color: var(--text-secondary);">Your AI Coach is reviewing your workout history</p>
+    </div>
+  `;
+  
   try {
-    const [recommendations, progress] = await Promise.all([
-      api('/ai/recommendations'),
-      api('/analytics/progress?days=30')
-    ]);
+    // Fetch training analysis data
+    const analysisData = await api('/ai/coach/analysis?days=90');
+    const data = analysisData.data;
+    
+    if (!data || data.summary.total_workouts < 1) {
+      container.innerHTML = `
+        <div class="card" style="background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); color: white; border: none;">
+          <h2 style="margin: 0 0 12px 0; color: white;"><i class="fas fa-robot"></i> AI Fitness Coach</h2>
+          <p style="margin: 0; opacity: 0.95;">Your personal AI-powered strength coach</p>
+        </div>
+        <div class="card" style="text-align: center; padding: 60px;">
+          <i class="fas fa-dumbbell" style="font-size: 64px; color: var(--gray); margin-bottom: 16px;"></i>
+          <h3>Complete Some Workouts First</h3>
+          <p style="color: var(--text-secondary); margin-bottom: 24px;">
+            Your AI Coach needs workout data to provide personalized recommendations.<br>
+            Complete at least 3 workouts to unlock AI coaching features.
+          </p>
+          <button class="btn btn-primary" onclick="switchTab('workout')">
+            <i class="fas fa-play"></i> Start a Workout
+          </button>
+        </div>
+      `;
+      return;
+    }
+    
+    // Store for chat context
+    state.aiCoachData = data;
+    state.aiChatHistory = state.aiChatHistory || [];
+    
+    const system = state.user?.measurement_system || 'metric';
+    const isImperial = system === 'imperial';
     
     container.innerHTML = `
+      <!-- Header -->
       <div class="card" style="background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); color: white; border: none;">
-        <h2 style="margin: 0 0 12px 0; color: white;"><i class="fas fa-brain"></i> AI-Powered Training Insights</h2>
-        <p style="margin: 0; opacity: 0.95; font-size: 15px;">Personalized recommendations based on your performance data, recovery patterns, and training history</p>
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+          <div>
+            <h2 style="margin: 0 0 8px 0; color: white;"><i class="fas fa-robot"></i> AI Fitness Coach</h2>
+            <p style="margin: 0; opacity: 0.95;">Science-based coaching from ${data.summary.total_workouts} workouts</p>
+          </div>
+        </div>
       </div>
       
-      ${recommendations.recommendations && recommendations.recommendations.length > 0 ? `
-        <!-- Active Recommendations -->
-        <div class="card">
-          <h3><i class="fas fa-lightbulb"></i> Current Recommendations</h3>
-          <div style="display: flex; flex-direction: column; gap: 16px; margin-top: 16px;">
-            ${recommendations.recommendations.map(rec => `
-              <div style="background: ${rec.priority === 'high' ? 'var(--danger-light)' : rec.priority === 'medium' ? 'var(--warning-light)' : 'var(--secondary-light)'}; 
-                          border-left: 4px solid ${rec.priority === 'high' ? 'var(--danger)' : rec.priority === 'medium' ? 'var(--warning)' : 'var(--secondary)'}; 
-                          padding: 16px; border-radius: 8px;">
-                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
-                  <div>
-                    <strong style="font-size: 16px; color: var(--dark);">${rec.title}</strong>
-                    <div style="font-size: 13px; color: var(--gray); margin-top: 4px;">
-                      <i class="fas fa-tag"></i> ${rec.category} • 
-                      <i class="fas fa-clock"></i> ${new Date(rec.created_at).toLocaleDateString()}
-                    </div>
-                  </div>
-                  <span style="background: ${rec.priority === 'high' ? 'var(--danger)' : rec.priority === 'medium' ? 'var(--warning)' : 'var(--secondary)'}; 
-                               color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; text-transform: uppercase;">
-                    ${rec.priority}
-                  </span>
+      <!-- AI Chat Interface -->
+      <div class="card">
+        <h3 style="margin-bottom: 16px;"><i class="fas fa-comments"></i> Ask Your AI Coach</h3>
+        <div id="aiChatMessages" style="max-height: 400px; overflow-y: auto; margin-bottom: 16px; padding: 12px; background: var(--bg-secondary); border-radius: 8px;">
+          <div style="display: flex; gap: 12px; margin-bottom: 12px;">
+            <div style="width: 36px; height: 36px; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              <i class="fas fa-robot" style="color: white;"></i>
+            </div>
+            <div style="background: var(--bg-primary); padding: 12px 16px; border-radius: 12px; border-top-left-radius: 4px; max-width: 85%;">
+              <p style="margin: 0; line-height: 1.6;">
+                Hi ${data.user.name || 'there'}! I'm your AI fitness coach with access to your complete training history. Ask me anything about:
+              </p>
+              <ul style="margin: 8px 0 0 0; padding-left: 20px; line-height: 1.8; font-size: 14px;">
+                <li><strong>Progressive overload</strong> - "Should I increase weight on bench press?"</li>
+                <li><strong>Volume optimization</strong> - "Am I training chest enough?"</li>
+                <li><strong>Recovery</strong> - "Do I need more rest days?"</li>
+                <li><strong>Plateaus</strong> - "Why isn't my squat improving?"</li>
+                <li><strong>Program design</strong> - "What should I focus on this week?"</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="aiChatInput" placeholder="Ask your AI coach anything..." 
+                 style="flex: 1; padding: 14px 16px; border: 2px solid var(--border); border-radius: 8px; font-size: 15px;"
+                 onkeypress="if(event.key==='Enter') sendAIChat()">
+          <button class="btn btn-primary" onclick="sendAIChat()" style="padding: 14px 24px;">
+            <i class="fas fa-paper-plane"></i>
+          </button>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;">
+          <button class="btn btn-outline" onclick="askQuickQuestion('What should I focus on in my next workout?')" style="font-size: 12px; padding: 8px 12px;">
+            <i class="fas fa-dumbbell"></i> Next workout focus
+          </button>
+          <button class="btn btn-outline" onclick="askQuickQuestion('Analyze my training volume - am I doing enough?')" style="font-size: 12px; padding: 8px 12px;">
+            <i class="fas fa-chart-bar"></i> Volume check
+          </button>
+          <button class="btn btn-outline" onclick="askQuickQuestion('Which exercises should I increase weight on?')" style="font-size: 12px; padding: 8px 12px;">
+            <i class="fas fa-arrow-up"></i> Progressive overload
+          </button>
+          <button class="btn btn-outline" onclick="askQuickQuestion('Are there any muscle imbalances I should address?')" style="font-size: 12px; padding: 8px 12px;">
+            <i class="fas fa-balance-scale"></i> Muscle balance
+          </button>
+        </div>
+      </div>
+      
+      <!-- Plateau Alerts -->
+      ${data.plateauExercises && data.plateauExercises.length > 0 ? `
+        <div class="card" style="border-left: 4px solid var(--warning);">
+          <h3 style="color: var(--warning);"><i class="fas fa-exclamation-triangle"></i> Plateau Detected</h3>
+          <p style="color: var(--text-secondary); margin-bottom: 16px;">These exercises haven't progressed in 3+ weeks. Ask your AI coach for strategies to break through!</p>
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            ${data.plateauExercises.map(p => `
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--warning-light); border-radius: 8px;">
+                <div>
+                  <strong>${p.exercise_name}</strong>
+                  <div style="font-size: 13px; color: var(--text-secondary);">${p.muscle_group} • Stuck at ${formatWeight(p.current_weight)}</div>
                 </div>
-                <p style="margin: 0 0 12px 0; line-height: 1.6;">${rec.description}</p>
-                ${rec.action_items && rec.action_items.length > 0 ? `
-                  <div style="background: white; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
-                    <strong style="font-size: 13px; color: var(--dark); display: block; margin-bottom: 8px;">
-                      <i class="fas fa-tasks"></i> Action Items:
-                    </strong>
-                    <ul style="margin: 0; padding-left: 20px; line-height: 1.8;">
-                      ${rec.action_items.map(item => `<li>${item}</li>`).join('')}
-                    </ul>
-                  </div>
-                ` : ''}
-                <div style="display: flex; gap: 8px;">
-                  ${rec.auto_apply ? `
-                    <button class="btn btn-primary" onclick="applyRecommendation(${rec.id})" style="flex: 1;">
-                      <i class="fas fa-magic"></i> Apply Automatically
-                    </button>
-                  ` : ''}
-                  <button class="btn btn-outline" onclick="dismissRecommendation(${rec.id})" style="flex: 1;">
-                    <i class="fas fa-times"></i> Dismiss
-                  </button>
-                  <button class="btn btn-outline" onclick="viewRecommendationDetails(${rec.id})">
-                    <i class="fas fa-info-circle"></i> Details
-                  </button>
-                </div>
+                <button class="btn btn-outline" onclick="askQuickQuestion('How do I break through my ${p.exercise_name} plateau? I\\'ve been stuck at ${formatWeight(p.current_weight)} for weeks.')" style="font-size: 12px;">
+                  <i class="fas fa-lightbulb"></i> Get Tips
+                </button>
               </div>
             `).join('')}
           </div>
         </div>
-      ` : `
-        <div class="card">
-          <div style="text-align: center; padding: 40px 20px;">
-            <i class="fas fa-brain" style="font-size: 64px; color: var(--gray); margin-bottom: 16px;"></i>
-            <h3 style="color: var(--dark);">Analyzing Your Training...</h3>
-            <p style="color: var(--gray); margin-bottom: 24px;">Complete more workouts to receive personalized AI recommendations</p>
-            <button class="btn btn-primary" onclick="generateRecommendations()">
-              <i class="fas fa-sync"></i> Generate Recommendations Now
-            </button>
-          </div>
-        </div>
-      `}
+      ` : ''}
       
-      <!-- Recommendation Categories -->
+      <!-- Saved Conversations -->
       <div class="card">
-        <h3><i class="fas fa-th-large"></i> Recommendation Categories</h3>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 16px;">
-          <div style="background: var(--primary-light); padding: 20px; border-radius: 12px; text-align: center;">
-            <i class="fas fa-chart-line" style="font-size: 32px; color: var(--primary); margin-bottom: 8px;"></i>
-            <div style="font-size: 24px; font-weight: bold; color: var(--primary);">${recommendations.stats?.volume || 0}</div>
-            <div style="font-size: 13px; color: var(--gray); margin-top: 4px;">Volume Insights</div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h3 style="margin: 0;"><i class="fas fa-history"></i> Previous Coaching Sessions</h3>
+          <button class="btn btn-outline" onclick="loadSavedConversations()" style="font-size: 12px; padding: 8px 12px;">
+            <i class="fas fa-sync"></i> Refresh
+          </button>
+        </div>
+        <div id="savedConversations" style="max-height: 400px; overflow-y: auto;">
+          <p style="color: var(--text-secondary); text-align: center; padding: 20px;">Loading saved conversations...</p>
+        </div>
+      </div>
+      
+      <!-- Quick Stats for AI Context -->
+      <div class="card">
+        <h3><i class="fas fa-chart-line"></i> Your Training at a Glance</h3>
+        <p style="color: var(--text-secondary); margin-bottom: 16px; font-size: 14px;">This data powers your AI coach's recommendations</p>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px;">
+          <div style="text-align: center; padding: 16px; background: var(--bg-secondary); border-radius: 8px;">
+            <div style="font-size: 24px; font-weight: bold; color: var(--primary);">${data.summary.workouts_per_week}</div>
+            <div style="font-size: 11px; color: var(--text-secondary);">Workouts/Week</div>
           </div>
-          <div style="background: var(--secondary-light); padding: 20px; border-radius: 12px; text-align: center;">
-            <i class="fas fa-sync" style="font-size: 32px; color: var(--secondary); margin-bottom: 8px;"></i>
-            <div style="font-size: 24px; font-weight: bold; color: var(--secondary);">${recommendations.stats?.recovery || 0}</div>
-            <div style="font-size: 13px; color: var(--gray); margin-top: 4px;">Recovery Alerts</div>
+          <div style="text-align: center; padding: 16px; background: var(--bg-secondary); border-radius: 8px;">
+            <div style="font-size: 24px; font-weight: bold; color: var(--secondary);">${formatWeight(data.summary.total_volume_kg)}</div>
+            <div style="font-size: 11px; color: var(--text-secondary);">90-Day Volume</div>
           </div>
-          <div style="background: var(--warning-light); padding: 20px; border-radius: 12px; text-align: center;">
-            <i class="fas fa-balance-scale" style="font-size: 32px; color: var(--warning); margin-bottom: 8px;"></i>
-            <div style="font-size: 24px; font-weight: bold; color: var(--warning);">${recommendations.stats?.balance || 0}</div>
-            <div style="font-size: 13px; color: var(--gray); margin-top: 4px;">Muscle Balance</div>
+          <div style="text-align: center; padding: 16px; background: var(--bg-secondary); border-radius: 8px;">
+            <div style="font-size: 24px; font-weight: bold; color: var(--warning);">${data.summary.avg_workout_duration_minutes}m</div>
+            <div style="font-size: 11px; color: var(--text-secondary);">Avg Duration</div>
           </div>
-          <div style="background: var(--danger-light); padding: 20px; border-radius: 12px; text-align: center;">
-            <i class="fas fa-exclamation-triangle" style="font-size: 32px; color: var(--danger); margin-bottom: 8px;"></i>
-            <div style="font-size: 24px; font-weight: bold; color: var(--danger);">${recommendations.stats?.warnings || 0}</div>
-            <div style="font-size: 13px; color: var(--gray); margin-top: 4px;">Injury Risks</div>
+          <div style="text-align: center; padding: 16px; background: var(--bg-secondary); border-radius: 8px;">
+            <div style="font-size: 24px; font-weight: bold; color: ${data.summary.avg_perceived_exertion > 7 ? 'var(--danger)' : 'var(--primary)'};">
+              ${data.summary.avg_perceived_exertion || '-'}/10
+            </div>
+            <div style="font-size: 11px; color: var(--text-secondary);">Avg Effort</div>
           </div>
         </div>
       </div>
       
-      <!-- AI Settings -->
-      <div class="card">
-        <h3><i class="fas fa-cog"></i> AI Recommendation Settings</h3>
-        <div style="display: flex; flex-direction: column; gap: 16px; margin-top: 16px;">
-          <label style="display: flex; align-items: center; justify-content: space-between; padding: 12px; background: var(--light); border-radius: 8px; cursor: pointer;">
-            <div>
-              <strong style="display: block; margin-bottom: 4px;">Auto-Apply Recommendations</strong>
-              <span style="font-size: 13px; color: var(--gray);">Automatically modify your program based on AI insights</span>
-            </div>
-            <input type="checkbox" id="autoApplyRecs" ${recommendations.settings?.auto_apply ? 'checked' : ''} 
-                   onchange="toggleAutoApply(this.checked)" 
-                   style="width: 20px; height: 20px; cursor: pointer;">
-          </label>
-          <label style="display: flex; align-items: center; justify-content: space-between; padding: 12px; background: var(--light); border-radius: 8px; cursor: pointer;">
-            <div>
-              <strong style="display: block; margin-bottom: 4px;">Weekly Analysis</strong>
-              <span style="font-size: 13px; color: var(--gray);">Generate new recommendations every week</span>
-            </div>
-            <input type="checkbox" id="weeklyAnalysis" ${recommendations.settings?.weekly_analysis !== false ? 'checked' : ''} 
-                   onchange="toggleWeeklyAnalysis(this.checked)" 
-                   style="width: 20px; height: 20px; cursor: pointer;">
-          </label>
-          <label style="display: flex; align-items: center; justify-content: space-between; padding: 12px; background: var(--light); border-radius: 8px; cursor: pointer;">
-            <div>
-              <strong style="display: block; margin-bottom: 4px;">Real-Time Suggestions</strong>
-              <span style="font-size: 13px; color: var(--gray);">Show suggestions during workouts</span>
-            </div>
-            <input type="checkbox" id="realtimeSuggestions" ${recommendations.settings?.realtime_suggestions !== false ? 'checked' : ''} 
-                   onchange="toggleRealtimeSuggestions(this.checked)" 
-                   style="width: 20px; height: 20px; cursor: pointer;">
-          </label>
+      <!-- Advanced Analytics Section -->
+      <div id="advancedAnalyticsSection">
+        <div class="card" style="text-align: center; padding: 40px;">
+          <i class="fas fa-brain fa-spin" style="font-size: 32px; color: var(--primary); margin-bottom: 12px;"></i>
+          <p style="color: var(--text-secondary);">Loading advanced analytics...</p>
         </div>
       </div>
     `;
+    
+    // Load saved conversations
+    loadSavedConversations();
+    
+    // Load advanced analytics
+    loadAdvancedAnalytics();
+    
   } catch (error) {
+    console.error('Error loading AI Coach:', error);
     container.innerHTML = `
       <div class="card">
-        <p>Error loading AI insights: ${error.message}</p>
+        <p style="color: var(--danger);">Error loading AI Coach: ${error.message}</p>
         <button class="btn btn-primary" onclick="loadInsights()">
+          <i class="fas fa-sync"></i> Retry
+        </button>
+      </div>
+    `;
+  }
+}
+
+// Load saved AI coach conversations
+async function loadSavedConversations() {
+  const container = document.getElementById('savedConversations');
+  if (!container) return;
+  
+  try {
+    const result = await api('/ai/coach/history?limit=10');
+    const conversations = result.conversations || [];
+    
+    if (conversations.length === 0) {
+      container.innerHTML = `
+        <p style="color: var(--text-secondary); text-align: center; padding: 20px;">
+          <i class="fas fa-comment-slash" style="font-size: 24px; margin-bottom: 8px; display: block;"></i>
+          No saved conversations yet. Ask your AI coach a question to get started!
+        </p>
+      `;
+      return;
+    }
+    
+    container.innerHTML = conversations.map(conv => `
+      <div style="border: 1px solid var(--border); border-radius: 12px; margin-bottom: 12px; overflow: hidden;">
+        <div style="padding: 12px 16px; background: var(--bg-secondary); border-bottom: 1px solid var(--border);">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <strong style="font-size: 14px;"><i class="fas fa-user"></i> You asked:</strong>
+            <span style="font-size: 11px; color: var(--text-secondary);">${new Date(conv.created_at).toLocaleDateString()} ${new Date(conv.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+          </div>
+          <p style="margin: 8px 0 0 0; font-size: 14px; color: var(--text-primary);">${escapeHtml(conv.user_message)}</p>
+        </div>
+        <div style="padding: 12px 16px;">
+          <strong style="font-size: 14px; color: var(--primary);"><i class="fas fa-robot"></i> AI Coach:</strong>
+          <p style="margin: 8px 0 0 0; font-size: 14px; line-height: 1.6; white-space: pre-wrap;">${escapeHtml(conv.ai_response)}</p>
+        </div>
+      </div>
+    `).join('');
+    
+  } catch (error) {
+    console.error('Error loading saved conversations:', error);
+    container.innerHTML = `
+      <p style="color: var(--danger); text-align: center; padding: 20px;">
+        Error loading saved conversations. <a href="#" onclick="loadSavedConversations(); return false;">Try again</a>
+      </p>
+    `;
+  }
+}
+
+// Load Advanced Analytics
+async function loadAdvancedAnalytics() {
+  const container = document.getElementById('advancedAnalyticsSection');
+  if (!container) return;
+  
+  try {
+    const data = await api('/analytics/advanced');
+    
+    // Get color for recovery status
+    const recoveryColors = {
+      'well_rested': 'var(--secondary)',
+      'moderate': 'var(--warning)',
+      'fatigued': 'var(--danger)',
+      'needs_rest': 'var(--danger)'
+    };
+    const recoveryColor = recoveryColors[data.recovery?.status] || 'var(--gray)';
+    
+    // Get color for consistency
+    const consistencyColor = data.consistency?.consistency >= 70 ? 'var(--secondary)' : 
+                             data.consistency?.consistency >= 40 ? 'var(--warning)' : 'var(--danger)';
+    
+    // Get trend icon
+    const trendIcons = {
+      'increasing': '<i class="fas fa-arrow-up" style="color: var(--secondary);"></i>',
+      'decreasing': '<i class="fas fa-arrow-down" style="color: var(--danger);"></i>',
+      'stable': '<i class="fas fa-minus" style="color: var(--warning);"></i>'
+    };
+    
+    container.innerHTML = `
+      <!-- Advanced Analytics Header -->
+      <div class="card" style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); color: white; border: none;">
+        <h2 style="margin: 0; color: white;"><i class="fas fa-brain"></i> Advanced Analytics</h2>
+        <p style="margin: 8px 0 0 0; opacity: 0.9;">ML-powered predictions and insights based on ${data.summary?.total_workouts_analyzed || 0} workouts</p>
+      </div>
+      
+      <!-- Key Metrics Row -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 16px;">
+        <!-- Recovery Score -->
+        <div class="card" style="text-align: center; padding: 24px;">
+          <div style="width: 80px; height: 80px; border-radius: 50%; background: ${recoveryColor}20; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">
+            <span style="font-size: 28px; font-weight: bold; color: ${recoveryColor};">${data.recovery?.score || 0}</span>
+          </div>
+          <div style="font-weight: 600; margin-bottom: 4px;">Recovery Score</div>
+          <div style="font-size: 13px; color: var(--text-secondary); text-transform: capitalize;">${(data.recovery?.status || 'unknown').replace('_', ' ')}</div>
+          <p style="font-size: 12px; color: var(--text-secondary); margin-top: 8px;">${data.recovery?.recommendation || ''}</p>
+        </div>
+        
+        <!-- Consistency Score -->
+        <div class="card" style="text-align: center; padding: 24px;">
+          <div style="width: 80px; height: 80px; border-radius: 50%; background: ${consistencyColor}20; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">
+            <span style="font-size: 28px; font-weight: bold; color: ${consistencyColor};">${data.consistency?.consistency || 0}%</span>
+          </div>
+          <div style="font-weight: 600; margin-bottom: 4px;">Consistency</div>
+          <div style="font-size: 13px; color: var(--text-secondary);">
+            <i class="fas fa-fire" style="color: var(--warning);"></i> ${data.consistency?.currentStreak || 0} workout streak
+          </div>
+          <p style="font-size: 12px; color: var(--text-secondary); margin-top: 8px;">Best day: ${data.consistency?.bestDay || 'N/A'}</p>
+        </div>
+        
+        <!-- Muscle Balance -->
+        <div class="card" style="text-align: center; padding: 24px;">
+          <div style="width: 80px; height: 80px; border-radius: 50%; background: ${data.muscle_balance?.balance >= 70 ? 'var(--secondary)' : 'var(--warning)'}20; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">
+            <span style="font-size: 28px; font-weight: bold; color: ${data.muscle_balance?.balance >= 70 ? 'var(--secondary)' : 'var(--warning)'};">${data.muscle_balance?.balance || 0}%</span>
+          </div>
+          <div style="font-weight: 600; margin-bottom: 4px;">Muscle Balance</div>
+          <div style="font-size: 13px; color: var(--text-secondary);">
+            ${data.muscle_balance?.imbalances?.length || 0} imbalances detected
+          </div>
+        </div>
+        
+        <!-- Volume Trend -->
+        <div class="card" style="text-align: center; padding: 24px;">
+          <div style="width: 80px; height: 80px; border-radius: 50%; background: var(--primary)20; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">
+            ${trendIcons[data.volume_predictions?.trend] || trendIcons['stable']}
+          </div>
+          <div style="font-weight: 600; margin-bottom: 4px;">Volume Trend</div>
+          <div style="font-size: 13px; color: var(--text-secondary); text-transform: capitalize;">${data.volume_predictions?.trend || 'stable'}</div>
+          <p style="font-size: 12px; color: var(--text-secondary); margin-top: 8px;">${data.volume_predictions?.confidence || 0}% confidence</p>
+        </div>
+      </div>
+      
+      <!-- AI Insights -->
+      ${data.ai_insights?.insights?.length > 0 ? `
+        <div class="card">
+          <h3><i class="fas fa-lightbulb" style="color: var(--warning);"></i> AI-Powered Insights</h3>
+          <p style="color: var(--text-secondary); margin-bottom: 16px; font-size: 14px;">${data.ai_insights?.overall_assessment || ''}</p>
+          <div style="display: grid; gap: 12px;">
+            ${data.ai_insights.insights.map(insight => `
+              <div style="padding: 16px; background: var(--bg-secondary); border-radius: 12px; border-left: 4px solid ${insight.priority === 'high' ? 'var(--danger)' : insight.priority === 'medium' ? 'var(--warning)' : 'var(--secondary)'};">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+                  <strong>${insight.title}</strong>
+                  <span style="font-size: 11px; padding: 2px 8px; background: ${insight.priority === 'high' ? 'var(--danger)' : insight.priority === 'medium' ? 'var(--warning)' : 'var(--secondary)'}; color: white; border-radius: 12px; text-transform: uppercase;">${insight.priority}</span>
+                </div>
+                <p style="font-size: 14px; color: var(--text-secondary); margin: 0 0 8px 0;">${insight.insight}</p>
+                <p style="font-size: 13px; color: var(--primary); margin: 0;"><i class="fas fa-check-circle"></i> ${insight.action}</p>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+      
+      <!-- Strength Predictions -->
+      ${data.strength_predictions?.length > 0 ? `
+        <div class="card">
+          <h3><i class="fas fa-chart-line" style="color: var(--primary);"></i> Strength Predictions</h3>
+          <p style="color: var(--text-secondary); margin-bottom: 16px; font-size: 14px;">Predicted 1RM in 4 weeks based on your progression rate</p>
+          <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+              <thead>
+                <tr style="background: var(--bg-secondary);">
+                  <th style="text-align: left; padding: 12px; border-bottom: 2px solid var(--border);">Exercise</th>
+                  <th style="text-align: right; padding: 12px; border-bottom: 2px solid var(--border);">Current</th>
+                  <th style="text-align: right; padding: 12px; border-bottom: 2px solid var(--border);">Predicted</th>
+                  <th style="text-align: center; padding: 12px; border-bottom: 2px solid var(--border);">Trend</th>
+                  <th style="text-align: right; padding: 12px; border-bottom: 2px solid var(--border);">Confidence</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${data.strength_predictions.slice(0, 8).map(pred => `
+                  <tr>
+                    <td style="padding: 12px; border-bottom: 1px solid var(--border);">
+                      <strong>${pred.exercise_name}</strong>
+                      <div style="font-size: 11px; color: var(--text-secondary);">${pred.data_points} data points</div>
+                    </td>
+                    <td style="text-align: right; padding: 12px; border-bottom: 1px solid var(--border);">${formatWeight(pred.current_max)}</td>
+                    <td style="text-align: right; padding: 12px; border-bottom: 1px solid var(--border); font-weight: bold; color: var(--primary);">${formatWeight(pred.predicted_max_4_weeks)}</td>
+                    <td style="text-align: center; padding: 12px; border-bottom: 1px solid var(--border);">
+                      ${pred.trend === 'increasing' ? '<i class="fas fa-arrow-up" style="color: var(--secondary);"></i>' : pred.trend === 'decreasing' ? '<i class="fas fa-arrow-down" style="color: var(--danger);"></i>' : '<i class="fas fa-minus" style="color: var(--warning);"></i>'}
+                    </td>
+                    <td style="text-align: right; padding: 12px; border-bottom: 1px solid var(--border);">
+                      <span style="padding: 2px 8px; background: ${pred.confidence >= 70 ? 'var(--secondary)' : pred.confidence >= 40 ? 'var(--warning)' : 'var(--gray)'}; color: white; border-radius: 12px; font-size: 11px;">${pred.confidence}%</span>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ` : ''}
+      
+      <!-- Volume Predictions -->
+      ${data.volume_predictions?.predictions?.length > 0 ? `
+        <div class="card">
+          <h3><i class="fas fa-weight" style="color: var(--secondary);"></i> Volume Forecast</h3>
+          <p style="color: var(--text-secondary); margin-bottom: 16px; font-size: 14px;">${data.volume_predictions?.recommendation || ''}</p>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+            ${data.volume_predictions.predictions.map((pred, idx) => `
+              <div style="flex: 1; min-width: 100px; text-align: center; padding: 16px; background: var(--bg-secondary); border-radius: 8px;">
+                <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px;">${pred.week}</div>
+                <div style="font-size: 18px; font-weight: bold; color: var(--primary);">${formatWeight(pred.predicted_volume)}</div>
+              </div>
+            `).join('')}
+          </div>
+          <div style="margin-top: 16px; padding: 12px; background: var(--bg-secondary); border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 13px;">Current Weekly Volume</span>
+            <strong>${formatWeight(data.volume_predictions?.current_weekly_volume || 0)}</strong>
+          </div>
+        </div>
+      ` : ''}
+      
+      <!-- Muscle Balance Details -->
+      ${data.muscle_balance?.imbalances?.length > 0 ? `
+        <div class="card">
+          <h3><i class="fas fa-balance-scale" style="color: var(--warning);"></i> Muscle Imbalances</h3>
+          <p style="color: var(--text-secondary); margin-bottom: 16px; font-size: 14px;">Areas that need attention based on your training volume distribution</p>
+          <div style="display: grid; gap: 8px;">
+            ${data.muscle_balance.imbalances.map(imb => `
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: ${imb.status === 'undertrained' ? 'var(--warning)' : 'var(--danger)'}15; border-radius: 8px; border-left: 4px solid ${imb.status === 'undertrained' ? 'var(--warning)' : 'var(--danger)'};">
+                <div>
+                  <strong>${imb.muscle}</strong>
+                  <span style="font-size: 12px; color: var(--text-secondary); margin-left: 8px; text-transform: capitalize;">${imb.status}</span>
+                </div>
+                <span style="font-size: 13px; color: ${imb.deviation < 0 ? 'var(--danger)' : 'var(--warning)'};">${imb.deviation > 0 ? '+' : ''}${imb.deviation}%</span>
+              </div>
+            `).join('')}
+          </div>
+          ${data.muscle_balance.recommendations?.length > 0 ? `
+            <div style="margin-top: 16px; padding: 12px; background: var(--bg-secondary); border-radius: 8px;">
+              <strong style="font-size: 13px;"><i class="fas fa-lightbulb"></i> Recommendations:</strong>
+              <ul style="margin: 8px 0 0 0; padding-left: 20px; font-size: 13px; color: var(--text-secondary);">
+                ${data.muscle_balance.recommendations.map(rec => `<li>${rec}</li>`).join('')}
+              </ul>
+            </div>
+          ` : ''}
+        </div>
+      ` : ''}
+      
+      <!-- Training Pattern -->
+      ${data.consistency?.dayDistribution ? `
+        <div class="card">
+          <h3><i class="fas fa-calendar-alt" style="color: var(--primary);"></i> Training Pattern</h3>
+          <p style="color: var(--text-secondary); margin-bottom: 16px; font-size: 14px;">Your workout distribution by day of the week</p>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            ${Object.entries(data.consistency.dayDistribution).map(([day, count]) => {
+              const maxCount = Math.max(...Object.values(data.consistency.dayDistribution));
+              const intensity = maxCount > 0 ? count / maxCount : 0;
+              return `
+                <div style="flex: 1; min-width: 60px; text-align: center; padding: 12px 8px; background: rgba(79, 70, 229, ${0.1 + intensity * 0.5}); border-radius: 8px;">
+                  <div style="font-size: 11px; color: var(--text-secondary);">${day.substring(0, 3)}</div>
+                  <div style="font-size: 18px; font-weight: bold; color: var(--primary);">${count}</div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+          <div style="margin-top: 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;">
+            <div style="padding: 12px; background: var(--bg-secondary); border-radius: 8px;">
+              <div style="font-size: 12px; color: var(--text-secondary);">Average Gap</div>
+              <div style="font-size: 18px; font-weight: bold;">${data.consistency?.averageGap || 0} days</div>
+            </div>
+            <div style="padding: 12px; background: var(--bg-secondary); border-radius: 8px;">
+              <div style="font-size: 12px; color: var(--text-secondary);">Longest Streak</div>
+              <div style="font-size: 18px; font-weight: bold;">${data.consistency?.longestStreak || 0} workouts</div>
+            </div>
+            <div style="padding: 12px; background: var(--bg-secondary); border-radius: 8px;">
+              <div style="font-size: 12px; color: var(--text-secondary);">Training Age</div>
+              <div style="font-size: 18px; font-weight: bold;">${data.summary?.training_age_days || 0} days</div>
+            </div>
+          </div>
+        </div>
+      ` : ''}
+    `;
+    
+  } catch (error) {
+    console.error('Error loading advanced analytics:', error);
+    container.innerHTML = `
+      <div class="card">
+        <p style="color: var(--danger);">Error loading advanced analytics: ${error.message}</p>
+        <button class="btn btn-outline" onclick="loadAdvancedAnalytics()">
           <i class="fas fa-sync"></i> Retry
         </button>
       </div>
@@ -3086,6 +4870,378 @@ async function toggleRealtimeSuggestions(enabled) {
   }
 }
 
+// ========== AI COACH FUNCTIONS ==========
+
+// Send message to AI Coach chat
+async function sendAIChat() {
+  const input = document.getElementById('aiChatInput');
+  const messagesContainer = document.getElementById('aiChatMessages');
+  const message = input.value.trim();
+  
+  if (!message) return;
+  
+  // Clear input
+  input.value = '';
+  
+  // Add user message to chat
+  messagesContainer.innerHTML += `
+    <div style="display: flex; gap: 12px; margin-bottom: 12px; justify-content: flex-end;">
+      <div style="background: var(--primary); color: white; padding: 12px 16px; border-radius: 12px; border-top-right-radius: 4px; max-width: 85%;">
+        <p style="margin: 0; line-height: 1.6;">${escapeHtml(message)}</p>
+      </div>
+      <div style="width: 36px; height: 36px; background: var(--secondary); border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+        <i class="fas fa-user" style="color: white;"></i>
+      </div>
+    </div>
+  `;
+  
+  // Add loading indicator
+  const loadingId = 'ai-loading-' + Date.now();
+  messagesContainer.innerHTML += `
+    <div id="${loadingId}" style="display: flex; gap: 12px; margin-bottom: 12px;">
+      <div style="width: 36px; height: 36px; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+        <i class="fas fa-robot" style="color: white;"></i>
+      </div>
+      <div style="background: var(--bg-primary); padding: 12px 16px; border-radius: 12px; border-top-left-radius: 4px;">
+        <i class="fas fa-circle-notch fa-spin"></i> Thinking...
+      </div>
+    </div>
+  `;
+  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  
+  try {
+    // Build conversation history for context
+    const history = (state.aiChatHistory || []).slice(-6).map(h => ({
+      role: h.role,
+      content: h.content
+    }));
+    
+    const response = await api('/ai/coach/chat', {
+      method: 'POST',
+      body: JSON.stringify({ message, history })
+    });
+    
+    // Remove loading indicator
+    document.getElementById(loadingId)?.remove();
+    
+    if (response.success && response.response) {
+      // Store in history
+      state.aiChatHistory = state.aiChatHistory || [];
+      state.aiChatHistory.push({ role: 'user', content: message });
+      state.aiChatHistory.push({ role: 'assistant', content: response.response });
+      
+      // Add AI response
+      messagesContainer.innerHTML += `
+        <div style="display: flex; gap: 12px; margin-bottom: 12px;">
+          <div style="width: 36px; height: 36px; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <i class="fas fa-robot" style="color: white;"></i>
+          </div>
+          <div style="background: var(--bg-primary); padding: 12px 16px; border-radius: 12px; border-top-left-radius: 4px; max-width: 85%;">
+            <p style="margin: 0; line-height: 1.6; white-space: pre-wrap;">${escapeHtml(response.response)}</p>
+          </div>
+        </div>
+      `;
+    } else {
+      messagesContainer.innerHTML += `
+        <div style="display: flex; gap: 12px; margin-bottom: 12px;">
+          <div style="width: 36px; height: 36px; background: var(--danger); border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <i class="fas fa-exclamation" style="color: white;"></i>
+          </div>
+          <div style="background: var(--danger-light); padding: 12px 16px; border-radius: 12px; border-top-left-radius: 4px;">
+            <p style="margin: 0; color: var(--danger);">Sorry, I couldn't process that request. Please try again.</p>
+          </div>
+        </div>
+      `;
+    }
+  } catch (error) {
+    document.getElementById(loadingId)?.remove();
+    messagesContainer.innerHTML += `
+      <div style="display: flex; gap: 12px; margin-bottom: 12px;">
+        <div style="width: 36px; height: 36px; background: var(--danger); border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <i class="fas fa-exclamation" style="color: white;"></i>
+        </div>
+        <div style="background: var(--danger-light); padding: 12px 16px; border-radius: 12px; border-top-left-radius: 4px;">
+          <p style="margin: 0; color: var(--danger);">Error: ${error.message}</p>
+        </div>
+      </div>
+    `;
+  }
+  
+  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+// Quick question helper - fills input and sends
+function askQuickQuestion(question) {
+  const input = document.getElementById('aiChatInput');
+  if (input) {
+    input.value = question;
+    sendAIChat();
+  }
+}
+
+// Generate comprehensive AI coaching analysis
+async function generateAICoaching() {
+  const resultsContainer = document.getElementById('aiAnalysisResults');
+  
+  resultsContainer.innerHTML = `
+    <div class="card" style="text-align: center; padding: 40px;">
+      <i class="fas fa-brain fa-spin" style="font-size: 48px; color: var(--primary); margin-bottom: 16px;"></i>
+      <h3>Generating Personalized Analysis...</h3>
+      <p style="color: var(--text-secondary);">Your AI Coach is analyzing your training patterns, progression, and recovery</p>
+    </div>
+  `;
+  
+  try {
+    const response = await api('/ai/coach/generate', {
+      method: 'POST',
+      body: JSON.stringify({ type: 'comprehensive' })
+    });
+    
+    if (!response.success) {
+      resultsContainer.innerHTML = `
+        <div class="card" style="border-left: 4px solid var(--warning);">
+          <h3><i class="fas fa-info-circle"></i> ${response.message || 'Unable to generate analysis'}</h3>
+          <p style="color: var(--text-secondary);">Complete more workouts to receive detailed AI coaching.</p>
+        </div>
+      `;
+      return;
+    }
+    
+    const analysis = response.analysis;
+    
+    if (!analysis) {
+      resultsContainer.innerHTML = `
+        <div class="card">
+          <h3><i class="fas fa-robot"></i> AI Response</h3>
+          <p style="white-space: pre-wrap; line-height: 1.8;">${response.raw_response || 'No analysis available'}</p>
+        </div>
+      `;
+      return;
+    }
+    
+    resultsContainer.innerHTML = `
+      <!-- Overall Assessment -->
+      <div class="card" style="border-left: 4px solid var(--primary);">
+        <h3><i class="fas fa-clipboard-check"></i> Overall Assessment</h3>
+        <p style="font-size: 16px; line-height: 1.8; margin-top: 12px;">${analysis.overall_assessment || 'Analysis complete.'}</p>
+      </div>
+      
+      <!-- Strengths & Areas for Improvement -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">
+        ${analysis.strengths && analysis.strengths.length > 0 ? `
+          <div class="card" style="border-left: 4px solid var(--secondary);">
+            <h3 style="color: var(--secondary);"><i class="fas fa-thumbs-up"></i> Strengths</h3>
+            <ul style="margin: 12px 0 0 0; padding-left: 20px; line-height: 1.8;">
+              ${analysis.strengths.map(s => `<li>${s}</li>`).join('')}
+            </ul>
+          </div>
+        ` : ''}
+        ${analysis.areas_for_improvement && analysis.areas_for_improvement.length > 0 ? `
+          <div class="card" style="border-left: 4px solid var(--warning);">
+            <h3 style="color: var(--warning);"><i class="fas fa-arrow-up"></i> Areas to Improve</h3>
+            <ul style="margin: 12px 0 0 0; padding-left: 20px; line-height: 1.8;">
+              ${analysis.areas_for_improvement.map(a => `<li>${a}</li>`).join('')}
+            </ul>
+          </div>
+        ` : ''}
+      </div>
+      
+      <!-- Recommendations -->
+      ${analysis.recommendations && analysis.recommendations.length > 0 ? `
+        <div class="card">
+          <h3><i class="fas fa-lightbulb"></i> Personalized Recommendations</h3>
+          <div style="display: flex; flex-direction: column; gap: 16px; margin-top: 16px;">
+            ${analysis.recommendations.map(rec => `
+              <div style="background: var(--bg-secondary); padding: 20px; border-radius: 12px; border-left: 4px solid ${
+                rec.priority === 'high' ? 'var(--danger)' : rec.priority === 'medium' ? 'var(--warning)' : 'var(--secondary)'
+              };">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                  <strong style="font-size: 16px;">${rec.title}</strong>
+                  <div style="display: flex; gap: 8px;">
+                    <span style="background: var(--primary-light); color: var(--primary); padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600;">
+                      ${rec.category || 'general'}
+                    </span>
+                    <span style="background: ${rec.priority === 'high' ? 'var(--danger)' : rec.priority === 'medium' ? 'var(--warning)' : 'var(--secondary)'}; 
+                                 color: white; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; text-transform: uppercase;">
+                      ${rec.priority || 'medium'}
+                    </span>
+                  </div>
+                </div>
+                <p style="margin: 0 0 12px 0; line-height: 1.7;">${rec.description}</p>
+                ${rec.action_steps && rec.action_steps.length > 0 ? `
+                  <div style="background: var(--bg-primary); padding: 12px; border-radius: 8px; margin-bottom: 12px;">
+                    <strong style="font-size: 13px; display: block; margin-bottom: 8px;"><i class="fas fa-tasks"></i> Action Steps:</strong>
+                    <ol style="margin: 0; padding-left: 20px; line-height: 1.8;">
+                      ${rec.action_steps.map(step => `<li>${step}</li>`).join('')}
+                    </ol>
+                  </div>
+                ` : ''}
+                ${rec.expected_outcome ? `
+                  <p style="margin: 0; font-size: 13px; color: var(--secondary);"><i class="fas fa-bullseye"></i> <strong>Expected:</strong> ${rec.expected_outcome}</p>
+                ` : ''}
+                ${rec.timeframe ? `
+                  <p style="margin: 4px 0 0 0; font-size: 13px; color: var(--text-secondary);"><i class="fas fa-clock"></i> ${rec.timeframe}</p>
+                ` : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+      
+      <!-- Quick Tips -->
+      ${analysis.next_workout_tips && analysis.next_workout_tips.length > 0 ? `
+        <div class="card" style="background: linear-gradient(135deg, var(--primary-light) 0%, var(--secondary-light) 100%); border: none;">
+          <h3><i class="fas fa-bolt"></i> Tips for Your Next Workout</h3>
+          <ul style="margin: 12px 0 0 0; padding-left: 20px; line-height: 1.8;">
+            ${analysis.next_workout_tips.map(tip => `<li>${tip}</li>`).join('')}
+          </ul>
+        </div>
+      ` : ''}
+      
+      ${analysis.weekly_focus ? `
+        <div class="card" style="text-align: center; padding: 24px; background: var(--primary); color: white; border: none;">
+          <h3 style="color: white; margin-bottom: 8px;"><i class="fas fa-crosshairs"></i> This Week's Focus</h3>
+          <p style="margin: 0; font-size: 18px; opacity: 0.95;">${analysis.weekly_focus}</p>
+        </div>
+      ` : ''}
+    `;
+    
+  } catch (error) {
+    console.error('Error generating AI coaching:', error);
+    resultsContainer.innerHTML = `
+      <div class="card" style="border-left: 4px solid var(--danger);">
+        <h3 style="color: var(--danger);"><i class="fas fa-exclamation-circle"></i> Error</h3>
+        <p>Failed to generate AI analysis: ${error.message}</p>
+        <button class="btn btn-primary" onclick="generateAICoaching()" style="margin-top: 12px;">
+          <i class="fas fa-sync"></i> Try Again
+        </button>
+      </div>
+    `;
+  }
+}
+
+// Get exercise-specific coaching tips
+async function getExerciseCoaching(exerciseId, exerciseName) {
+  showModal(`
+    <div style="text-align: center; padding: 40px;">
+      <i class="fas fa-dumbbell fa-spin" style="font-size: 48px; color: var(--primary); margin-bottom: 16px;"></i>
+      <h3>Analyzing ${exerciseName}...</h3>
+      <p style="color: var(--text-secondary);">Getting personalized coaching tips</p>
+    </div>
+  `);
+  
+  try {
+    const response = await api(`/ai/coach/exercise/${exerciseId}`);
+    
+    if (!response.success) {
+      showModal(`
+        <h2><i class="fas fa-dumbbell"></i> ${exerciseName}</h2>
+        <div style="margin-top: 20px;">
+          <p style="color: var(--text-secondary);">${response.message || 'Need more workout data for this exercise to provide coaching tips.'}</p>
+        </div>
+        <button class="btn btn-outline" onclick="closeModal()" style="margin-top: 20px;">Close</button>
+      `);
+      return;
+    }
+    
+    const coaching = response.coaching;
+    
+    showModal(`
+      <h2><i class="fas fa-dumbbell"></i> ${response.exercise?.name || exerciseName}</h2>
+      <p style="color: var(--text-secondary); margin-bottom: 20px;">${response.exercise?.muscle_group || ''}</p>
+      
+      ${coaching ? `
+        <!-- Progress Assessment -->
+        ${coaching.progress_assessment ? `
+          <div style="background: var(--bg-secondary); padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+            <strong><i class="fas fa-chart-line"></i> Progress Assessment</strong>
+            <p style="margin: 8px 0 0 0; line-height: 1.6;">${coaching.progress_assessment}</p>
+          </div>
+        ` : ''}
+        
+        <!-- Next Session Recommendation -->
+        ${coaching.next_session_recommendation ? `
+          <div style="background: var(--primary-light); padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+            <strong style="color: var(--primary);"><i class="fas fa-bullseye"></i> Next Session Target</strong>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 12px; text-align: center;">
+              <div>
+                <div style="font-size: 24px; font-weight: bold; color: var(--primary);">${formatWeight(coaching.next_session_recommendation.weight_kg)}</div>
+                <div style="font-size: 12px; color: var(--text-secondary);">Weight</div>
+              </div>
+              <div>
+                <div style="font-size: 24px; font-weight: bold; color: var(--primary);">${coaching.next_session_recommendation.sets || 3}</div>
+                <div style="font-size: 12px; color: var(--text-secondary);">Sets</div>
+              </div>
+              <div>
+                <div style="font-size: 24px; font-weight: bold; color: var(--primary);">${coaching.next_session_recommendation.reps || '8-10'}</div>
+                <div style="font-size: 12px; color: var(--text-secondary);">Reps</div>
+              </div>
+            </div>
+            ${coaching.next_session_recommendation.notes ? `
+              <p style="margin: 12px 0 0 0; font-size: 13px; color: var(--text-secondary);"><i class="fas fa-info-circle"></i> ${coaching.next_session_recommendation.notes}</p>
+            ` : ''}
+          </div>
+        ` : ''}
+        
+        <!-- Technique Tips -->
+        ${coaching.technique_tips && coaching.technique_tips.length > 0 ? `
+          <div style="margin-bottom: 16px;">
+            <strong><i class="fas fa-clipboard-list"></i> Technique Tips</strong>
+            <ul style="margin: 8px 0 0 0; padding-left: 20px; line-height: 1.8;">
+              ${coaching.technique_tips.map(tip => `<li>${tip}</li>`).join('')}
+            </ul>
+          </div>
+        ` : ''}
+        
+        <!-- Common Mistakes -->
+        ${coaching.common_mistakes_to_avoid && coaching.common_mistakes_to_avoid.length > 0 ? `
+          <div style="background: var(--danger-light); padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+            <strong style="color: var(--danger);"><i class="fas fa-exclamation-triangle"></i> Mistakes to Avoid</strong>
+            <ul style="margin: 8px 0 0 0; padding-left: 20px; line-height: 1.8;">
+              ${coaching.common_mistakes_to_avoid.map(m => `<li>${m}</li>`).join('')}
+            </ul>
+          </div>
+        ` : ''}
+        
+        <!-- Progression Plan -->
+        ${coaching.progression_plan ? `
+          <div style="margin-bottom: 16px;">
+            <strong><i class="fas fa-calendar-alt"></i> 4-Week Progression Plan</strong>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 12px;">
+              ${Object.entries(coaching.progression_plan).map(([week, target]) => `
+                <div style="padding: 12px; background: var(--bg-secondary); border-radius: 8px; text-align: center;">
+                  <div style="font-size: 12px; color: var(--text-secondary); text-transform: capitalize;">${week.replace('_', ' ')}</div>
+                  <div style="font-weight: 600; margin-top: 4px;">${target}</div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+      ` : `
+        <p style="white-space: pre-wrap; line-height: 1.8;">${response.raw_response || 'No coaching data available'}</p>
+      `}
+      
+      <button class="btn btn-primary" onclick="closeModal()" style="width: 100%; margin-top: 16px;">
+        Got It
+      </button>
+    `);
+    
+  } catch (error) {
+    showModal(`
+      <h2><i class="fas fa-exclamation-circle" style="color: var(--danger);"></i> Error</h2>
+      <p style="margin: 20px 0;">Failed to get coaching tips: ${error.message}</p>
+      <button class="btn btn-outline" onclick="closeModal()">Close</button>
+    `);
+  }
+}
+
+// Helper function to escape HTML in chat messages
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
 // Achievements
 async function loadAchievements() {
   const container = document.getElementById('achievements');
@@ -3172,8 +5328,8 @@ async function loadAchievements() {
                     <tr>
                       <td><strong>${pr.exercise_name}</strong></td>
                       <td><span class="badge">${pr.record_type.toUpperCase()}</span></td>
-                      <td><strong style="color: var(--secondary);">${pr.record_value.toFixed(1)} kg</strong></td>
-                      <td>${pr.previous_value ? pr.previous_value.toFixed(1) + ' kg' : '-'}</td>
+                      <td><strong style="color: var(--secondary);">${formatWeight(pr.record_value)}</strong></td>
+                      <td>${pr.previous_value ? formatWeight(pr.previous_value) : '-'}</td>
                       <td><span style="color: ${improvementColor}; font-weight: bold;">${improvement}</span></td>
                       <td>${new Date(pr.achieved_at).toLocaleDateString()}</td>
                     </tr>
@@ -3415,21 +5571,6 @@ async function loadNutrition() {
           </div>
         </div>
 
-        <!-- Export Options -->
-        <div style="margin-bottom: 24px; display: flex; gap: 12px; flex-wrap: wrap;">
-          <button class="btn btn-outline" onclick="exportNutritionCSV('daily', 30)">
-            <i class="fas fa-download"></i> Export Daily CSV (30 days)
-          </button>
-          <button class="btn btn-outline" onclick="exportNutritionCSV('weekly', 30)">
-            <i class="fas fa-download"></i> Export Weekly CSV (30 days)
-          </button>
-          <button class="btn btn-outline" onclick="exportNutritionReport(30)">
-            <i class="fas fa-file-alt"></i> Export Report (30 days)
-          </button>
-          <button class="btn btn-outline" onclick="exportNutritionCSV('daily', 90)">
-            <i class="fas fa-download"></i> Export Daily CSV (90 days)
-          </button>
-        </div>
 
         <!-- Weekly Trends -->
         ${weekly_trends.length > 0 ? `
@@ -3896,6 +6037,50 @@ function showProfile() {
       </div>
     </div>
 
+    <hr style="margin: 24px 0; border: none; border-top: 1px solid var(--border);">
+    
+    <h3 style="margin-bottom: 16px;"><i class="fas fa-envelope"></i> Email Reports</h3>
+    <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">
+      Receive workout summary reports comparing your progress to previous periods.
+    </p>
+    
+    <div id="emailReportPrefs" style="margin-bottom: 20px;">
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <label style="display: flex; align-items: center; gap: 12px; cursor: pointer; padding: 12px; background: var(--bg-secondary); border-radius: 8px;">
+          <input type="checkbox" id="weeklyReport" style="width: 18px; height: 18px;">
+          <div>
+            <strong>Weekly Report</strong>
+            <div style="font-size: 12px; color: var(--text-secondary);">Sent every Monday morning</div>
+          </div>
+        </label>
+        <label style="display: flex; align-items: center; gap: 12px; cursor: pointer; padding: 12px; background: var(--bg-secondary); border-radius: 8px;">
+          <input type="checkbox" id="monthlyReport" style="width: 18px; height: 18px;">
+          <div>
+            <strong>Monthly Report</strong>
+            <div style="font-size: 12px; color: var(--text-secondary);">Sent on the 1st of each month</div>
+          </div>
+        </label>
+        <label style="display: flex; align-items: center; gap: 12px; cursor: pointer; padding: 12px; background: var(--bg-secondary); border-radius: 8px;">
+          <input type="checkbox" id="yearlyReport" style="width: 18px; height: 18px;">
+          <div>
+            <strong>Yearly Report</strong>
+            <div style="font-size: 12px; color: var(--text-secondary);">Sent on January 1st</div>
+          </div>
+        </label>
+      </div>
+      <div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+        <button class="btn btn-outline" onclick="previewReport('weekly')" style="font-size: 13px;">
+          <i class="fas fa-eye"></i> Preview Weekly
+        </button>
+        <button class="btn btn-outline" onclick="previewReport('monthly')" style="font-size: 13px;">
+          <i class="fas fa-eye"></i> Preview Monthly
+        </button>
+        <button class="btn btn-outline" onclick="previewReport('yearly')" style="font-size: 13px;">
+          <i class="fas fa-eye"></i> Preview Yearly
+        </button>
+      </div>
+    </div>
+
     <button class="btn btn-primary" onclick="saveProfile()">
       <i class="fas fa-save"></i> Save Profile
     </button>
@@ -3903,6 +6088,9 @@ function showProfile() {
 
   document.getElementById('modalTitle').textContent = 'User Profile';
   openModal();
+  
+  // Load email report preferences
+  loadEmailReportPreferences();
 }
 
 function toggleMeasurementInputs() {
@@ -3946,6 +6134,10 @@ async function saveProfile() {
     });
 
     state.user = data.user;
+    
+    // Also save email report preferences
+    await saveEmailReportPreferences();
+    
     showNotification('Profile updated!', 'success');
     closeModal();
     loadUser();
@@ -3978,6 +6170,54 @@ function formatDateOnly(dateStr) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+// Email report preferences functions
+async function loadEmailReportPreferences() {
+  try {
+    const result = await api('/reports/preferences');
+    const prefs = result.preferences || {};
+    
+    const weeklyEl = document.getElementById('weeklyReport');
+    const monthlyEl = document.getElementById('monthlyReport');
+    const yearlyEl = document.getElementById('yearlyReport');
+    
+    if (weeklyEl) weeklyEl.checked = prefs.weeklyReport || false;
+    if (monthlyEl) monthlyEl.checked = prefs.monthlyReport || false;
+    if (yearlyEl) yearlyEl.checked = prefs.yearlyReport || false;
+  } catch (error) {
+    console.error('Error loading email report preferences:', error);
+  }
+}
+
+async function saveEmailReportPreferences() {
+  try {
+    const weeklyReport = document.getElementById('weeklyReport')?.checked || false;
+    const monthlyReport = document.getElementById('monthlyReport')?.checked || false;
+    const yearlyReport = document.getElementById('yearlyReport')?.checked || false;
+    
+    await api('/reports/preferences', {
+      method: 'PUT',
+      body: JSON.stringify({ weeklyReport, monthlyReport, yearlyReport })
+    });
+    
+    return true;
+  } catch (error) {
+    console.error('Error saving email report preferences:', error);
+    return false;
+  }
+}
+
+async function previewReport(period) {
+  showNotification(`Generating ${period} report preview...`, 'info');
+  
+  try {
+    // Open the HTML report in a new tab
+    const token = localStorage.getItem('token');
+    window.open(`/api/reports/html/${period}?token=${token}`, '_blank');
+  } catch (error) {
+    showNotification('Error generating report: ' + error.message, 'error');
+  }
+}
+
 function openModal(wide = false) {
   const modal = document.getElementById('modal');
   const modalContent = document.querySelector('.modal-content');
@@ -4005,6 +6245,51 @@ function closeModal() {
   const modal = document.getElementById('modal');
   modal.classList.remove('active');
   modal.onclick = null;
+}
+
+// Show rename program modal
+function showRenameProgramModal(programId, currentName) {
+  const modalBody = document.getElementById('modalBody');
+  modalBody.innerHTML = `
+    <div class="form-group">
+      <label>Program Name:</label>
+      <input type="text" id="newProgramName" class="form-control" value="${currentName}" />
+    </div>
+    <div style="display: flex; gap: 12px; margin-top: 20px;">
+      <button class="btn btn-outline" onclick="viewProgram(${programId})">Cancel</button>
+      <button class="btn btn-primary" onclick="renameProgram(${programId})">
+        <i class="fas fa-save"></i> Save Name
+      </button>
+    </div>
+  `;
+  document.getElementById('modalTitle').textContent = 'Rename Program';
+}
+
+// Rename program
+async function renameProgram(programId) {
+  const newName = document.getElementById('newProgramName').value.trim();
+  
+  if (!newName) {
+    showNotification('Please enter a program name', 'error');
+    return;
+  }
+  
+  try {
+    await api(`/programs/${programId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name: newName })
+    });
+    
+    showNotification('Program renamed successfully', 'success');
+    
+    // Refresh the program view
+    viewProgram(programId);
+    
+    // Refresh programs list in background
+    loadPrograms();
+  } catch (error) {
+    showNotification('Failed to rename program: ' + error.message, 'error');
+  }
 }
 
 function showNotification(message, type = 'success') {
@@ -4046,6 +6331,155 @@ async function saveWorkoutNotes() {
     }
   } catch (error) {
     showNotification('Error saving notes: ' + error.message, 'error');
+  }
+}
+
+// Show exercise history with charts and progression
+async function showExerciseHistory(exerciseId, exerciseName) {
+  try {
+    const data = await api(`/analytics/exercise-history/${exerciseId}`);
+    const system = (state.user && state.user.measurement_system) || 'metric';
+    const isImperial = system === 'imperial';
+    const weightUnit = isImperial ? 'lbs' : 'kg';
+    
+    // Create history modal
+    const modal = document.createElement('div');
+    modal.id = 'exercise-history-modal';
+    modal.style.cssText = `
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7); z-index: 20000;
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+    `;
+    
+    const formatHistoryWeight = (kg) => isImperial ? (kg * 2.20462).toFixed(1) : kg?.toFixed(1) || '0';
+    
+    // Build chart data points
+    const chartData = data.progression || [];
+    const maxWeight = Math.max(...chartData.map(d => d.max_weight || 0), 1);
+    const max1RM = Math.max(...chartData.map(d => d.max_1rm || 0), 1);
+    
+    modal.innerHTML = `
+      <div style="background: var(--bg-primary); border-radius: 16px; max-width: 800px; width: 100%; max-height: 90vh; overflow-y: auto;">
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); padding: 24px; border-radius: 16px 16px 0 0; color: white;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h2 style="margin: 0 0 8px 0; font-size: 22px; color: white;">${exerciseName}</h2>
+              <p style="margin: 0; opacity: 0.9; font-size: 14px;">
+                <i class="fas fa-bullseye"></i> ${data.exercise?.muscle_group || 'N/A'} • 
+                <i class="fas fa-dumbbell"></i> ${data.exercise?.equipment || 'N/A'}
+              </p>
+            </div>
+            <button onclick="document.getElementById('exercise-history-modal').remove()" 
+              style="background: rgba(255,255,255,0.2); border: none; color: white; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font-size: 18px;">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+        
+        <!-- Personal Records -->
+        <div style="padding: 20px; border-bottom: 1px solid var(--border);">
+          <h3 style="margin: 0 0 12px 0; font-size: 14px; text-transform: uppercase; color: var(--text-secondary);">
+            <i class="fas fa-trophy" style="color: gold;"></i> Personal Records
+          </h3>
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+            <div style="background: var(--bg-secondary); padding: 16px; border-radius: 12px; text-align: center;">
+              <div style="font-size: 24px; font-weight: bold; color: var(--primary);">${formatHistoryWeight(data.personal_records?.max_weight)} ${weightUnit}</div>
+              <div style="font-size: 12px; color: var(--text-secondary);">Max Weight</div>
+            </div>
+            <div style="background: var(--bg-secondary); padding: 16px; border-radius: 12px; text-align: center;">
+              <div style="font-size: 24px; font-weight: bold; color: var(--secondary);">${formatHistoryWeight(data.personal_records?.max_1rm)} ${weightUnit}</div>
+              <div style="font-size: 12px; color: var(--text-secondary);">Est. 1RM</div>
+            </div>
+            <div style="background: var(--bg-secondary); padding: 16px; border-radius: 12px; text-align: center;">
+              <div style="font-size: 24px; font-weight: bold; color: #f59e0b;">${data.personal_records?.max_reps || 0}</div>
+              <div style="font-size: 12px; color: var(--text-secondary);">Max Reps</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Weight Progression Chart -->
+        ${chartData.length > 1 ? `
+        <div style="padding: 20px; border-bottom: 1px solid var(--border);">
+          <h3 style="margin: 0 0 16px 0; font-size: 14px; text-transform: uppercase; color: var(--text-secondary);">
+            <i class="fas fa-chart-line"></i> Weight Progression
+          </h3>
+          <div style="height: 150px; display: flex; align-items: flex-end; gap: 4px; padding: 10px 0;">
+            ${chartData.slice(-20).map((d, i) => {
+              const heightPercent = (d.max_weight / maxWeight) * 100;
+              const date = new Date(d.workout_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+              return `
+                <div style="flex: 1; display: flex; flex-direction: column; align-items: center; min-width: 30px;">
+                  <div style="font-size: 10px; color: var(--text-secondary); margin-bottom: 4px;">${formatHistoryWeight(d.max_weight)}</div>
+                  <div style="width: 100%; background: linear-gradient(180deg, var(--primary) 0%, var(--secondary) 100%); height: ${heightPercent}%; min-height: 4px; border-radius: 4px 4px 0 0;" title="${date}: ${formatHistoryWeight(d.max_weight)} ${weightUnit}"></div>
+                  <div style="font-size: 9px; color: var(--text-secondary); margin-top: 4px; writing-mode: vertical-rl; transform: rotate(180deg); height: 40px; overflow: hidden;">${date}</div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+        ` : '<div style="padding: 20px; text-align: center; color: var(--text-secondary);">Not enough data for progression chart</div>'}
+        
+        <!-- History Table -->
+        <div style="padding: 20px;">
+          <h3 style="margin: 0 0 16px 0; font-size: 14px; text-transform: uppercase; color: var(--text-secondary);">
+            <i class="fas fa-history"></i> Workout History
+          </h3>
+          ${data.history && data.history.length > 0 ? `
+            <div style="max-height: 300px; overflow-y: auto;">
+              ${data.history.slice(0, 20).map(workout => `
+                <div style="background: var(--bg-secondary); border-radius: 10px; margin-bottom: 12px; overflow: hidden;">
+                  <div style="background: var(--primary); color: white; padding: 10px 14px; font-weight: 600; font-size: 14px;">
+                    <i class="fas fa-calendar"></i> ${new Date(workout.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                  </div>
+                  <div style="padding: 12px;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                      <thead>
+                        <tr style="color: var(--text-secondary); font-size: 12px; text-transform: uppercase;">
+                          <th style="text-align: left; padding: 4px 8px;">Set</th>
+                          <th style="text-align: right; padding: 4px 8px;">Weight</th>
+                          <th style="text-align: right; padding: 4px 8px;">Reps</th>
+                          <th style="text-align: right; padding: 4px 8px;">Est. 1RM</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${workout.sets.map(set => `
+                          <tr style="border-top: 1px solid var(--border);">
+                            <td style="padding: 8px; font-weight: 600;">${set.set_number}</td>
+                            <td style="padding: 8px; text-align: right;">${formatHistoryWeight(set.weight_kg)} ${weightUnit}</td>
+                            <td style="padding: 8px; text-align: right;">${set.reps}</td>
+                            <td style="padding: 8px; text-align: right; color: var(--primary);">${formatHistoryWeight(set.one_rep_max_kg)}</td>
+                          </tr>
+                        `).join('')}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          ` : '<p style="text-align: center; color: var(--text-secondary);">No history available for this exercise</p>'}
+        </div>
+        
+        <!-- Close Button -->
+        <div style="padding: 20px; border-top: 1px solid var(--border); text-align: center;">
+          <button class="btn btn-primary" onclick="document.getElementById('exercise-history-modal').remove()" style="min-width: 150px;">
+            <i class="fas fa-check"></i> Close
+          </button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Close on backdrop click
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.remove();
+    });
+    
+  } catch (error) {
+    showNotification('Error loading exercise history: ' + error.message, 'error');
+    console.error('Exercise history error:', error);
   }
 }
 
@@ -4663,7 +7097,14 @@ function showWorkoutWarmupScreen(workout) {
     background: var(--bg-secondary);
     z-index: 10000;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   `;
+  
+  // Prevent background scrolling on mobile
+  document.body.style.overflow = 'hidden';
+  document.body.style.position = 'fixed';
+  document.body.style.width = '100%';
+  document.body.style.top = `-${window.scrollY}px`;
   
   // Get muscle groups from exercises
   const muscleGroups = [...new Set(workout.exercises.map(ex => ex.muscle_group).filter(Boolean))];
@@ -4775,10 +7216,23 @@ function setupWorkoutModalEventDelegation(modal) {
   });
 }
 
+// Restore body scroll after modal closes
+function restoreBodyScroll() {
+  const scrollY = document.body.style.top;
+  document.body.style.overflow = '';
+  document.body.style.position = '';
+  document.body.style.width = '';
+  document.body.style.top = '';
+  if (scrollY) {
+    window.scrollTo(0, parseInt(scrollY || '0') * -1);
+  }
+}
+
 // Cancel workout start
 function cancelWorkoutStart() {
   const modal = document.getElementById('workout-modal');
   if (modal) modal.remove();
+  restoreBodyScroll();
   
   // Delete the workout that was created
   if (state.currentWorkout) {
@@ -4803,11 +7257,18 @@ async function resumeWorkoutModal() {
       right: 0;
       bottom: 0;
       background: var(--bg-secondary);
-      z-index: 1000;
+      z-index: 10000;
       overflow-y: auto;
       padding: 20px;
+      -webkit-overflow-scrolling: touch;
     `;
     document.body.appendChild(modal);
+    
+    // Prevent background scrolling on mobile
+    document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.width = '100%';
+    document.body.style.top = `-${window.scrollY}px`;
     
     // Set up event delegation for the modal
     setupWorkoutModalEventDelegation(modal);
@@ -4938,7 +7399,7 @@ function renderWorkoutExerciseTabs() {
       
       <!-- Exercise Tabs -->
       <div style="background: var(--light); border-bottom: 2px solid var(--border); padding: 8px 0; overflow-x: auto; flex-shrink: 0;">
-        <div style="max-width: 1200px; margin: 0 auto; padding: 0 20px; display: flex; gap: 8px;">
+        <div style="max-width: 1200px; margin: 0 auto; padding: 0 20px; display: flex; gap: 8px; align-items: center;">
           ${workout.exercises.map((ex, idx) => {
             const hasRecordedSets = ex.sets && ex.sets.length > 0;
             const isComplete = hasRecordedSets && ex.sets.length >= (ex.target_sets || 1);
@@ -4961,11 +7422,25 @@ function renderWorkoutExerciseTabs() {
             }
             
             return `
-            <button 
-              onclick="switchToExercise(${idx})"
-              style="padding: 12px 20px; border: none; background: ${bgColor}; color: ${textColor}; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap; opacity: ${opacity};">
-              ${isComplete ? '<i class="fas fa-check"></i>' : ''} ${ex.name.length > 20 ? ex.name.substring(0, 20) + '...' : ex.name}
-            </button>
+            <div style="display: flex; align-items: center; gap: 2px;">
+              <button 
+                onclick="switchToExercise(${idx})"
+                style="padding: 12px 20px; border: none; background: ${bgColor}; color: ${textColor}; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap; opacity: ${opacity};">
+                ${isComplete ? '<i class="fas fa-check"></i>' : ''} ${ex.name.length > 20 ? ex.name.substring(0, 20) + '...' : ex.name}
+              </button>
+              ${isCurrent ? `
+                <div style="display: flex; flex-direction: column; gap: 2px; margin-left: 4px;">
+                  <button onclick="moveWorkoutExercise(${idx}, -1)" ${idx === 0 ? 'disabled' : ''} 
+                    style="padding: 4px 6px; border: none; background: ${idx === 0 ? 'var(--bg-secondary)' : 'var(--bg-primary)'}; color: ${idx === 0 ? 'var(--text-muted)' : 'var(--primary)'}; border-radius: 4px; cursor: ${idx === 0 ? 'not-allowed' : 'pointer'}; font-size: 10px;" title="Move up">
+                    <i class="fas fa-chevron-up"></i>
+                  </button>
+                  <button onclick="moveWorkoutExercise(${idx}, 1)" ${idx === workout.exercises.length - 1 ? 'disabled' : ''} 
+                    style="padding: 4px 6px; border: none; background: ${idx === workout.exercises.length - 1 ? 'var(--bg-secondary)' : 'var(--bg-primary)'}; color: ${idx === workout.exercises.length - 1 ? 'var(--text-muted)' : 'var(--primary)'}; border-radius: 4px; cursor: ${idx === workout.exercises.length - 1 ? 'not-allowed' : 'pointer'}; font-size: 10px;" title="Move down">
+                    <i class="fas fa-chevron-down"></i>
+                  </button>
+                </div>
+              ` : ''}
+            </div>
           `}).join('')}
         </div>
       </div>
@@ -5478,6 +7953,48 @@ function previousExercise() {
   }
 }
 
+// Move workout exercise up or down
+async function moveWorkoutExercise(index, direction) {
+  const exercises = state.currentWorkout.exercises;
+  const newIndex = index + direction;
+  
+  // Validate bounds
+  if (newIndex < 0 || newIndex >= exercises.length) return;
+  
+  // Swap exercises in local state
+  const temp = exercises[index];
+  exercises[index] = exercises[newIndex];
+  exercises[newIndex] = temp;
+  
+  // Update current index to follow the moved exercise
+  state.workoutExercise.currentIndex = newIndex;
+  
+  // Re-render immediately for responsive UI
+  renderWorkoutExerciseTabs();
+  
+  // Build exercise orders array for API
+  const exerciseOrders = exercises.map((ex, idx) => ({
+    id: ex.id,
+    order_index: idx
+  }));
+  
+  try {
+    await api(`/workouts/${state.currentWorkout.id}/reorder`, {
+      method: 'PATCH',
+      body: JSON.stringify({ exerciseOrders })
+    });
+    
+    showNotification(`Exercise moved ${direction < 0 ? 'up' : 'down'}`, 'success');
+  } catch (error) {
+    // Revert on failure
+    exercises[newIndex] = exercises[index];
+    exercises[index] = temp;
+    state.workoutExercise.currentIndex = index;
+    renderWorkoutExerciseTabs();
+    showNotification('Failed to reorder exercise: ' + error.message, 'error');
+  }
+}
+
 // End workout early
 function endWorkoutEarly() {
   if (confirm('Are you sure you want to end this workout? Your progress will be saved.')) {
@@ -5491,6 +8008,7 @@ function minimizeWorkout() {
   if (modal) {
     modal.style.display = 'none';
   }
+  restoreBodyScroll();
   
   // Stop the rest timer display but keep workout state
   if (state.restTimerInterval) {
@@ -5984,6 +8502,7 @@ async function deleteCompletedWorkout() {
     // Close modal
     const modal = document.getElementById('workout-modal');
     if (modal) modal.remove();
+    restoreBodyScroll();
     
     // Stop any active rest timer
     if (state.restTimerInterval) {
@@ -6067,6 +8586,7 @@ async function finishWorkoutSummary() {
   
   const modal = document.getElementById('workout-modal');
   if (modal) modal.remove();
+  restoreBodyScroll();
   
   // Clear workout state
   state.currentWorkout = null;

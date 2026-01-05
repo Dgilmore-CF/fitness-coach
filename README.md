@@ -1206,19 +1206,434 @@ For detailed technical documentation, see the `docs/` folder:
 
 ---
 
+## Email Report Integration
+
+The AI Fitness Coach supports automated email reports (weekly, monthly, yearly) that compare your progress to previous periods. To enable email sending, you need to integrate with an email service provider.
+
+### Supported Email Services
+
+Choose one of these providers:
+
+| Provider | Free Tier | Best For |
+|----------|-----------|----------|
+| **SendGrid** | 100 emails/day | Most popular, great docs |
+| **Mailgun** | 5,000 emails/month (3 months) | Developer-friendly |
+| **Resend** | 3,000 emails/month | Modern API, great DX |
+| **Amazon SES** | 62,000 emails/month (from EC2) | High volume, low cost |
+
+---
+
+### Option 1: SendGrid Integration (Recommended)
+
+**Step 1: Create SendGrid Account**
+
+1. Go to [sendgrid.com](https://sendgrid.com) and sign up
+2. Verify your email address
+3. Complete the sender authentication process
+
+**Step 2: Create API Key**
+
+1. Navigate to **Settings** → **API Keys**
+2. Click **Create API Key**
+3. Name it "AI Fitness Coach"
+4. Select **Restricted Access**:
+   - **Mail Send** → Full Access
+5. Click **Create & View**
+6. **Copy the API key immediately** (shown only once!)
+
+**Step 3: Verify Sender Identity**
+
+1. Go to **Settings** → **Sender Authentication**
+2. Choose **Single Sender Verification** (easiest)
+3. Fill in your sender details:
+   - From Email: `noreply@yourdomain.com` (or your email)
+   - From Name: `AI Fitness Coach`
+4. Click the verification link sent to your email
+
+**Step 4: Add Secret to Cloudflare Worker**
+
+```bash
+# Set the SendGrid API key as a secret
+npx wrangler secret put SENDGRID_API_KEY
+# Paste your API key when prompted
+
+# Set your verified sender email
+npx wrangler secret put EMAIL_FROM
+# Enter: noreply@yourdomain.com
+```
+
+**Step 5: Update the Email Reports Service**
+
+Edit `src/services/email-reports.js` and add the `sendEmail` function:
+
+```javascript
+// Add this function to src/services/email-reports.js
+
+export async function sendEmailReport(env, toEmail, subject, htmlContent) {
+  const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${env.SENDGRID_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      personalizations: [{ to: [{ email: toEmail }] }],
+      from: { email: env.EMAIL_FROM, name: 'AI Fitness Coach' },
+      subject: subject,
+      content: [{ type: 'text/html', value: htmlContent }],
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`SendGrid error: ${error}`);
+  }
+
+  return { success: true };
+}
+```
+
+**Step 6: Update the Reports Route**
+
+Edit `src/routes/reports.js` to use the new function:
+
+```javascript
+// Add import at top of src/routes/reports.js
+import { sendEmailReport } from '../services/email-reports.js';
+
+// Replace the send-test endpoint with:
+reports.post('/send-test/:period', async (c) => {
+  const user = requireAuth(c);
+  const db = c.env.DB;
+  const period = c.req.param('period');
+
+  if (!['weekly', 'monthly', 'yearly'].includes(period)) {
+    return c.json({ error: 'Invalid period' }, 400);
+  }
+
+  try {
+    const userData = await db.prepare('SELECT email, name FROM users WHERE id = ?')
+      .bind(user.id).first();
+    
+    if (!userData?.email) {
+      return c.json({ error: 'No email address found' }, 400);
+    }
+
+    const report = await generateWorkoutReport(db, user.id, period);
+    const html = generateReportHTML(report);
+    
+    const periodTitle = period.charAt(0).toUpperCase() + period.slice(1);
+    const subject = `Your ${periodTitle} Workout Report - AI Fitness Coach`;
+
+    await sendEmailReport(c.env, userData.email, subject, html);
+
+    return c.json({ 
+      success: true, 
+      message: `Report sent to ${userData.email}` 
+    });
+  } catch (error) {
+    console.error('Error sending report:', error);
+    return c.json({ error: 'Failed to send report: ' + error.message }, 500);
+  }
+});
+```
+
+---
+
+### Option 2: Resend Integration (Modern Alternative)
+
+**Step 1: Create Resend Account**
+
+1. Go to [resend.com](https://resend.com) and sign up
+2. Verify your email address
+
+**Step 2: Create API Key**
+
+1. Go to **API Keys** in the dashboard
+2. Click **Create API Key**
+3. Name it "AI Fitness Coach"
+4. Copy the API key
+
+**Step 3: Add Domain (Optional but Recommended)**
+
+1. Go to **Domains** → **Add Domain**
+2. Add DNS records to your domain
+3. Wait for verification
+
+**Step 4: Add Secrets to Cloudflare Worker**
+
+```bash
+npx wrangler secret put RESEND_API_KEY
+# Paste your API key
+
+npx wrangler secret put EMAIL_FROM
+# Enter: noreply@yourdomain.com (or onboarding@resend.dev for testing)
+```
+
+**Step 5: Update Email Reports Service**
+
+```javascript
+// Add to src/services/email-reports.js
+
+export async function sendEmailReport(env, toEmail, subject, htmlContent) {
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: `AI Fitness Coach <${env.EMAIL_FROM}>`,
+      to: [toEmail],
+      subject: subject,
+      html: htmlContent,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(`Resend error: ${JSON.stringify(error)}`);
+  }
+
+  return { success: true };
+}
+```
+
+---
+
+### Option 3: Mailgun Integration
+
+**Step 1: Create Mailgun Account**
+
+1. Go to [mailgun.com](https://www.mailgun.com) and sign up
+2. Verify your email and add payment method (required for sending)
+
+**Step 2: Get API Credentials**
+
+1. Go to **Sending** → **Domains**
+2. Use the sandbox domain for testing, or add your own domain
+3. Go to **API Security** → Copy your **Private API key**
+4. Note your domain (e.g., `sandbox123.mailgun.org`)
+
+**Step 3: Add Secrets**
+
+```bash
+npx wrangler secret put MAILGUN_API_KEY
+# Paste your private API key
+
+npx wrangler secret put MAILGUN_DOMAIN
+# Enter: your-domain.mailgun.org
+
+npx wrangler secret put EMAIL_FROM
+# Enter: noreply@your-domain.mailgun.org
+```
+
+**Step 4: Update Email Reports Service**
+
+```javascript
+// Add to src/services/email-reports.js
+
+export async function sendEmailReport(env, toEmail, subject, htmlContent) {
+  const auth = btoa(`api:${env.MAILGUN_API_KEY}`);
+  
+  const formData = new FormData();
+  formData.append('from', `AI Fitness Coach <${env.EMAIL_FROM}>`);
+  formData.append('to', toEmail);
+  formData.append('subject', subject);
+  formData.append('html', htmlContent);
+
+  const response = await fetch(
+    `https://api.mailgun.net/v3/${env.MAILGUN_DOMAIN}/messages`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${auth}`,
+      },
+      body: formData,
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Mailgun error: ${error}`);
+  }
+
+  return { success: true };
+}
+```
+
+---
+
+### Setting Up Automated Report Scheduling
+
+Cloudflare Workers support **Cron Triggers** for scheduled tasks. Here's how to set up automatic report sending:
+
+**Step 1: Add Cron Triggers to wrangler.toml**
+
+```toml
+# Add to wrangler.toml
+
+[triggers]
+crons = [
+  "0 8 * * 1",    # Weekly: Every Monday at 8 AM UTC
+  "0 8 1 * *",   # Monthly: 1st of each month at 8 AM UTC  
+  "0 8 1 1 *"    # Yearly: January 1st at 8 AM UTC
+]
+```
+
+**Step 2: Add Scheduled Handler to index.js**
+
+```javascript
+// Add to src/index.js (after the app export)
+
+export default {
+  fetch: app.fetch,
+  
+  async scheduled(event, env, ctx) {
+    const db = env.DB;
+    
+    // Determine which reports to send based on cron schedule
+    const now = new Date();
+    const dayOfWeek = now.getUTCDay();
+    const dayOfMonth = now.getUTCDate();
+    const month = now.getUTCMonth();
+    
+    let reportType = null;
+    if (month === 0 && dayOfMonth === 1) {
+      reportType = 'yearly';
+    } else if (dayOfMonth === 1) {
+      reportType = 'monthly';
+    } else if (dayOfWeek === 1) {
+      reportType = 'weekly';
+    }
+    
+    if (!reportType) return;
+    
+    // Get users who have this report type enabled
+    const users = await db.prepare(`
+      SELECT u.id, u.email, u.name
+      FROM users u
+      JOIN email_report_preferences erp ON u.id = erp.user_id
+      WHERE erp.${reportType}_report = 1
+    `).all();
+    
+    // Send reports to each user
+    for (const user of users.results || []) {
+      try {
+        const { generateWorkoutReport, generateReportHTML, sendEmailReport } = 
+          await import('./services/email-reports.js');
+        
+        const report = await generateWorkoutReport(db, user.id, reportType);
+        const html = generateReportHTML(report);
+        const subject = `Your ${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Workout Report`;
+        
+        await sendEmailReport(env, user.email, subject, html);
+        
+        // Update last sent timestamp
+        await db.prepare(`
+          UPDATE email_report_preferences 
+          SET last_${reportType}_sent = CURRENT_TIMESTAMP 
+          WHERE user_id = ?
+        `).bind(user.id).run();
+        
+        console.log(`Sent ${reportType} report to ${user.email}`);
+      } catch (error) {
+        console.error(`Failed to send report to ${user.email}:`, error);
+      }
+    }
+  }
+};
+```
+
+**Step 3: Deploy and Test**
+
+```bash
+# Deploy with cron triggers
+npm run deploy
+
+# Test the scheduled handler locally
+npx wrangler dev --test-scheduled
+
+# In another terminal, trigger the cron:
+curl "http://localhost:8787/__scheduled?cron=0+8+*+*+1"
+```
+
+---
+
+### Testing Email Integration
+
+**1. Preview Reports (No Email Service Required)**
+
+Users can preview reports in-app before enabling email:
+- Go to **Profile** → **Email Reports** section
+- Click **Preview Weekly/Monthly/Yearly** buttons
+- Report opens in new tab
+
+**2. Send Test Email**
+
+```bash
+# Using curl (replace YOUR_TOKEN with your auth token)
+curl -X POST "https://your-worker.workers.dev/api/reports/send-test/weekly" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+**3. Check Logs**
+
+```bash
+# View live logs for email sending
+npx wrangler tail
+```
+
+---
+
+### Troubleshooting Email Issues
+
+| Issue | Solution |
+|-------|----------|
+| "Unauthorized" from SendGrid | Check API key has Mail Send permission |
+| "Domain not verified" | Complete sender authentication in provider dashboard |
+| Emails going to spam | Set up SPF, DKIM, and DMARC records for your domain |
+| "Rate limit exceeded" | Check your provider's free tier limits |
+| No emails received | Check spam folder, verify recipient email is correct |
+
+### Email Deliverability Tips
+
+1. **Use a custom domain** - Improves trust with email providers
+2. **Set up DNS records** - SPF, DKIM, DMARC for authentication
+3. **Use consistent sender** - Always send from same address
+4. **Include unsubscribe** - Required by law (CAN-SPAM, GDPR)
+5. **Monitor bounce rates** - High bounces hurt deliverability
+
+---
+
 ## Roadmap & Future Enhancements
+
+### Completed Features ✅
+- [x] **Workout challenges and achievements** - Unlock achievements, track streaks, earn badges
+- [x] **Export data to CSV/JSON** - Full data export system for workouts, nutrition, health data, and personal records
+- [x] **Calendar view for workout history** - Visual calendar displaying workout days with details on click
+- [x] **Email reports** - Automated weekly, monthly, and yearly workout summary reports
+- [x] **Exercise reordering** - Drag exercises up/down within program days and during active workouts
+- [x] **Comprehensive exercise library** - 200+ exercises including full bodyweight exercise collection
+- [x] **Nutrition tracking** - Daily protein and water intake logging
+- [x] **Personal records tracking** - Automatic PR detection for weight, volume, and estimated 1RM
+- [x] **AI-powered recommendations** - Smart workout suggestions based on training history
+- [x] **Rest timer** - Configurable rest periods with audio notifications
+- [x] **Workout notes** - Add notes to workouts and individual exercises
+- [x] **Dark mode** - Full dark theme support
+- [x] **Mobile-responsive design** - Optimized for all screen sizes
+- [x] **Advanced analytics** - ML-powered predictions for strength progression, volume trends, recovery scores, and muscle balance analysis
+- [x] **PDF export with charts** - Professional report builder with customizable charts, analytics, and data visualization
 
 ### Planned Features
 - [ ] Exercise demonstration videos
 - [ ] Social features (share workouts, follow friends)
-- [ ] Advanced analytics (machine learning predictions)
 - [ ] Meal planning and macro tracking
 - [ ] Native mobile apps (iOS/Android)
 - [ ] Integration with fitness wearables (Fitbit, Garmin)
 - [ ] Form check AI using computer vision
-- [x] Workout challenges and achievements ✅ **COMPLETED**
-- [ ] Export data to CSV/PDF
 - [ ] Progressive Web App (PWA) support
+- [ ] Workout templates marketplace
 
 ### Community Requests
 - Open issues on GitHub to suggest features

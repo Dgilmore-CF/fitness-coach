@@ -97,4 +97,68 @@ achievements.get('/leaderboard', async (c) => {
   });
 });
 
+// Recalculate all PRs from actual set data (fixes corrupted PR data)
+achievements.post('/prs/recalculate', async (c) => {
+  const user = requireAuth(c);
+  const db = c.env.DB;
+
+  try {
+    // Delete all existing PRs for this user
+    await db.prepare('DELETE FROM personal_records WHERE user_id = ?').bind(user.id).run();
+
+    // Get all sets with their exercise info, grouped by exercise
+    const allSets = await db.prepare(`
+      SELECT 
+        s.weight_kg,
+        s.reps,
+        s.one_rep_max_kg,
+        we.exercise_id,
+        e.name as exercise_name,
+        w.id as workout_id,
+        w.start_time
+      FROM sets s
+      JOIN workout_exercises we ON s.workout_exercise_id = we.id
+      JOIN exercises e ON we.exercise_id = e.id
+      JOIN workouts w ON we.workout_id = w.id
+      WHERE w.user_id = ? AND w.completed = 1 AND s.weight_kg > 0
+      ORDER BY we.exercise_id, w.start_time
+    `).bind(user.id).all();
+
+    // Group by exercise and find best 1RM for each
+    const exerciseBests = {};
+    for (const set of allSets.results || []) {
+      // Calculate 1RM using Epley formula
+      const oneRM = set.reps === 1 ? set.weight_kg : set.weight_kg * (1 + set.reps / 30);
+      
+      if (!exerciseBests[set.exercise_id] || oneRM > exerciseBests[set.exercise_id].best1RM) {
+        exerciseBests[set.exercise_id] = {
+          best1RM: oneRM,
+          exerciseName: set.exercise_name,
+          workoutId: set.workout_id,
+          achievedAt: set.start_time
+        };
+      }
+    }
+
+    // Insert new PRs
+    let prCount = 0;
+    for (const [exerciseId, data] of Object.entries(exerciseBests)) {
+      await db.prepare(`
+        INSERT INTO personal_records (user_id, exercise_id, record_type, record_value, workout_id, previous_value, achieved_at)
+        VALUES (?, ?, '1rm', ?, ?, 0, ?)
+      `).bind(user.id, exerciseId, data.best1RM, data.workoutId, data.achievedAt).run();
+      prCount++;
+    }
+
+    return c.json({ 
+      success: true, 
+      message: `Recalculated ${prCount} personal records from your workout history`,
+      prs_updated: prCount
+    });
+  } catch (error) {
+    console.error('Error recalculating PRs:', error);
+    return c.json({ error: 'Failed to recalculate PRs: ' + error.message }, 500);
+  }
+});
+
 export default achievements;

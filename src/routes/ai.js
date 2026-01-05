@@ -1,5 +1,11 @@
 import { Hono } from 'hono';
 import { requireAuth } from '../middleware/auth';
+import { 
+  aggregateTrainingData, 
+  generateCoachingAnalysis, 
+  getExerciseCoaching,
+  chatWithCoach 
+} from '../services/ai-coach.js';
 
 const ai = new Hono();
 
@@ -292,6 +298,163 @@ ai.patch('/recommendations/settings', async (c) => {
   }
 
   return c.json({ message: 'Settings updated successfully' });
+});
+
+// ========== NEW AI COACH ENDPOINTS ==========
+
+// Get comprehensive training data analysis
+ai.get('/coach/analysis', async (c) => {
+  const user = requireAuth(c);
+  const db = c.env.DB;
+  const days = parseInt(c.req.query('days')) || 90;
+
+  try {
+    const trainingData = await aggregateTrainingData(db, user.id, { days });
+    return c.json({ 
+      success: true, 
+      data: trainingData 
+    });
+  } catch (error) {
+    console.error('Error aggregating training data:', error.message, error.stack);
+    return c.json({ error: 'Failed to aggregate training data: ' + error.message }, 500);
+  }
+});
+
+// Generate AI coaching recommendations
+ai.post('/coach/generate', async (c) => {
+  const user = requireAuth(c);
+  const db = c.env.DB;
+  const aiModel = c.env.AI;
+  
+  let analysisType = 'comprehensive';
+  try {
+    const body = await c.req.json();
+    analysisType = body.type || 'comprehensive';
+  } catch (e) {
+    // Use default
+  }
+
+  try {
+    const result = await generateCoachingAnalysis(db, aiModel, user.id, analysisType);
+    return c.json(result);
+  } catch (error) {
+    console.error('Error generating coaching analysis:', error);
+    return c.json({ error: 'Failed to generate coaching analysis' }, 500);
+  }
+});
+
+// Get exercise-specific coaching
+ai.get('/coach/exercise/:exerciseId', async (c) => {
+  const user = requireAuth(c);
+  const db = c.env.DB;
+  const aiModel = c.env.AI;
+  const exerciseId = c.req.param('exerciseId');
+
+  try {
+    const result = await getExerciseCoaching(db, aiModel, user.id, exerciseId);
+    return c.json(result);
+  } catch (error) {
+    console.error('Error getting exercise coaching:', error);
+    return c.json({ error: 'Failed to get exercise coaching' }, 500);
+  }
+});
+
+// AI Coach chat
+ai.post('/coach/chat', async (c) => {
+  const user = requireAuth(c);
+  const db = c.env.DB;
+  const aiModel = c.env.AI;
+
+  try {
+    const body = await c.req.json();
+    const { message, history = [] } = body;
+
+    if (!message || message.trim().length === 0) {
+      return c.json({ error: 'Message is required' }, 400);
+    }
+
+    const result = await chatWithCoach(db, aiModel, user.id, message, history);
+    
+    // Save conversation to database if successful
+    if (result.success) {
+      try {
+        await db.prepare(`
+          INSERT INTO ai_coach_conversations (user_id, user_message, ai_response, context_summary)
+          VALUES (?, ?, ?, ?)
+        `).bind(
+          user.id,
+          message,
+          result.response,
+          JSON.stringify(result.context_used || {})
+        ).run();
+      } catch (saveError) {
+        console.error('Error saving conversation:', saveError);
+        // Don't fail the request if saving fails
+      }
+    }
+    
+    return c.json(result);
+  } catch (error) {
+    console.error('Error in coach chat:', error);
+    return c.json({ error: 'Failed to process chat message' }, 500);
+  }
+});
+
+// Get saved AI coach conversations
+ai.get('/coach/history', async (c) => {
+  const user = requireAuth(c);
+  const db = c.env.DB;
+  const limit = parseInt(c.req.query('limit') || '20');
+
+  try {
+    const conversations = await db.prepare(`
+      SELECT id, user_message, ai_response, context_summary, created_at
+      FROM ai_coach_conversations
+      WHERE user_id = ?
+      ORDER BY created_at DESC
+      LIMIT ?
+    `).bind(user.id, limit).all();
+
+    return c.json({ 
+      success: true, 
+      conversations: conversations.results || [] 
+    });
+  } catch (error) {
+    console.error('Error fetching conversation history:', error);
+    return c.json({ error: 'Failed to fetch conversation history' }, 500);
+  }
+});
+
+// Save AI recommendation to history
+ai.post('/coach/save-recommendation', async (c) => {
+  const user = requireAuth(c);
+  const db = c.env.DB;
+
+  try {
+    const body = await c.req.json();
+    const { title, category, description, action_items, priority } = body;
+
+    const result = await db.prepare(`
+      INSERT INTO ai_recommendations 
+      (user_id, title, description, category, priority, action_items, status)
+      VALUES (?, ?, ?, ?, ?, ?, 'active')
+    `).bind(
+      user.id,
+      title,
+      description,
+      category || 'general',
+      priority || 'medium',
+      JSON.stringify(action_items || [])
+    ).run();
+
+    return c.json({ 
+      success: true, 
+      recommendation_id: result.meta.last_row_id 
+    });
+  } catch (error) {
+    console.error('Error saving recommendation:', error);
+    return c.json({ error: 'Failed to save recommendation' }, 500);
+  }
 });
 
 export default ai;
