@@ -101,6 +101,39 @@ function feetInchesToCm(feet, inches) {
   return inchesToCm(feet * 12 + inches);
 }
 
+// Measurement system utilities - centralized to avoid duplication
+function getMeasurementSystem() {
+  return (state.user && state.user.measurement_system) || 'metric';
+}
+
+function isImperialSystem() {
+  return getMeasurementSystem() === 'imperial';
+}
+
+function getWeightUnit() {
+  return isImperialSystem() ? 'lbs' : 'kg';
+}
+
+function getWeightStep() {
+  return isImperialSystem() ? '5' : '2.5';
+}
+
+function getDistanceUnit() {
+  return isImperialSystem() ? 'mi' : 'km';
+}
+
+function convertWeightForDisplay(kg) {
+  if (!kg) return '';
+  const value = isImperialSystem() ? kgToLbs(kg) : kg;
+  return value % 1 === 0 ? String(value) : value.toFixed(1);
+}
+
+function convertWeightForStorage(displayWeight) {
+  const weight = parseFloat(displayWeight);
+  if (isNaN(weight)) return null;
+  return isImperialSystem() ? lbsToKg(weight) : weight;
+}
+
 function formatWeight(kg, system) {
   if (!kg) return 'N/A';
   system = system || (state.user && state.user.measurement_system) || 'metric';
@@ -2409,120 +2442,6 @@ function startWorkoutFromDay(programId, dayId) {
   startWorkoutDay(programId, dayId);
 }
 
-// Load workout interface
-async function loadWorkoutInterface() {
-  const container = document.getElementById('workout');
-  
-  try {
-    const data = await api(`/workouts/${state.currentWorkout.id}`);
-    const workout = data.workout;
-
-    // Start workout timer if not already started
-    if (!state.workoutTimer) {
-      startWorkoutTimer(workout);
-    }
-
-    const totalSets = workout.exercises.reduce((sum, ex) => sum + (ex.sets?.length || 0), 0);
-    const totalVolume = workout.exercises.reduce((sum, ex) => {
-      const multiplier = ex.is_unilateral ? 2 : 1;
-      return sum + (ex.sets || []).reduce((exSum, set) => exSum + (set.weight_kg * set.reps * multiplier), 0);
-    }, 0);
-
-    container.innerHTML = `
-      <!-- Header Card -->
-      <div class="card" style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white; border: none;">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
-          <div>
-            <h2 style="color: white; margin-bottom: 8px;"><i class="fas fa-dumbbell"></i> ${workout.day_name || 'Workout Session'}</h2>
-            <div style="font-size: 14px; opacity: 0.9;">${workout.day_focus || 'Strength Training'}</div>
-          </div>
-          <div style="text-align: right;">
-            <div id="workoutTimer" style="font-size: 32px; font-weight: bold; font-family: 'Courier New', monospace;">00:00:00</div>
-            <div style="font-size: 12px; opacity: 0.8; margin-top: 4px;">Duration</div>
-          </div>
-        </div>
-        
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.2);">
-          <div>
-            <div style="font-size: 12px; opacity: 0.8;">Exercises</div>
-            <div style="font-size: 24px; font-weight: bold;">${workout.exercises.length}</div>
-          </div>
-          <div>
-            <div style="font-size: 12px; opacity: 0.8;">Sets Completed</div>
-            <div style="font-size: 24px; font-weight: bold;">${totalSets}</div>
-          </div>
-          <div>
-            <div style="font-size: 12px; opacity: 0.8;">Volume (kg)</div>
-            <div style="font-size: 24px; font-weight: bold;">${Math.round(totalVolume)}</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Quick Actions -->
-      <div class="card">
-        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-          <button class="btn btn-primary" onclick="completeWorkout()" style="flex: 1; min-width: 150px;">
-            <i class="fas fa-check-circle"></i> Complete Workout
-          </button>
-          <button class="btn btn-secondary" onclick="switchToCardio()" style="flex: 1; min-width: 150px;">
-            <i class="fas fa-running"></i> Switch to Cardio
-          </button>
-          <button class="btn btn-danger" onclick="deleteWorkout()" style="min-width: 150px;">
-            <i class="fas fa-trash"></i> Delete Workout
-          </button>
-        </div>
-      </div>
-
-      <!-- Rest Timer -->
-      <div class="card" style="background: var(--light); border: 2px solid var(--border);">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-          <h3 style="margin: 0;"><i class="fas fa-clock"></i> Rest Timer</h3>
-          <button class="btn btn-outline" onclick="stopRestTimer()" style="padding: 6px 12px; font-size: 12px;">
-            <i class="fas fa-stop"></i> Reset
-          </button>
-        </div>
-        <div id="restTimer" style="font-size: 48px; font-weight: bold; text-align: center; font-family: 'Courier New', monospace; color: var(--primary); margin: 16px 0;">00:00</div>
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
-          <button class="btn btn-secondary" onclick="startRestTimer(60)" style="font-size: 14px;">60s</button>
-          <button class="btn btn-secondary" onclick="startRestTimer(90)" style="font-size: 14px;">90s</button>
-          <button class="btn btn-secondary" onclick="startRestTimer(120)" style="font-size: 14px;">2min</button>
-          <button class="btn btn-secondary" onclick="startRestTimer(180)" style="font-size: 14px;">3min</button>
-        </div>
-      </div>
-
-      <!-- Exercises -->
-      <div class="card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-          <h3 style="margin: 0;"><i class="fas fa-list-check"></i> Exercises</h3>
-          <button class="btn btn-outline" onclick="addExerciseToWorkout()" style="padding: 8px 16px;">
-            <i class="fas fa-plus"></i> Add Exercise
-          </button>
-        </div>
-        <div id="exerciseList" style="display: flex; flex-direction: column; gap: 16px;">
-          ${workout.exercises.map((ex, idx) => renderExerciseEnhanced(ex, idx)).join('')}
-        </div>
-      </div>
-
-      <!-- Workout Notes -->
-      <div class="card">
-        <h3><i class="fas fa-sticky-note"></i> Session Notes</h3>
-        <div style="background: var(--light); border-radius: 12px; padding: 16px; margin-top: 12px;">
-          <textarea id="workoutNotes" 
-            placeholder="How did this workout feel? Any modifications made? Energy levels? Notes for next time..." 
-            style="width: 100%; min-height: 120px; border: 2px solid var(--border); border-radius: 8px; padding: 12px; font-size: 14px; resize: vertical; font-family: inherit;">${workout.notes || ''}</textarea>
-          <button class="btn btn-primary" onclick="saveWorkoutNotes()" style="margin-top: 12px; width: 100%;">
-            <i class="fas fa-save"></i> Save Notes
-          </button>
-        </div>
-      </div>
-    `;
-
-    updateWorkoutTimerDisplay();
-  } catch (error) {
-    container.innerHTML = `<div class="card"><p>Error loading workout: ${error.message}</p></div>`;
-  }
-}
-
 // Check if exercise is cardio
 function isCardioExercise(exercise) {
   return exercise.muscle_group === 'Cardio';
@@ -2554,293 +2473,6 @@ function formatCardioTime(seconds) {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-// Render exercise with enhanced UI
-function renderExerciseEnhanced(exercise, index) {
-  // Check if this is a cardio exercise
-  if (isCardioExercise(exercise)) {
-    return renderCardioExercise(exercise, index);
-  }
-  
-  const system = (state.user && state.user.measurement_system) || 'metric';
-  const isImperial = system === 'imperial';
-  const weightUnit = isImperial ? 'lbs' : 'kg';
-  const weightStep = isImperial ? '5' : '2.5';
-  
-  const completedSets = (exercise.sets || []).length;
-  const targetSets = exercise.target_sets || 3;
-  const setsProgress = Math.min((completedSets / targetSets) * 100, 100);
-  
-  // Auto-fill last weight and reps from previous set
-  const lastSet = exercise.sets && exercise.sets.length > 0 ? exercise.sets[exercise.sets.length - 1] : null;
-  let defaultWeight = '';
-  let defaultReps = exercise.target_reps || '';
-  if (lastSet) {
-    if (lastSet.weight_kg) {
-      // Convert to user's preferred unit system
-      const weightValue = isImperial ? kgToLbs(lastSet.weight_kg) : lastSet.weight_kg;
-      defaultWeight = weightValue % 1 === 0 ? String(weightValue) : weightValue.toFixed(1);
-    }
-    if (lastSet.reps) {
-      defaultReps = lastSet.reps;
-    }
-  }
-  
-  return `
-    <div style="background: var(--white); border: 2px solid var(--border); border-radius: 16px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);" id="exercise-${exercise.id}">
-      <!-- Exercise Header -->
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
-        <div style="flex: 1;">
-          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
-            <div style="background: var(--primary); color: white; width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px;">
-              ${index + 1}
-            </div>
-            <h4 style="margin: 0; font-size: 18px; font-weight: 600;">${exercise.name}</h4>
-          </div>
-          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;">
-            <span style="background: var(--secondary-light); color: var(--secondary); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">
-              <i class="fas fa-bullseye"></i> ${exercise.muscle_group}
-            </span>
-            <span style="background: var(--primary-light); color: var(--primary); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">
-              <i class="fas fa-dumbbell"></i> ${exercise.equipment}
-            </span>
-            ${exercise.is_unilateral ? '<span style="background: var(--warning); color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;"><i class="fas fa-balance-scale"></i> Unilateral</span>' : ''}
-          </div>
-        </div>
-        <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
-          <button onclick="deleteExerciseFromWorkout(${exercise.id}, '${exercise.name.replace(/'/g, "\\'")}')" 
-            style="background: none; border: none; color: var(--danger); cursor: pointer; font-size: 14px; padding: 4px 8px; opacity: 0.6; transition: opacity 0.2s;"
-            onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'"
-            title="Remove exercise">
-            <i class="fas fa-trash"></i>
-          </button>
-          <div>
-            <div style="font-size: 24px; font-weight: bold; color: var(--primary);">${completedSets}/${targetSets}</div>
-            <div style="font-size: 11px; color: var(--gray); text-transform: uppercase; letter-spacing: 0.5px;">Sets</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Progress Bar -->
-      <div style="background: var(--light); height: 8px; border-radius: 4px; margin-bottom: 16px; overflow: hidden;">
-        <div style="background: linear-gradient(90deg, var(--secondary) 0%, var(--primary) 100%); height: 100%; width: ${setsProgress}%; transition: width 0.3s;"></div>
-      </div>
-
-      <!-- Exercise Tips (Comprehensive) -->
-      ${exercise.tips ? `
-      <details style="margin-bottom: 16px; background: var(--light); border-radius: 12px; padding: 12px;">
-        <summary style="cursor: pointer; font-weight: 600; color: var(--primary); user-select: none;">
-          <i class="fas fa-lightbulb"></i> Form & Technique Guide
-        </summary>
-        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
-          <div style="font-size: 14px; line-height: 1.6; color: var(--dark); white-space: pre-wrap;">${exercise.tips}</div>
-          ${exercise.target_reps ? `
-          <div style="margin-top: 12px; padding: 12px; background: var(--white); border-radius: 8px; border-left: 4px solid var(--primary);">
-            <strong style="color: var(--primary);"><i class="fas fa-chart-line"></i> AI Recommendation:</strong><br>
-            <span style="font-size: 14px;">${targetSets} sets × ${exercise.target_reps} reps @ ${exercise.target_rpe ? `RPE ${exercise.target_rpe}` : 'moderate intensity'}</span>
-          </div>
-          ` : ''}
-        </div>
-      </details>
-      ` : ''}
-
-      <!-- Completed Sets -->
-      ${(exercise.sets && exercise.sets.length > 0) ? `
-      <div style="margin-bottom: 16px;">
-        <div style="font-size: 13px; font-weight: 600; color: var(--gray); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">
-          <i class="fas fa-check-circle"></i> Completed Sets
-        </div>
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px;">
-          ${exercise.sets.map((set, setIdx) => `
-            <div style="background: linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%); color: white; padding: 12px; border-radius: 10px; position: relative;">
-              <div style="position: absolute; top: 4px; right: 4px; display: flex; gap: 4px;">
-                <button onclick="editSet(${exercise.id}, ${set.id}, ${set.weight_kg || 0}, ${set.reps || 0})" 
-                  style="background: rgba(0,0,0,0.2); border: none; color: white; width: 24px; height: 24px; border-radius: 50%; cursor: pointer; font-size: 10px; display: flex; align-items: center; justify-content: center;"
-                  title="Edit set">
-                  <i class="fas fa-pencil-alt"></i>
-                </button>
-                <button onclick="deleteSet(${exercise.id}, ${set.id})" 
-                  style="background: rgba(0,0,0,0.2); border: none; color: white; width: 24px; height: 24px; border-radius: 50%; cursor: pointer; font-size: 10px; display: flex; align-items: center; justify-content: center;"
-                  title="Delete set">
-                  <i class="fas fa-times"></i>
-                </button>
-              </div>
-              <div style="font-size: 11px; opacity: 0.9; margin-bottom: 4px;">Set ${set.set_number}</div>
-              <div style="font-size: 18px; font-weight: bold;">${formatWeight(set.weight_kg, system)} × ${set.reps}</div>
-              <div style="font-size: 11px; opacity: 0.9; margin-top: 4px;">1RM: ${formatWeight(set.one_rep_max_kg, system)}</div>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-      ` : ''}
-
-      <!-- Add Set Form -->
-      <div style="background: var(--light); border-radius: 12px; padding: 16px;">
-        <div style="font-size: 13px; font-weight: 600; color: var(--gray); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
-          <i class="fas fa-plus-circle"></i> Record Next Set
-        </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr auto auto; gap: 8px; align-items: end;">
-          <div>
-            <label style="font-size: 12px; color: var(--gray); display: block; margin-bottom: 4px; font-weight: 600;">Weight (${weightUnit})</label>
-            <input type="number" id="weight-${exercise.id}" value="${defaultWeight}" placeholder="0" step="${weightStep}" 
-                   style="width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 16px; font-weight: 600;">
-          </div>
-          <div>
-            <label style="font-size: 12px; color: var(--gray); display: block; margin-bottom: 4px; font-weight: 600;">Reps</label>
-            <input type="number" id="reps-${exercise.id}" value="${defaultReps}" placeholder="0" min="1"
-                   style="width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 16px; font-weight: 600;">
-          </div>
-          <button class="btn btn-primary" onclick="recordSet(${exercise.id})" style="padding: 12px 24px; font-size: 16px;">
-            <i class="fas fa-check"></i> Add
-          </button>
-          <button class="btn btn-outline" onclick="showExerciseHistory(${exercise.exercise_id || exercise.id}, '${exercise.name.replace(/'/g, "\\'")}')" style="padding: 12px 16px;" title="View History">
-            <i class="fas fa-chart-line"></i>
-          </button>
-          <button class="btn btn-outline" onclick="showExerciseNotes(${exercise.id})" style="padding: 12px 16px;">
-            <i class="fas fa-sticky-note"></i>
-          </button>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-// Render cardio exercise with duration/calorie tracking
-function renderCardioExercise(exercise, index) {
-  const system = (state.user && state.user.measurement_system) || 'metric';
-  const isImperial = system === 'imperial';
-  const distanceUnit = isImperial ? 'mi' : 'km';
-  
-  // Calculate totals from logged sessions
-  const totalDuration = (exercise.sets || []).reduce((sum, s) => sum + (s.duration_seconds || 0), 0);
-  const totalCalories = (exercise.sets || []).reduce((sum, s) => sum + (s.calories_burned || 0), 0);
-  const totalDistance = (exercise.sets || []).reduce((sum, s) => sum + (s.distance_meters || 0), 0);
-  const sessionsCount = (exercise.sets || []).length;
-  
-  return `
-    <div style="background: var(--white); border: 2px solid var(--border); border-radius: 16px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);" id="exercise-${exercise.id}">
-      <!-- Exercise Header -->
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
-        <div style="flex: 1;">
-          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
-            <div style="background: linear-gradient(135deg, #ef4444 0%, #f97316 100%); color: white; width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px;">
-              <i class="fas fa-heartbeat"></i>
-            </div>
-            <h4 style="margin: 0; font-size: 18px; font-weight: 600;">${exercise.name}</h4>
-          </div>
-          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;">
-            <span style="background: linear-gradient(135deg, #ef4444 0%, #f97316 100%); color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">
-              <i class="fas fa-fire"></i> Cardio
-            </span>
-            <span style="background: var(--primary-light); color: var(--primary); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">
-              <i class="fas fa-dumbbell"></i> ${exercise.equipment}
-            </span>
-          </div>
-        </div>
-        <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
-          <button onclick="deleteExerciseFromWorkout(${exercise.id}, '${exercise.name.replace(/'/g, "\\'")}')" 
-            style="background: none; border: none; color: var(--danger); cursor: pointer; font-size: 14px; padding: 4px 8px; opacity: 0.6; transition: opacity 0.2s;"
-            onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'"
-            title="Remove exercise">
-            <i class="fas fa-trash"></i>
-          </button>
-          <div>
-            <div style="font-size: 24px; font-weight: bold; color: #ef4444;">${sessionsCount}</div>
-            <div style="font-size: 11px; color: var(--gray); text-transform: uppercase; letter-spacing: 0.5px;">Sessions</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Cardio Stats Summary -->
-      ${sessionsCount > 0 ? `
-      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;">
-        <div style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; padding: 12px; border-radius: 10px; text-align: center;">
-          <div style="font-size: 11px; opacity: 0.9; margin-bottom: 4px;"><i class="fas fa-clock"></i> Duration</div>
-          <div style="font-size: 18px; font-weight: bold;">${formatCardioTime(totalDuration)}</div>
-        </div>
-        <div style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 12px; border-radius: 10px; text-align: center;">
-          <div style="font-size: 11px; opacity: 0.9; margin-bottom: 4px;"><i class="fas fa-fire"></i> Calories</div>
-          <div style="font-size: 18px; font-weight: bold;">${totalCalories}</div>
-        </div>
-        <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 12px; border-radius: 10px; text-align: center;">
-          <div style="font-size: 11px; opacity: 0.9; margin-bottom: 4px;"><i class="fas fa-route"></i> Distance</div>
-          <div style="font-size: 18px; font-weight: bold;">${totalDistance > 0 ? (isImperial ? (totalDistance / 1609.34).toFixed(2) : (totalDistance / 1000).toFixed(2)) : '-'} ${totalDistance > 0 ? distanceUnit : ''}</div>
-        </div>
-      </div>
-      ` : ''}
-
-      <!-- Logged Sessions -->
-      ${sessionsCount > 0 ? `
-      <div style="margin-bottom: 16px;">
-        <div style="font-size: 13px; font-weight: 600; color: var(--gray); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">
-          <i class="fas fa-check-circle"></i> Logged Sessions
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 8px;">
-          ${exercise.sets.map((set, setIdx) => `
-            <div style="background: linear-gradient(135deg, #ef4444 0%, #f97316 100%); color: white; padding: 12px 16px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center;">
-              <div style="display: flex; gap: 16px; align-items: center;">
-                <span style="font-weight: bold;">Session ${set.set_number}</span>
-                <span><i class="fas fa-clock"></i> ${formatCardioTime(set.duration_seconds)}</span>
-                ${set.calories_burned ? `<span><i class="fas fa-fire"></i> ${set.calories_burned} cal</span>` : ''}
-                ${set.distance_meters ? `<span><i class="fas fa-route"></i> ${isImperial ? (set.distance_meters / 1609.34).toFixed(2) + ' mi' : (set.distance_meters / 1000).toFixed(2) + ' km'}</span>` : ''}
-                ${set.avg_heart_rate ? `<span><i class="fas fa-heartbeat"></i> ${set.avg_heart_rate} bpm</span>` : ''}
-              </div>
-              <button onclick="deleteSet(${exercise.id}, ${set.id})" 
-                style="background: rgba(0,0,0,0.2); border: none; color: white; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; font-size: 12px;"
-                title="Delete session">
-                <i class="fas fa-times"></i>
-              </button>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-      ` : ''}
-
-      <!-- Add Cardio Session Form -->
-      <div style="background: var(--light); border-radius: 12px; padding: 16px;">
-        <div style="font-size: 13px; font-weight: 600; color: var(--gray); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
-          <i class="fas fa-plus-circle"></i> Log Cardio Session
-        </div>
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px;">
-          <div>
-            <label style="font-size: 12px; color: var(--gray); display: block; margin-bottom: 4px; font-weight: 600;">Duration (minutes)</label>
-            <input type="number" id="cardio-duration-${exercise.id}" placeholder="30" min="1" step="1"
-                   style="width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 16px; font-weight: 600;">
-          </div>
-          <div>
-            <label style="font-size: 12px; color: var(--gray); display: block; margin-bottom: 4px; font-weight: 600;">Intensity</label>
-            <select id="cardio-intensity-${exercise.id}" style="width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 16px; font-weight: 600;">
-              <option value="light">Light (Walking)</option>
-              <option value="moderate" selected>Moderate (Jogging)</option>
-              <option value="vigorous">Vigorous (Running)</option>
-              <option value="intense">Intense (HIIT/Sprint)</option>
-            </select>
-          </div>
-        </div>
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px;">
-          <div>
-            <label style="font-size: 12px; color: var(--gray); display: block; margin-bottom: 4px; font-weight: 600;">Distance (${distanceUnit}) - optional</label>
-            <input type="number" id="cardio-distance-${exercise.id}" placeholder="0" min="0" step="0.1"
-                   style="width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 16px; font-weight: 600;">
-          </div>
-          <div>
-            <label style="font-size: 12px; color: var(--gray); display: block; margin-bottom: 4px; font-weight: 600;">Avg Heart Rate - optional</label>
-            <input type="number" id="cardio-hr-${exercise.id}" placeholder="140" min="40" max="220"
-                   style="width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 16px; font-weight: 600;">
-          </div>
-        </div>
-        <div style="display: flex; gap: 8px;">
-          <button class="btn btn-primary" onclick="recordCardioSession(${exercise.id})" style="flex: 1; padding: 12px 24px; font-size: 16px; background: linear-gradient(135deg, #ef4444 0%, #f97316 100%); border: none;">
-            <i class="fas fa-fire"></i> Log Session
-          </button>
-        </div>
-        <p style="font-size: 11px; color: var(--gray); margin-top: 8px; text-align: center;">
-          <i class="fas fa-info-circle"></i> Calories will be estimated based on your profile and intensity
-        </p>
-      </div>
-    </div>
-  `;
-}
-
 // Record cardio session
 async function recordCardioSession(exerciseId) {
   const durationInput = document.getElementById(`cardio-duration-${exerciseId}`);
@@ -2859,12 +2491,10 @@ async function recordCardioSession(exerciseId) {
   const caloriesBurned = estimateCaloriesBurned(durationMinutes, intensity);
   
   // Convert distance to meters
-  const system = (state.user && state.user.measurement_system) || 'metric';
-  const isImperial = system === 'imperial';
   let distanceMeters = null;
   if (distanceInput?.value) {
     const distanceValue = parseFloat(distanceInput.value);
-    distanceMeters = isImperial ? distanceValue * 1609.34 : distanceValue * 1000;
+    distanceMeters = isImperialSystem() ? distanceValue * 1609.34 : distanceValue * 1000;
   }
   
   const avgHeartRate = hrInput?.value ? parseInt(hrInput.value) : null;
@@ -2882,21 +2512,29 @@ async function recordCardioSession(exerciseId) {
     
     showNotification(`Cardio logged! ~${caloriesBurned} calories burned`, 'success');
     
-    // Refresh workout data
-    const data = await api(`/workouts/${state.currentWorkout.id}`);
-    state.currentWorkout = data.workout;
-    loadWorkoutInterface();
+    // Refresh workout UI
+    await refreshWorkoutUI();
   } catch (error) {
     showNotification('Error logging cardio: ' + error.message, 'error');
   }
 }
 
-// Render exercise (legacy - keep for compatibility)
-function renderExercise(exercise, index) {
-  return renderExerciseEnhanced(exercise, index);
+// Refresh workout UI - uses Phase 3 modal if open, otherwise does nothing (modal is primary interface)
+async function refreshWorkoutUI() {
+  const workoutModal = document.getElementById('workout-modal');
+  if (workoutModal) {
+    // Refresh data and re-render the modal
+    try {
+      const data = await api(`/workouts/${state.currentWorkout.id}`);
+      state.currentWorkout = data.workout;
+      renderWorkoutExerciseTabs();
+    } catch (error) {
+      console.error('Error refreshing workout UI:', error);
+    }
+  }
 }
 
-// Record set
+// Record set (legacy function - kept for any remaining references)
 async function recordSet(exerciseId) {
   let weight = parseFloat(document.getElementById(`weight-${exerciseId}`).value);
   const reps = parseInt(document.getElementById(`reps-${exerciseId}`).value);
@@ -2907,8 +2545,7 @@ async function recordSet(exerciseId) {
   }
 
   // Convert to kg if user is using imperial
-  const system = (state.user && state.user.measurement_system) || 'metric';
-  if (system === 'imperial') {
+  if (isImperialSystem()) {
     weight = lbsToKg(weight);
   }
 
@@ -2919,7 +2556,7 @@ async function recordSet(exerciseId) {
     });
 
     showNotification('Set recorded!', 'success');
-    loadWorkoutInterface();
+    await refreshWorkoutUI();
 
     // Auto-start rest timer
     startRestTimer(90);
@@ -6338,9 +5975,7 @@ async function saveWorkoutNotes() {
 async function showExerciseHistory(exerciseId, exerciseName) {
   try {
     const data = await api(`/analytics/exercise-history/${exerciseId}`);
-    const system = (state.user && state.user.measurement_system) || 'metric';
-    const isImperial = system === 'imperial';
-    const weightUnit = isImperial ? 'lbs' : 'kg';
+    const weightUnit = getWeightUnit();
     
     // Create history modal
     const modal = document.createElement('div');
@@ -6352,7 +5987,7 @@ async function showExerciseHistory(exerciseId, exerciseName) {
       padding: 20px;
     `;
     
-    const formatHistoryWeight = (kg) => isImperial ? (kg * 2.20462).toFixed(1) : kg?.toFixed(1) || '0';
+    const formatHistoryWeight = (kg) => isImperialSystem() ? (kg * 2.20462).toFixed(1) : kg?.toFixed(1) || '0';
     
     // Build chart data points
     const chartData = data.progression || [];
@@ -6686,10 +6321,8 @@ function sortWeeklyTrendsByColumn(column) {
 
 // Edit a set
 function editSet(exerciseId, setId, currentWeightKg, currentReps) {
-  const system = (state.user && state.user.measurement_system) || 'metric';
-  const isImperial = system === 'imperial';
-  const weightUnit = isImperial ? 'lbs' : 'kg';
-  const currentWeight = isImperial ? kgToLbs(currentWeightKg) : currentWeightKg;
+  const weightUnit = getWeightUnit();
+  const currentWeight = isImperialSystem() ? kgToLbs(currentWeightKg) : currentWeightKg;
   const displayWeight = currentWeight % 1 === 0 ? String(currentWeight) : currentWeight.toFixed(1);
   
   // Create inline edit overlay for workout modal
@@ -6710,7 +6343,7 @@ function editSet(exerciseId, setId, currentWeightKg, currentReps) {
         <div style="display: flex; flex-direction: column; gap: 16px;">
           <div>
             <label style="display: block; margin-bottom: 6px; font-weight: 600; color: var(--text-secondary);">Weight (${weightUnit})</label>
-            <input type="number" id="editSetWeight" value="${displayWeight}" step="${isImperial ? '5' : '2.5'}" 
+            <input type="number" id="editSetWeight" value="${displayWeight}" step="${getWeightStep()}" 
                    style="width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 18px; background: var(--bg-secondary); color: var(--text-primary);">
           </div>
           <div>
@@ -6740,7 +6373,7 @@ function editSet(exerciseId, setId, currentWeightKg, currentReps) {
     <div style="display: flex; flex-direction: column; gap: 16px;">
       <div class="form-group">
         <label>Weight (${weightUnit})</label>
-        <input type="number" id="editSetWeight" value="${displayWeight}" step="${isImperial ? '5' : '2.5'}" 
+        <input type="number" id="editSetWeight" value="${displayWeight}" step="${getWeightStep()}" 
                style="width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 16px;">
       </div>
       <div class="form-group">
@@ -6782,9 +6415,8 @@ async function saveEditedSet(exerciseId, setId) {
   }
   
   // Convert to kg if imperial
-  const system = (state.user && state.user.measurement_system) || 'metric';
-  if (system === 'imperial') {
-    weight = weight * 0.453592;
+  if (isImperialSystem()) {
+    weight = lbsToKg(weight);
   }
   
   try {
@@ -6803,13 +6435,8 @@ async function saveEditedSet(exerciseId, setId) {
     const data = await api(`/workouts/${state.currentWorkout.id}`);
     state.currentWorkout = data.workout;
     
-    // Refresh the appropriate view
-    const workoutModal = document.getElementById('workout-modal');
-    if (workoutModal && workoutModal.style.display !== 'none') {
-      renderWorkoutExerciseTabs();
-    } else {
-      loadWorkoutInterface();
-    }
+    // Refresh workout UI
+    await refreshWorkoutUI();
   } catch (error) {
     showNotification('Error updating set: ' + error.message, 'error');
   }
@@ -6825,7 +6452,7 @@ async function deleteSet(exerciseId, setId) {
     });
     
     showNotification('Set deleted!', 'success');
-    loadWorkoutInterface();
+    await refreshWorkoutUI();
   } catch (error) {
     showNotification('Error deleting set: ' + error.message, 'error');
   }
@@ -6841,11 +6468,7 @@ async function deleteExerciseFromWorkout(exerciseId, exerciseName) {
     });
     
     showNotification('Exercise removed!', 'success');
-    
-    // Refresh workout data
-    const data = await api(`/workouts/${state.currentWorkout.id}`);
-    state.currentWorkout = data.workout;
-    loadWorkoutInterface();
+    await refreshWorkoutUI();
   } catch (error) {
     showNotification('Error removing exercise: ' + error.message, 'error');
   }
@@ -7564,9 +7187,7 @@ function renderWorkoutExerciseTabs() {
 
 // Render exercise content with set table
 function renderExerciseContent(exercise, index) {
-  const system = (state.user && state.user.measurement_system) || 'metric';
-  const isImperial = system === 'imperial';
-  const weightUnit = isImperial ? 'lbs' : 'kg';
+  const weightUnit = getWeightUnit();
   const completedSets = (exercise.sets || []).length;
   const targetSets = exercise.target_sets || 3;
   const showNewSetRow = completedSets < targetSets && completedSets < 10;
@@ -7592,7 +7213,7 @@ function renderExerciseContent(exercise, index) {
   
   if (sourceSet) {
     if (sourceSet.weight_kg) {
-      const weightValue = isImperial ? kgToLbs(sourceSet.weight_kg) : sourceSet.weight_kg;
+      const weightValue = isImperialSystem() ? kgToLbs(sourceSet.weight_kg) : sourceSet.weight_kg;
       defaultWeight = weightValue % 1 === 0 ? String(weightValue) : weightValue.toFixed(1);
     }
     if (sourceSet.reps) {
@@ -7619,11 +7240,18 @@ function renderExerciseContent(exercise, index) {
           <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
             <h2 style="margin: 0; font-size: clamp(18px, 4vw, 24px);">${exercise.name}</h2>
             ${exercise.is_added ? '<span style="background: var(--warning); color: var(--white); padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600;">ADDED</span>' : ''}
-            <button onclick="deleteExerciseFromWorkoutModal(${exercise.id}, '${exercise.name.replace(/'/g, "\\'")}')" 
-              style="background: none; border: none; color: var(--danger); cursor: pointer; font-size: 14px; padding: 4px 8px; opacity: 0.6; margin-left: auto;"
-              title="Remove exercise">
-              <i class="fas fa-trash"></i>
-            </button>
+            <div style="margin-left: auto; display: flex; gap: 8px;">
+              <button onclick="showExerciseHistory(${exercise.exercise_id}, '${exercise.name.replace(/'/g, "\\'")}')" 
+                style="background: var(--primary-light); border: none; color: var(--primary); cursor: pointer; font-size: 14px; padding: 8px 12px; border-radius: 8px;"
+                title="View History & Progression">
+                <i class="fas fa-chart-line"></i>
+              </button>
+              <button onclick="deleteExerciseFromWorkoutModal(${exercise.id}, '${exercise.name.replace(/'/g, "\\'")}')" 
+                style="background: none; border: none; color: var(--danger); cursor: pointer; font-size: 14px; padding: 4px 8px; opacity: 0.6;"
+                title="Remove exercise">
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
           </div>
           <div style="display: flex; gap: 8px; flex-wrap: wrap;">
             <span style="background: var(--secondary-light); color: var(--secondary); padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: 600;">
@@ -7731,7 +7359,7 @@ function renderExerciseContent(exercise, index) {
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
               <div>
                 <label style="font-size: 12px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Weight (${weightUnit})</label>
-                <input type="number" id="newSetWeight" value="${defaultWeight}" placeholder="0" step="${isImperial ? '5' : '2.5'}" 
+                <input type="number" id="newSetWeight" value="${defaultWeight}" placeholder="0" step="${getWeightStep()}" 
                   data-prepopulated="${hasHistoricalData}"
                   style="width: 100%; padding: 12px; border: 2px solid ${hasHistoricalData ? 'var(--primary)' : 'var(--border)'}; border-radius: 8px; font-size: 18px; font-weight: bold; background: var(--bg-secondary); ${inputTextStyle}">
               </div>
@@ -7814,9 +7442,8 @@ async function addExerciseSet(exerciseId) {
   }
   
   // Convert to kg if imperial
-  const system = (state.user && state.user.measurement_system) || 'metric';
-  if (system === 'imperial') {
-    weight = weight * 0.453592;
+  if (isImperialSystem()) {
+    weight = lbsToKg(weight);
   }
   
   try {
