@@ -309,18 +309,42 @@ analytics.get('/progress-comparison', async (c) => {
   const user = requireAuth(c);
   const db = c.env.DB;
 
-  // Get date ranges for display
-  const dateRanges = await db.prepare(`
-    SELECT 
-      date('now', 'weekday 0', '-6 days') as this_week_start,
-      date('now') as this_week_end,
-      date('now', 'weekday 0', '-13 days') as last_week_start,
-      date('now', 'weekday 0', '-7 days') as last_week_end,
-      date('now', 'start of month') as this_month_start,
-      date('now') as this_month_end,
-      date('now', 'start of month', '-1 month') as last_month_start,
-      date('now', 'start of month', '-1 day') as last_month_end
-  `).first();
+  // Calculate week boundaries in JavaScript (Monday-Sunday weeks)
+  const now = new Date();
+  const dayOfWeek = now.getUTCDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
+  const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Monday = 0 days ago
+  
+  const thisWeekStart = new Date(now);
+  thisWeekStart.setUTCDate(now.getUTCDate() - daysSinceMonday);
+  thisWeekStart.setUTCHours(0, 0, 0, 0);
+  
+  const thisWeekEnd = new Date(thisWeekStart);
+  thisWeekEnd.setUTCDate(thisWeekStart.getUTCDate() + 6);
+  
+  const lastWeekStart = new Date(thisWeekStart);
+  lastWeekStart.setUTCDate(thisWeekStart.getUTCDate() - 7);
+  
+  const lastWeekEnd = new Date(thisWeekStart);
+  lastWeekEnd.setUTCDate(thisWeekStart.getUTCDate() - 1);
+  
+  const thisMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const thisMonthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
+  const lastMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+  const lastMonthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0));
+  
+  // Format dates for SQL and display
+  const formatDate = (d) => d.toISOString().split('T')[0];
+  
+  const dateRanges = {
+    this_week_start: formatDate(thisWeekStart),
+    this_week_end: formatDate(thisWeekEnd),
+    last_week_start: formatDate(lastWeekStart),
+    last_week_end: formatDate(lastWeekEnd),
+    this_month_start: formatDate(thisMonthStart),
+    this_month_end: formatDate(thisMonthEnd),
+    last_month_start: formatDate(lastMonthStart),
+    last_month_end: formatDate(lastMonthEnd)
+  };
 
   // This week vs last week
   const thisWeek = await db.prepare(`
@@ -330,8 +354,8 @@ analytics.get('/progress-comparison', async (c) => {
       COALESCE(SUM(total_duration_seconds), 0) as total_time
     FROM workouts
     WHERE user_id = ? AND completed = 1 
-      AND start_time >= datetime('now', 'weekday 0', '-6 days')
-  `).bind(user.id).first();
+      AND date(start_time) >= ?
+  `).bind(user.id, dateRanges.this_week_start).first();
 
   const lastWeek = await db.prepare(`
     SELECT 
@@ -340,9 +364,8 @@ analytics.get('/progress-comparison', async (c) => {
       COALESCE(SUM(total_duration_seconds), 0) as total_time
     FROM workouts
     WHERE user_id = ? AND completed = 1 
-      AND start_time >= datetime('now', 'weekday 0', '-13 days')
-      AND start_time < datetime('now', 'weekday 0', '-6 days')
-  `).bind(user.id).first();
+      AND date(start_time) >= ? AND date(start_time) <= ?
+  `).bind(user.id, dateRanges.last_week_start, dateRanges.last_week_end).first();
 
   // This month vs last month
   const thisMonth = await db.prepare(`
@@ -352,8 +375,8 @@ analytics.get('/progress-comparison', async (c) => {
       COALESCE(SUM(total_duration_seconds), 0) as total_time
     FROM workouts
     WHERE user_id = ? AND completed = 1 
-      AND start_time >= datetime('now', 'start of month')
-  `).bind(user.id).first();
+      AND date(start_time) >= ?
+  `).bind(user.id, dateRanges.this_month_start).first();
 
   const lastMonth = await db.prepare(`
     SELECT 
@@ -362,9 +385,8 @@ analytics.get('/progress-comparison', async (c) => {
       COALESCE(SUM(total_duration_seconds), 0) as total_time
     FROM workouts
     WHERE user_id = ? AND completed = 1 
-      AND start_time >= datetime('now', 'start of month', '-1 month')
-      AND start_time < datetime('now', 'start of month')
-  `).bind(user.id).first();
+      AND date(start_time) >= ? AND date(start_time) <= ?
+  `).bind(user.id, dateRanges.last_month_start, dateRanges.last_month_end).first();
 
   // Calculate percentage changes
   const calcChange = (current, previous) => {

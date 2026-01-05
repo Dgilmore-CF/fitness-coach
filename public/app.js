@@ -6836,6 +6836,18 @@ function setupWorkoutModalEventDelegation(modal) {
       }
       return;
     }
+    
+    // Handle show history button
+    const historyBtn = e.target.closest('[data-show-history]');
+    if (historyBtn) {
+      e.preventDefault();
+      const exerciseId = parseInt(historyBtn.getAttribute('data-exercise-id'));
+      const exerciseName = historyBtn.getAttribute('data-exercise-name');
+      if (!isNaN(exerciseId) && exerciseName) {
+        showExerciseHistory(exerciseId, exerciseName);
+      }
+      return;
+    }
   });
 }
 
@@ -7240,20 +7252,13 @@ function renderExerciseContent(exercise, index) {
           <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
             <h2 style="margin: 0; font-size: clamp(18px, 4vw, 24px);">${exercise.name}</h2>
             ${exercise.is_added ? '<span style="background: var(--warning); color: var(--white); padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600;">ADDED</span>' : ''}
-            <div style="margin-left: auto; display: flex; gap: 8px;">
-              <button onclick="showExerciseHistory(${exercise.exercise_id}, '${exercise.name.replace(/'/g, "\\'")}')" 
-                style="background: var(--primary-light); border: none; color: var(--primary); cursor: pointer; font-size: 14px; padding: 8px 12px; border-radius: 8px;"
-                title="View History & Progression">
-                <i class="fas fa-chart-line"></i>
-              </button>
-              <button onclick="deleteExerciseFromWorkoutModal(${exercise.id}, '${exercise.name.replace(/'/g, "\\'")}')" 
-                style="background: none; border: none; color: var(--danger); cursor: pointer; font-size: 14px; padding: 4px 8px; opacity: 0.6;"
-                title="Remove exercise">
-                <i class="fas fa-trash"></i>
-              </button>
-            </div>
+            <button onclick="deleteExerciseFromWorkoutModal(${exercise.id}, '${exercise.name.replace(/'/g, "\\'")}')" 
+              style="margin-left: auto; background: none; border: none; color: var(--danger); cursor: pointer; font-size: 14px; padding: 4px 8px; opacity: 0.6;"
+              title="Remove exercise">
+              <i class="fas fa-trash"></i>
+            </button>
           </div>
-          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
             <span style="background: var(--secondary-light); color: var(--secondary); padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: 600;">
               <i class="fas fa-bullseye"></i> ${exercise.muscle_group}
             </span>
@@ -7261,6 +7266,10 @@ function renderExerciseContent(exercise, index) {
               <i class="fas fa-dumbbell"></i> ${exercise.equipment}
             </span>
             ${exercise.is_unilateral ? '<span style="background: var(--warning); color: var(--white); padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: 600;"><i class="fas fa-balance-scale"></i> Unilateral</span>' : ''}
+            <button class="btn btn-outline" data-show-history="true" data-exercise-id="${exercise.exercise_id || exercise.id}" data-exercise-name="${exercise.name.replace(/"/g, '&quot;')}" 
+              style="padding: 6px 12px; font-size: 13px; margin-left: auto;">
+              <i class="fas fa-chart-line"></i> History
+            </button>
           </div>
         </div>
         <div style="text-align: right;">
