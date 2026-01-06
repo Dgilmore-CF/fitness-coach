@@ -114,98 +114,114 @@ analytics.get('/1rm', async (c) => {
 
 // Get exercise history with progression data for charts and history table
 analytics.get('/exercise-history/:exerciseId', async (c) => {
-  const user = requireAuth(c);
-  const exerciseId = c.req.param('exerciseId');
-  const db = c.env.DB;
+  let step = 'init';
+  try {
+    step = 'auth';
+    const user = requireAuth(c);
+    
+    step = 'params';
+    const exerciseId = c.req.param('exerciseId');
+    const db = c.env.DB;
+    
+    console.log(`Exercise history request: exerciseId=${exerciseId}, userId=${user.id}`);
 
-  // Get exercise details
-  const exercise = await db.prepare(
-    'SELECT * FROM exercises WHERE id = ?'
-  ).bind(exerciseId).first();
+    step = 'get_exercise';
+    // Get exercise details
+    const exercise = await db.prepare(
+      'SELECT * FROM exercises WHERE id = ?'
+    ).bind(exerciseId).first();
 
-  if (!exercise) {
-    return c.json({ error: 'Exercise not found' }, 404);
-  }
-
-  // Get all sets for this exercise grouped by workout date
-  const setsHistory = await db.prepare(`
-    SELECT 
-      w.id as workout_id,
-      date(w.start_time) as workout_date,
-      w.start_time,
-      s.set_number,
-      s.weight_kg,
-      s.reps,
-      s.one_rep_max_kg,
-      s.rpe
-    FROM sets s
-    JOIN workout_exercises we ON s.workout_exercise_id = we.id
-    JOIN workouts w ON we.workout_id = w.id
-    WHERE we.exercise_id = ? AND w.user_id = ? AND w.completed = 1
-    ORDER BY w.start_time DESC, s.set_number ASC
-    LIMIT 500
-  `).bind(exerciseId, user.id).all();
-
-  // Get progression data (best set per workout for charting)
-  const progressionData = await db.prepare(`
-    SELECT 
-      date(w.start_time) as workout_date,
-      MAX(s.weight_kg) as max_weight,
-      MAX(s.one_rep_max_kg) as max_1rm,
-      MAX(s.reps) as max_reps,
-      SUM(s.weight_kg * s.reps) as total_volume,
-      COUNT(s.id) as set_count
-    FROM sets s
-    JOIN workout_exercises we ON s.workout_exercise_id = we.id
-    JOIN workouts w ON we.workout_id = w.id
-    WHERE we.exercise_id = ? AND w.user_id = ? AND w.completed = 1
-    GROUP BY date(w.start_time)
-    ORDER BY workout_date ASC
-  `).bind(exerciseId, user.id).all();
-
-  // Get personal records
-  const pr = await db.prepare(`
-    SELECT 
-      MAX(s.weight_kg) as max_weight,
-      MAX(s.one_rep_max_kg) as max_1rm,
-      MAX(s.reps) as max_reps
-    FROM sets s
-    JOIN workout_exercises we ON s.workout_exercise_id = we.id
-    JOIN workouts w ON we.workout_id = w.id
-    WHERE we.exercise_id = ? AND w.user_id = ? AND w.completed = 1
-  `).bind(exerciseId, user.id).first();
-
-  // Group sets by workout date for the history table
-  const historyByDate = {};
-  for (const set of setsHistory.results) {
-    const date = set.workout_date;
-    if (!historyByDate[date]) {
-      historyByDate[date] = {
-        date: date,
-        start_time: set.start_time,
-        sets: []
-      };
+    if (!exercise) {
+      return c.json({ error: 'Exercise not found' }, 404);
     }
-    historyByDate[date].sets.push({
-      set_number: set.set_number,
-      weight_kg: set.weight_kg,
-      reps: set.reps,
-      one_rep_max_kg: set.one_rep_max_kg,
-      rpe: set.rpe
-    });
-  }
 
-  return c.json({
-    exercise: {
-      id: exercise.id,
-      name: exercise.name,
-      muscle_group: exercise.muscle_group,
-      equipment: exercise.equipment
-    },
-    personal_records: pr,
-    progression: progressionData.results,
-    history: Object.values(historyByDate)
-  });
+    step = 'get_sets_history';
+    // Get all sets for this exercise grouped by workout date
+    const setsHistory = await db.prepare(`
+      SELECT 
+        w.id as workout_id,
+        date(w.start_time) as workout_date,
+        w.start_time,
+        s.set_number,
+        s.weight_kg,
+        s.reps,
+        s.one_rep_max_kg
+      FROM sets s
+      JOIN workout_exercises we ON s.workout_exercise_id = we.id
+      JOIN workouts w ON we.workout_id = w.id
+      WHERE we.exercise_id = ? AND w.user_id = ? AND w.completed = 1
+      ORDER BY w.start_time DESC, s.set_number ASC
+      LIMIT 500
+    `).bind(exerciseId, user.id).all();
+
+    step = 'get_progression';
+    // Get progression data (best set per workout for charting)
+    const progressionData = await db.prepare(`
+      SELECT 
+        date(w.start_time) as workout_date,
+        MAX(s.weight_kg) as max_weight,
+        MAX(s.one_rep_max_kg) as max_1rm,
+        MAX(s.reps) as max_reps,
+        SUM(s.weight_kg * s.reps) as total_volume,
+        COUNT(s.id) as set_count
+      FROM sets s
+      JOIN workout_exercises we ON s.workout_exercise_id = we.id
+      JOIN workouts w ON we.workout_id = w.id
+      WHERE we.exercise_id = ? AND w.user_id = ? AND w.completed = 1
+      GROUP BY date(w.start_time)
+      ORDER BY workout_date ASC
+    `).bind(exerciseId, user.id).all();
+
+    step = 'get_pr';
+    // Get personal records
+    const pr = await db.prepare(`
+      SELECT 
+        MAX(s.weight_kg) as max_weight,
+        MAX(s.one_rep_max_kg) as max_1rm,
+        MAX(s.reps) as max_reps
+      FROM sets s
+      JOIN workout_exercises we ON s.workout_exercise_id = we.id
+      JOIN workouts w ON we.workout_id = w.id
+      WHERE we.exercise_id = ? AND w.user_id = ? AND w.completed = 1
+    `).bind(exerciseId, user.id).first();
+
+    step = 'process_history';
+    // Group sets by workout date for the history table
+    const historyByDate = {};
+    const results = setsHistory?.results || [];
+    for (const set of results) {
+      const date = set.workout_date;
+      if (!historyByDate[date]) {
+        historyByDate[date] = {
+          date: date,
+          start_time: set.start_time,
+          sets: []
+        };
+      }
+      historyByDate[date].sets.push({
+        set_number: set.set_number,
+        weight_kg: set.weight_kg,
+        reps: set.reps,
+        one_rep_max_kg: set.one_rep_max_kg
+      });
+    }
+
+    step = 'return_response';
+    return c.json({
+      exercise: {
+        id: exercise.id,
+        name: exercise.name,
+        muscle_group: exercise.muscle_group,
+        equipment: exercise.equipment
+      },
+      personal_records: pr || { max_weight: null, max_1rm: null, max_reps: null },
+      progression: progressionData?.results || [],
+      history: Object.values(historyByDate)
+    });
+  } catch (error) {
+    console.error(`Exercise history error at step '${step}':`, error);
+    return c.json({ error: 'Failed to fetch exercise history', step, details: error.message }, 500);
+  }
 });
 
 // Get volume trends

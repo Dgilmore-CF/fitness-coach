@@ -6,7 +6,8 @@
   "scripts": {
     "build": "node build-frontend.js",
     "dev": "npm run build && wrangler dev",
-    "deploy": "npm run build && wrangler deploy",
+    "deploy": "npm run build && git add -A && git commit -m 'Deploy' --allow-empty && git push",
+    "deploy:direct": "npm run build && wrangler deploy",
     "db:create": "wrangler d1 create fitness-coach-db",
     "db:migrate": "wrangler d1 migrations apply fitness-coach-db",
     "db:migrate:local": "wrangler d1 migrations apply fitness-coach-db --local"

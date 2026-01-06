@@ -7334,7 +7334,7 @@ function renderExerciseContent(exercise, index) {
             <div style="flex: 1; display: flex; gap: 16px; flex-wrap: wrap; min-width: 150px;">
               <div>
                 <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase;">Weight</div>
-                <div style="font-size: 18px; font-weight: bold; color: var(--text-primary);">\${formatWeight(set.weight_kg, system)}</div>
+                <div style="font-size: 18px; font-weight: bold; color: var(--text-primary);">\${formatWeight(set.weight_kg)}</div>
               </div>
               <div>
                 <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase;">Reps</div>
@@ -7342,7 +7342,7 @@ function renderExerciseContent(exercise, index) {
               </div>
               <div>
                 <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase;">Est. 1RM</div>
-                <div style="font-size: 14px; color: var(--text-secondary);">\${formatWeight(set.one_rep_max_kg, system)}</div>
+                <div style="font-size: 14px; color: var(--text-secondary);">\${formatWeight(set.one_rep_max_kg)}</div>
               </div>
             </div>
             <div style="display: flex; align-items: center; gap: 8px;">
