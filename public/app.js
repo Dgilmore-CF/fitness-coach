@@ -5989,102 +5989,167 @@ async function showExerciseHistory(exerciseId, exerciseName) {
     
     const formatHistoryWeight = (kg) => isImperialSystem() ? (kg * 2.20462).toFixed(1) : kg?.toFixed(1) || '0';
     
-    // Build chart data points
-    const chartData = data.progression || [];
-    const maxWeight = Math.max(...chartData.map(d => d.max_weight || 0), 1);
-    const max1RM = Math.max(...chartData.map(d => d.max_1rm || 0), 1);
+    // Build chart data points (last 20 workouts)
+    const chartData = (data.progression || []).slice(-20);
+    const weights = chartData.map(d => d.max_weight || 0);
+    const minWeight = Math.min(...weights) * 0.9 || 0;
+    const maxWeight = Math.max(...weights) * 1.05 || 1;
+    const weightRange = maxWeight - minWeight || 1;
+    
+    // SVG line chart dimensions
+    const chartWidth = 700;
+    const chartHeight = 180;
+    const padding = { top: 20, right: 20, bottom: 40, left: 50 };
+    const graphWidth = chartWidth - padding.left - padding.right;
+    const graphHeight = chartHeight - padding.top - padding.bottom;
+    
+    // Generate SVG path for line chart
+    let linePath = '';
+    let dots = '';
+    let labels = '';
+    
+    if (chartData.length > 1) {
+      const points = chartData.map((d, i) => {
+        const x = padding.left + (i / (chartData.length - 1)) * graphWidth;
+        const y = padding.top + graphHeight - ((d.max_weight - minWeight) / weightRange) * graphHeight;
+        return { x, y, data: d };
+      });
+      
+      // Create smooth line path
+      linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+      
+      // Create area fill path
+      const areaPath = linePath + ` L ${points[points.length-1].x} ${padding.top + graphHeight} L ${points[0].x} ${padding.top + graphHeight} Z`;
+      
+      // Create dots and labels
+      dots = points.map((p, i) => {
+        const date = new Date(p.data.workout_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        return `
+          <circle cx="${p.x}" cy="${p.y}" r="5" fill="var(--primary)" stroke="white" stroke-width="2"/>
+          <title>${date}: ${formatHistoryWeight(p.data.max_weight)} ${weightUnit}</title>
+        `;
+      }).join('');
+      
+      // X-axis labels (show first, middle, last)
+      const labelIndices = [0, Math.floor(chartData.length / 2), chartData.length - 1];
+      labels = labelIndices.map(i => {
+        const p = points[i];
+        const date = new Date(chartData[i].workout_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        return `<text x="${p.x}" y="${chartHeight - 5}" text-anchor="middle" fill="var(--text-secondary)" font-size="11">${date}</text>`;
+      }).join('');
+      
+      // Y-axis labels
+      const yLabels = [minWeight, (minWeight + maxWeight) / 2, maxWeight].map((val, i) => {
+        const y = padding.top + graphHeight - (i * graphHeight / 2);
+        return `<text x="${padding.left - 8}" y="${y + 4}" text-anchor="end" fill="var(--text-secondary)" font-size="11">${formatHistoryWeight(val)}</text>`;
+      }).join('');
+      
+      labels += yLabels;
+      
+      // Grid lines
+      const gridLines = [0, 1, 2].map(i => {
+        const y = padding.top + (i * graphHeight / 2);
+        return `<line x1="${padding.left}" y1="${y}" x2="${chartWidth - padding.right}" y2="${y}" stroke="var(--border)" stroke-dasharray="4"/>`;
+      }).join('');
+      
+      var svgChart = `
+        <svg width="100%" viewBox="0 0 ${chartWidth} ${chartHeight}" style="max-width: 100%;">
+          ${gridLines}
+          <defs>
+            <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" style="stop-color:var(--primary);stop-opacity:0.3" />
+              <stop offset="100%" style="stop-color:var(--primary);stop-opacity:0.05" />
+            </linearGradient>
+          </defs>
+          <path d="${areaPath}" fill="url(#areaGradient)"/>
+          <path d="${linePath}" fill="none" stroke="var(--primary)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          ${dots}
+          ${labels}
+        </svg>
+      `;
+    }
     
     modal.innerHTML = `
       <div style="background: var(--bg-primary); border-radius: 16px; max-width: 800px; width: 100%; max-height: 90vh; overflow-y: auto;">
         <!-- Header -->
-        <div style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); padding: 24px; border-radius: 16px 16px 0 0; color: white;">
+        <div style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); padding: 20px; border-radius: 16px 16px 0 0; color: white; position: sticky; top: 0; z-index: 1;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <div>
-              <h2 style="margin: 0 0 8px 0; font-size: 22px; color: white;">${exerciseName}</h2>
-              <p style="margin: 0; opacity: 0.9; font-size: 14px;">
+              <h2 style="margin: 0 0 4px 0; font-size: 20px; color: white;">${exerciseName}</h2>
+              <p style="margin: 0; opacity: 0.9; font-size: 13px;">
                 <i class="fas fa-bullseye"></i> ${data.exercise?.muscle_group || 'N/A'} • 
                 <i class="fas fa-dumbbell"></i> ${data.exercise?.equipment || 'N/A'}
               </p>
             </div>
             <button onclick="document.getElementById('exercise-history-modal').remove()" 
-              style="background: rgba(255,255,255,0.2); border: none; color: white; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font-size: 18px;">
+              style="background: rgba(255,255,255,0.2); border: none; color: white; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font-size: 16px;">
               <i class="fas fa-times"></i>
             </button>
           </div>
         </div>
         
         <!-- Personal Records -->
-        <div style="padding: 20px; border-bottom: 1px solid var(--border);">
-          <h3 style="margin: 0 0 12px 0; font-size: 14px; text-transform: uppercase; color: var(--text-secondary);">
+        <div style="padding: 16px 20px; border-bottom: 1px solid var(--border);">
+          <h3 style="margin: 0 0 10px 0; font-size: 13px; text-transform: uppercase; color: var(--text-secondary);">
             <i class="fas fa-trophy" style="color: gold;"></i> Personal Records
           </h3>
-          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
-            <div style="background: var(--bg-secondary); padding: 16px; border-radius: 12px; text-align: center;">
-              <div style="font-size: 24px; font-weight: bold; color: var(--primary);">${formatHistoryWeight(data.personal_records?.max_weight)} ${weightUnit}</div>
-              <div style="font-size: 12px; color: var(--text-secondary);">Max Weight</div>
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+            <div style="background: var(--bg-secondary); padding: 12px; border-radius: 10px; text-align: center;">
+              <div style="font-size: 20px; font-weight: bold; color: var(--primary);">${formatHistoryWeight(data.personal_records?.max_weight)} ${weightUnit}</div>
+              <div style="font-size: 11px; color: var(--text-secondary);">Max Weight</div>
             </div>
-            <div style="background: var(--bg-secondary); padding: 16px; border-radius: 12px; text-align: center;">
-              <div style="font-size: 24px; font-weight: bold; color: var(--secondary);">${formatHistoryWeight(data.personal_records?.max_1rm)} ${weightUnit}</div>
-              <div style="font-size: 12px; color: var(--text-secondary);">Est. 1RM</div>
+            <div style="background: var(--bg-secondary); padding: 12px; border-radius: 10px; text-align: center;">
+              <div style="font-size: 20px; font-weight: bold; color: var(--secondary);">${formatHistoryWeight(data.personal_records?.max_1rm)} ${weightUnit}</div>
+              <div style="font-size: 11px; color: var(--text-secondary);">Est. 1RM</div>
             </div>
-            <div style="background: var(--bg-secondary); padding: 16px; border-radius: 12px; text-align: center;">
-              <div style="font-size: 24px; font-weight: bold; color: #f59e0b;">${data.personal_records?.max_reps || 0}</div>
-              <div style="font-size: 12px; color: var(--text-secondary);">Max Reps</div>
+            <div style="background: var(--bg-secondary); padding: 12px; border-radius: 10px; text-align: center;">
+              <div style="font-size: 20px; font-weight: bold; color: #f59e0b;">${data.personal_records?.max_reps || 0}</div>
+              <div style="font-size: 11px; color: var(--text-secondary);">Max Reps</div>
             </div>
           </div>
         </div>
         
-        <!-- Weight Progression Chart -->
+        <!-- Weight Progression Line Chart -->
         ${chartData.length > 1 ? `
-        <div style="padding: 20px; border-bottom: 1px solid var(--border);">
-          <h3 style="margin: 0 0 16px 0; font-size: 14px; text-transform: uppercase; color: var(--text-secondary);">
-            <i class="fas fa-chart-line"></i> Weight Progression
+        <div style="padding: 16px 20px; border-bottom: 1px solid var(--border);">
+          <h3 style="margin: 0 0 12px 0; font-size: 13px; text-transform: uppercase; color: var(--text-secondary);">
+            <i class="fas fa-chart-line"></i> Weight Progression (${weightUnit})
           </h3>
-          <div style="height: 150px; display: flex; align-items: flex-end; gap: 4px; padding: 10px 0;">
-            ${chartData.slice(-20).map((d, i) => {
-              const heightPercent = (d.max_weight / maxWeight) * 100;
-              const date = new Date(d.workout_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-              return `
-                <div style="flex: 1; display: flex; flex-direction: column; align-items: center; min-width: 30px;">
-                  <div style="font-size: 10px; color: var(--text-secondary); margin-bottom: 4px;">${formatHistoryWeight(d.max_weight)}</div>
-                  <div style="width: 100%; background: linear-gradient(180deg, var(--primary) 0%, var(--secondary) 100%); height: ${heightPercent}%; min-height: 4px; border-radius: 4px 4px 0 0;" title="${date}: ${formatHistoryWeight(d.max_weight)} ${weightUnit}"></div>
-                  <div style="font-size: 9px; color: var(--text-secondary); margin-top: 4px; writing-mode: vertical-rl; transform: rotate(180deg); height: 40px; overflow: hidden;">${date}</div>
-                </div>
-              `;
-            }).join('')}
+          <div style="background: var(--bg-secondary); border-radius: 10px; padding: 12px;">
+            ${svgChart}
           </div>
         </div>
-        ` : '<div style="padding: 20px; text-align: center; color: var(--text-secondary);">Not enough data for progression chart</div>'}
+        ` : '<div style="padding: 16px 20px; text-align: center; color: var(--text-secondary); border-bottom: 1px solid var(--border);">Not enough data for progression chart</div>'}
         
-        <!-- History Table -->
-        <div style="padding: 20px;">
-          <h3 style="margin: 0 0 16px 0; font-size: 14px; text-transform: uppercase; color: var(--text-secondary);">
+        <!-- History Table (no inner scroll) -->
+        <div style="padding: 16px 20px;">
+          <h3 style="margin: 0 0 12px 0; font-size: 13px; text-transform: uppercase; color: var(--text-secondary);">
             <i class="fas fa-history"></i> Workout History
           </h3>
           ${data.history && data.history.length > 0 ? `
-            <div style="max-height: 300px; overflow-y: auto;">
-              ${data.history.slice(0, 20).map(workout => `
-                <div style="background: var(--bg-secondary); border-radius: 10px; margin-bottom: 12px; overflow: hidden;">
-                  <div style="background: var(--primary); color: white; padding: 10px 14px; font-weight: 600; font-size: 14px;">
+            <div>
+              ${data.history.slice(0, 10).map(workout => `
+                <div style="background: var(--bg-secondary); border-radius: 10px; margin-bottom: 10px; overflow: hidden;">
+                  <div style="background: var(--primary); color: white; padding: 8px 12px; font-weight: 600; font-size: 13px;">
                     <i class="fas fa-calendar"></i> ${new Date(workout.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
                   </div>
-                  <div style="padding: 12px;">
-                    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                  <div style="padding: 10px;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
                       <thead>
-                        <tr style="color: var(--text-secondary); font-size: 12px; text-transform: uppercase;">
-                          <th style="text-align: left; padding: 4px 8px;">Set</th>
-                          <th style="text-align: right; padding: 4px 8px;">Weight</th>
-                          <th style="text-align: right; padding: 4px 8px;">Reps</th>
-                          <th style="text-align: right; padding: 4px 8px;">Est. 1RM</th>
+                        <tr style="color: var(--text-secondary); font-size: 11px; text-transform: uppercase;">
+                          <th style="text-align: left; padding: 4px 6px;">Set</th>
+                          <th style="text-align: right; padding: 4px 6px;">Weight</th>
+                          <th style="text-align: right; padding: 4px 6px;">Reps</th>
+                          <th style="text-align: right; padding: 4px 6px;">Est. 1RM</th>
                         </tr>
                       </thead>
                       <tbody>
                         ${workout.sets.map(set => `
                           <tr style="border-top: 1px solid var(--border);">
-                            <td style="padding: 8px; font-weight: 600;">${set.set_number}</td>
-                            <td style="padding: 8px; text-align: right;">${formatHistoryWeight(set.weight_kg)} ${weightUnit}</td>
-                            <td style="padding: 8px; text-align: right;">${set.reps}</td>
-                            <td style="padding: 8px; text-align: right; color: var(--primary);">${formatHistoryWeight(set.one_rep_max_kg)}</td>
+                            <td style="padding: 6px; font-weight: 600;">${set.set_number}</td>
+                            <td style="padding: 6px; text-align: right;">${formatHistoryWeight(set.weight_kg)} ${weightUnit}</td>
+                            <td style="padding: 6px; text-align: right;">${set.reps}</td>
+                            <td style="padding: 6px; text-align: right; color: var(--primary);">${formatHistoryWeight(set.one_rep_max_kg)}</td>
                           </tr>
                         `).join('')}
                       </tbody>
@@ -6094,13 +6159,6 @@ async function showExerciseHistory(exerciseId, exerciseName) {
               `).join('')}
             </div>
           ` : '<p style="text-align: center; color: var(--text-secondary);">No history available for this exercise</p>'}
-        </div>
-        
-        <!-- Close Button -->
-        <div style="padding: 20px; border-top: 1px solid var(--border); text-align: center;">
-          <button class="btn btn-primary" onclick="document.getElementById('exercise-history-modal').remove()" style="min-width: 150px;">
-            <i class="fas fa-check"></i> Close
-          </button>
         </div>
       </div>
     `;
