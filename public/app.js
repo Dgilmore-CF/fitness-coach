@@ -134,6 +134,46 @@ function convertWeightForStorage(displayWeight) {
   return isImperialSystem() ? lbsToKg(weight) : weight;
 }
 
+// Smart weight tracking for bodyweight exercises
+// Returns: { showWeight: boolean, useBodyweight: boolean, weightOptional: boolean }
+function getBodyweightExerciseConfig(exerciseName, muscleGroup) {
+  const name = (exerciseName || '').toLowerCase();
+  const group = (muscleGroup || '').toLowerCase();
+  
+  // Core exercises - typically no weight needed (reps only)
+  const noWeightExercises = [
+    'sit-up', 'situp', 'crunch', 'plank', 'dead bug', 'bird dog', 'mountain climber',
+    'leg raise', 'flutter kick', 'bicycle', 'v-up', 'hollow hold', 'superman',
+    'reverse crunch', 'toe touch', 'russian twist', 'side plank', 'windshield wiper',
+    'jumping jack', 'high knee', 'butt kick', 'burpee'
+  ];
+  
+  // Exercises where bodyweight is the primary resistance (optional to track)
+  const bodyweightOptionalExercises = [
+    'push-up', 'push up', 'pushup', 'pull-up', 'pull up', 'pullup', 
+    'chin-up', 'chin up', 'chinup', 'dip', 'inverted row', 'muscle-up',
+    'pistol squat', 'lunge', 'squat', 'glute bridge', 'hip thrust',
+    'nordic curl', 'calf raise', 'step-up', 'step up'
+  ];
+  
+  // Check if weight should be hidden completely
+  for (const pattern of noWeightExercises) {
+    if (name.includes(pattern)) {
+      return { showWeight: false, useBodyweight: false, weightOptional: true };
+    }
+  }
+  
+  // Check if it's a bodyweight exercise where weight is optional
+  for (const pattern of bodyweightOptionalExercises) {
+    if (name.includes(pattern)) {
+      return { showWeight: true, useBodyweight: true, weightOptional: true };
+    }
+  }
+  
+  // Default: show weight input normally
+  return { showWeight: true, useBodyweight: false, weightOptional: false };
+}
+
 function formatWeight(kg, system) {
   if (!kg) return 'N/A';
   system = system || (state.user && state.user.measurement_system) || 'metric';
@@ -7246,9 +7286,9 @@ function renderWorkoutExerciseTabs() {
       };
     }
     
-    // Restore rest timer display if it was active
-    if (state.restTimerActive && state.restTimeRemaining > 0) {
-      updateRestTimerDisplay();
+    // Resume rest timer if it was active (handles minimize/restore)
+    if (state.restTimerActive && state.restTimerEndTime) {
+      resumeRestTimer();
     }
     
   }, 0); // Changed to 0 - no need to wait, elements are immediately available
@@ -7261,6 +7301,11 @@ function renderExerciseContent(exercise, index) {
   const completedSets = (exercise.sets || []).length;
   const targetSets = exercise.target_sets || 3;
   const showNewSetRow = completedSets < targetSets && completedSets < 10;
+  
+  // Check if this is a bodyweight exercise and how to handle weight
+  const bwConfig = getBodyweightExerciseConfig(exercise.name, exercise.muscle_group);
+  const isBodyweightOnly = !bwConfig.showWeight; // No weight input at all
+  const isBodyweightOptional = bwConfig.weightOptional && bwConfig.showWeight; // Weight shown but optional
   
   // Pre-populate from historical data (previous workout) or current workout's last set
   let defaultWeight = '';
@@ -7355,7 +7400,11 @@ function renderExerciseContent(exercise, index) {
       <div class="card" style="background: linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%); color: var(--white); text-align: center; padding: 20px;">
         <div style="font-size: 14px; opacity: 0.9; margin-bottom: 8px;"><i class="fas fa-clock"></i> Rest Timer</div>
         <div id="inline-rest-time" style="font-size: clamp(36px, 10vw, 56px); font-weight: bold; font-family: monospace; line-height: 1;">0:00</div>
-        <div style="display: flex; gap: 8px; margin-top: 16px; justify-content: center; flex-wrap: wrap;">
+        <!-- Progress Bar (reverse - full to empty) -->
+        <div style="margin: 16px 0; background: rgba(255,255,255,0.2); height: 8px; border-radius: 4px; overflow: hidden;">
+          <div id="rest-timer-progress" style="background: var(--white); height: 100%; width: 100%; border-radius: 4px; transition: width 0.1s linear;"></div>
+        </div>
+        <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
           <button class="btn" onclick="adjustRestTimer(-15)" style="background: rgba(255,255,255,0.2); color: var(--white); border: none; padding: 8px 16px; font-size: 14px;">-15s</button>
           <button class="btn" onclick="skipRestTimer()" style="background: var(--white); color: var(--primary); border: none; padding: 8px 20px; font-size: 14px; font-weight: 600;">Skip</button>
           <button class="btn" onclick="adjustRestTimer(15)" style="background: rgba(255,255,255,0.2); color: var(--white); border: none; padding: 8px 16px; font-size: 14px;">+15s</button>
@@ -7421,15 +7470,20 @@ function renderExerciseContent(exercise, index) {
                 ${completedSets + 1}
               </div>
               <div style="font-weight: 600; color: var(--text-primary);">Log Next Set</div>
+              ${isBodyweightOnly ? '<span style="font-size: 11px; color: var(--text-secondary); margin-left: auto;"><i class="fas fa-feather"></i> Bodyweight</span>' : ''}
+              ${isBodyweightOptional ? '<span style="font-size: 11px; color: var(--text-secondary); margin-left: auto;"><i class="fas fa-feather"></i> Weight optional</span>' : ''}
             </div>
             ${hasHistoricalData ? '<div style="font-size: 11px; color: var(--primary); margin-bottom: 8px; text-align: center;"><i class="fas fa-history"></i> Pre-filled from last workout</div>' : ''}
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+            <div style="display: grid; grid-template-columns: ${isBodyweightOnly ? '1fr' : '1fr 1fr'}; gap: 12px; margin-bottom: 12px;">
+              ${!isBodyweightOnly ? `
               <div>
-                <label style="font-size: 12px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Weight (${weightUnit})</label>
-                <input type="number" id="newSetWeight" value="${defaultWeight}" placeholder="0" step="${getWeightStep()}" 
+                <label style="font-size: 12px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Weight (${weightUnit})${isBodyweightOptional ? ' <span style="opacity: 0.7;">optional</span>' : ''}</label>
+                <input type="number" id="newSetWeight" value="${defaultWeight}" placeholder="${isBodyweightOptional ? 'BW' : '0'}" step="${getWeightStep()}" 
                   data-prepopulated="${hasHistoricalData}"
+                  data-bodyweight-optional="${isBodyweightOptional}"
                   style="width: 100%; padding: 12px; border: 2px solid ${hasHistoricalData ? 'var(--primary)' : 'var(--border)'}; border-radius: 8px; font-size: 18px; font-weight: bold; background: var(--bg-secondary); ${inputTextStyle}">
               </div>
+              ` : '<input type="hidden" id="newSetWeight" value="0" data-bodyweight-only="true">'}
               <div>
                 <label style="font-size: 12px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Reps</label>
                 <input type="number" id="newSetReps" value="${defaultReps}" placeholder="0" min="1"
@@ -7494,11 +7548,14 @@ async function addExerciseSet(exerciseId) {
     return;
   }
 
-  let weight = parseFloat(weightInput.value);
+  let weight = parseFloat(weightInput.value) || 0;
   const reps = parseInt(repsInput.value);
+  const isBodyweightOnly = weightInput.getAttribute('data-bodyweight-only') === 'true';
+  const isBodyweightOptional = weightInput.getAttribute('data-bodyweight-optional') === 'true';
   
-  if (!weight || !reps || isNaN(weight) || isNaN(reps)) {
-    showNotification('Please enter valid weight and reps', 'warning');
+  // Validate: reps always required, weight required unless bodyweight exercise
+  if (!reps || isNaN(reps)) {
+    showNotification('Please enter valid reps', 'warning');
     isAddingSet = false;
     if (logButton) {
       logButton.disabled = false;
@@ -7508,13 +7565,29 @@ async function addExerciseSet(exerciseId) {
     return;
   }
   
-  // Convert to kg if imperial
-  if (isImperialSystem()) {
+  // Weight validation: required unless bodyweight exercise
+  if (!isBodyweightOnly && !isBodyweightOptional && (!weight || isNaN(weight))) {
+    showNotification('Please enter valid weight', 'warning');
+    isAddingSet = false;
+    if (logButton) {
+      logButton.disabled = false;
+      logButton.style.opacity = '1';
+      logButton.innerHTML = '<i class="fas fa-plus"></i> Log Set';
+    }
+    return;
+  }
+  
+  // Convert to kg if imperial (only if weight > 0)
+  if (weight > 0 && isImperialSystem()) {
     weight = lbsToKg(weight);
   }
   
+  // Get current exercise for PR checking
+  const currentExercise = state.currentWorkout.exercises.find(ex => ex.id === exerciseId);
+  const previousMaxWeight = currentExercise ? Math.max(...(currentExercise.sets || []).map(s => s.weight_kg || 0), 0) : 0;
+  
   try {
-    await api(`/workouts/${state.currentWorkout.id}/exercises/${exerciseId}/sets`, {
+    const result = await api(`/workouts/${state.currentWorkout.id}/exercises/${exerciseId}/sets`, {
       method: 'POST',
       body: JSON.stringify({ weight_kg: weight, reps, rest_seconds: 90 })
     });
@@ -7523,7 +7596,14 @@ async function addExerciseSet(exerciseId) {
     const data = await api(`/workouts/${state.currentWorkout.id}`);
     state.currentWorkout = data.workout;
     
-    showNotification('Set logged!', 'success');
+    // Check for PR (new max weight for this exercise in this workout)
+    const isPR = weight > 0 && weight > previousMaxWeight && previousMaxWeight > 0;
+    
+    if (isPR) {
+      showPRNotification(currentExercise?.name || 'Exercise', weight);
+    } else {
+      showNotification('Set logged!', 'success');
+    }
     
     // Start rest timer after logging set
     startRestTimer(90);
@@ -7704,11 +7784,13 @@ function minimizeWorkout() {
   }
   restoreBodyScroll();
   
-  // Stop the rest timer display but keep workout state
+  // Stop the rest timer interval but keep the end time so it can resume
+  // The timer will continue counting down and will be resumed when modal reopens
   if (state.restTimerInterval) {
     clearInterval(state.restTimerInterval);
     state.restTimerInterval = null;
   }
+  // Note: We keep state.restTimerActive and state.restTimerEndTime intact
   
   showNotification('Workout minimized. Resume from dashboard.', 'info');
   switchTab('dashboard');
@@ -8304,27 +8386,56 @@ async function finishWorkoutSummary() {
 
 // ========== PHASE 4: POLISH & REFINEMENTS ==========
 
-// Rest Timer System - Uses inline display within workout modal
+// Rest Timer System - Uses end time for persistence across modal minimize/restore
 function startRestTimer(seconds = 90) {
   // Clear any existing timer
   if (state.restTimerInterval) {
     clearInterval(state.restTimerInterval);
   }
   
-  state.restTimeRemaining = seconds;
+  state.restTimerDuration = seconds;
+  state.restTimerEndTime = Date.now() + (seconds * 1000);
   state.restTimerActive = true;
   
   // Show and update inline timer immediately
   showInlineRestTimer();
   
-  // Start countdown
+  // Start countdown using requestAnimationFrame for smoother updates
+  runRestTimerLoop();
+}
+
+// Resume rest timer if it was active (called when modal is restored)
+function resumeRestTimer() {
+  if (!state.restTimerActive || !state.restTimerEndTime) return;
+  
+  const remaining = state.restTimerEndTime - Date.now();
+  if (remaining <= 0) {
+    // Timer already expired while minimized
+    state.restTimerActive = false;
+    state.restTimerEndTime = null;
+    showNotification('Rest complete! Ready for next set 💪', 'success');
+    playRestCompleteSound();
+    return;
+  }
+  
+  // Resume the timer loop
+  showInlineRestTimer();
+  runRestTimerLoop();
+}
+
+function runRestTimerLoop() {
+  if (state.restTimerInterval) {
+    clearInterval(state.restTimerInterval);
+  }
+  
   state.restTimerInterval = setInterval(() => {
-    state.restTimeRemaining--;
+    const remaining = Math.max(0, Math.ceil((state.restTimerEndTime - Date.now()) / 1000));
     
-    if (state.restTimeRemaining <= 0) {
+    if (remaining <= 0) {
       clearInterval(state.restTimerInterval);
       state.restTimerInterval = null;
       state.restTimerActive = false;
+      state.restTimerEndTime = null;
       
       // Hide inline timer
       const inlineTimer = document.getElementById('inline-rest-timer');
@@ -8340,13 +8451,12 @@ function startRestTimer(seconds = 90) {
     } else {
       updateRestTimerDisplay();
     }
-  }, 1000);
+  }, 100); // Update more frequently for smoother progress bar
 }
 
 // Show and update inline rest timer (finds element fresh each time)
 function showInlineRestTimer() {
   const inlineTimer = document.getElementById('inline-rest-timer');
-  const inlineTimeDisplay = document.getElementById('inline-rest-time');
   
   if (inlineTimer && state.restTimerActive) {
     inlineTimer.style.display = 'block';
@@ -8357,20 +8467,110 @@ function showInlineRestTimer() {
   updateRestTimerDisplay();
 }
 
-// Update rest timer display (inline version) - finds element fresh each call
+// Update rest timer display with reverse progress bar
 function updateRestTimerDisplay() {
   const inlineTimer = document.getElementById('inline-rest-timer');
   const inlineTimeDisplay = document.getElementById('inline-rest-time');
+  const progressBar = document.getElementById('rest-timer-progress');
   
   // Show timer if it exists and timer is active
   if (inlineTimer && state.restTimerActive) {
     inlineTimer.style.display = 'block';
   }
   
-  if (inlineTimeDisplay && state.restTimeRemaining > 0) {
-    const mins = Math.floor(state.restTimeRemaining / 60);
-    const secs = state.restTimeRemaining % 60;
+  if (!state.restTimerEndTime) return;
+  
+  const remaining = Math.max(0, (state.restTimerEndTime - Date.now()) / 1000);
+  const duration = state.restTimerDuration || 90;
+  const progressPercent = (remaining / duration) * 100;
+  
+  if (inlineTimeDisplay) {
+    const mins = Math.floor(remaining / 60);
+    const secs = Math.ceil(remaining % 60);
     inlineTimeDisplay.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+  }
+  
+  if (progressBar) {
+    progressBar.style.width = `${progressPercent}%`;
+  }
+}
+
+// Show PR notification within workout modal
+function showPRNotification(exerciseName, weightKg) {
+  const weightDisplay = formatWeight(weightKg);
+  
+  // Create PR celebration overlay within the modal
+  const modal = document.getElementById('workout-modal');
+  if (!modal) {
+    showNotification(`🏆 NEW PR! ${exerciseName}: ${weightDisplay}`, 'success');
+    return;
+  }
+  
+  const prOverlay = document.createElement('div');
+  prOverlay.id = 'pr-celebration';
+  prOverlay.style.cssText = `
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.8); z-index: 30000;
+    display: flex; align-items: center; justify-content: center;
+    animation: fadeIn 0.3s ease;
+  `;
+  
+  prOverlay.innerHTML = `
+    <div style="text-align: center; color: white; padding: 40px; animation: bounceIn 0.5s ease;">
+      <div style="font-size: 80px; margin-bottom: 20px;">🏆</div>
+      <div style="font-size: 32px; font-weight: bold; margin-bottom: 12px; color: gold;">NEW PR!</div>
+      <div style="font-size: 24px; margin-bottom: 8px;">${exerciseName}</div>
+      <div style="font-size: 48px; font-weight: bold; color: var(--primary);">${weightDisplay}</div>
+      <div style="margin-top: 24px; font-size: 16px; opacity: 0.8;">Keep pushing! 💪</div>
+    </div>
+  `;
+  
+  document.body.appendChild(prOverlay);
+  
+  // Play celebration sound
+  playPRSound();
+  
+  // Auto-dismiss after 2.5 seconds
+  setTimeout(() => {
+    prOverlay.style.animation = 'fadeOut 0.3s ease';
+    setTimeout(() => prOverlay.remove(), 300);
+  }, 2500);
+  
+  // Also allow tap to dismiss
+  prOverlay.onclick = () => {
+    prOverlay.style.animation = 'fadeOut 0.3s ease';
+    setTimeout(() => prOverlay.remove(), 300);
+  };
+}
+
+function playPRSound() {
+  try {
+    if (!state.audioContext) {
+      state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    
+    // Play a triumphant chord
+    const notes = [523.25, 659.25, 783.99]; // C5, E5, G5 (C major chord)
+    notes.forEach((freq, i) => {
+      setTimeout(() => {
+        const oscillator = state.audioContext.createOscillator();
+        const gainNode = state.audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(state.audioContext.destination);
+        
+        oscillator.frequency.value = freq;
+        oscillator.type = 'sine';
+        
+        gainNode.gain.setValueAtTime(0.2, state.audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, state.audioContext.currentTime + 0.5);
+        
+        oscillator.start(state.audioContext.currentTime);
+        oscillator.stop(state.audioContext.currentTime + 0.5);
+      }, i * 100);
+    });
+  } catch (e) {
+    console.log('Could not play PR sound:', e);
   }
 }
 
@@ -8381,6 +8581,7 @@ function skipRestTimer() {
   }
   
   state.restTimerActive = false;
+  state.restTimerEndTime = null;
   
   // Hide inline timer
   const inlineTimer = document.getElementById('inline-rest-timer');
@@ -8393,9 +8594,10 @@ function skipRestTimer() {
 
 // Adjust rest timer by seconds (can be negative)
 function adjustRestTimer(seconds) {
-  if (!state.restTimerInterval) return;
+  if (!state.restTimerActive || !state.restTimerEndTime) return;
   
-  state.restTimeRemaining = Math.max(5, state.restTimeRemaining + seconds);
+  state.restTimerEndTime += seconds * 1000;
+  state.restTimerDuration = Math.max(5, (state.restTimerDuration || 90) + seconds);
   
   // Update inline display
   updateRestTimerDisplay();
