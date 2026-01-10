@@ -5121,8 +5121,33 @@ async function loadNutrition() {
         </div>
       </div>
 
+      <!-- Quick Actions -->
       <div class="card">
-        <h2><i class="fas fa-plus-circle"></i> Log Nutrition</h2>
+        <h2><i class="fas fa-utensils"></i> Log Meal</h2>
+        <p style="color: var(--gray); margin-bottom: 16px;">Track full meals with macros, search foods, or scan barcodes</p>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+          <button class="btn btn-primary" onclick="showLogMealModal('breakfast')" style="padding: 16px;">
+            <i class="fas fa-sun"></i> Breakfast
+          </button>
+          <button class="btn btn-primary" onclick="showLogMealModal('lunch')" style="padding: 16px;">
+            <i class="fas fa-cloud-sun"></i> Lunch
+          </button>
+          <button class="btn btn-primary" onclick="showLogMealModal('dinner')" style="padding: 16px;">
+            <i class="fas fa-moon"></i> Dinner
+          </button>
+          <button class="btn btn-secondary" onclick="showLogMealModal('snack')" style="padding: 16px;">
+            <i class="fas fa-cookie"></i> Snack
+          </button>
+        </div>
+        <div style="margin-top: 12px; text-align: center;">
+          <button class="btn btn-outline" onclick="showBarcodeScanner()" style="width: 100%;">
+            <i class="fas fa-barcode"></i> Scan Barcode
+          </button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2><i class="fas fa-plus-circle"></i> Quick Log</h2>
         <div style="display: grid; gap: 16px;">
           <div class="form-group">
             <label>Protein (grams):</label>
@@ -5636,6 +5661,559 @@ async function deleteNutritionEntry(id) {
     loadNutrition();
   } catch (error) {
     showNotification('Error deleting entry: ' + error.message, 'error');
+  }
+}
+
+// ========== MEAL TRACKING & FOOD DATABASE ==========
+
+// State for meal tracking
+state.mealTracking = {
+  searchResults: [],
+  selectedFoods: [],
+  currentMealType: 'snack',
+  scannerActive: false
+};
+
+// Show meal logging modal
+function showLogMealModal(mealType = 'snack') {
+  state.mealTracking.currentMealType = mealType;
+  state.mealTracking.selectedFoods = [];
+  
+  const modalBody = document.getElementById('modalBody');
+  modalBody.innerHTML = `
+    <div style="margin-bottom: 16px;">
+      <label style="font-weight: 600; margin-bottom: 8px; display: block;">Meal Type:</label>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        ${['breakfast', 'lunch', 'dinner', 'snack'].map(type => `
+          <button class="btn ${type === mealType ? 'btn-primary' : 'btn-outline'}" 
+                  onclick="selectMealType('${type}')" id="meal-type-${type}">
+            ${type.charAt(0).toUpperCase() + type.slice(1)}
+          </button>
+        `).join('')}
+      </div>
+    </div>
+    
+    <div style="margin-bottom: 16px;">
+      <label style="font-weight: 600; margin-bottom: 8px; display: block;">Search Foods:</label>
+      <div style="display: flex; gap: 8px;">
+        <input type="text" id="foodSearchInput" placeholder="Search foods..." 
+               style="flex: 1;" oninput="debounceSearchFoods(this.value)">
+        <button class="btn btn-secondary" onclick="showBarcodeScanner()" title="Scan Barcode">
+          <i class="fas fa-barcode"></i>
+        </button>
+      </div>
+      <div style="display: flex; gap: 8px; margin-top: 8px;">
+        <button class="btn btn-outline" onclick="searchFoodsUSDA()" style="font-size: 12px;">
+          <i class="fas fa-database"></i> Search USDA
+        </button>
+        <button class="btn btn-outline" onclick="loadFavoriteFoods()" style="font-size: 12px;">
+          <i class="fas fa-star"></i> Favorites
+        </button>
+      </div>
+    </div>
+    
+    <div id="foodSearchResults" style="max-height: 200px; overflow-y: auto; margin-bottom: 16px; display: none;">
+    </div>
+    
+    <div id="selectedFoodsList" style="margin-bottom: 16px;">
+      <label style="font-weight: 600; margin-bottom: 8px; display: block;">Selected Foods:</label>
+      <div id="selectedFoodsContainer" style="color: var(--gray); font-style: italic;">
+        No foods selected yet
+      </div>
+    </div>
+    
+    <div id="mealTotals" style="background: var(--light); padding: 12px; border-radius: 8px; margin-bottom: 16px; display: none;">
+      <div style="font-weight: 600; margin-bottom: 8px;">Meal Totals:</div>
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; text-align: center;">
+        <div><div style="font-size: 18px; font-weight: bold;" id="totalCalories">0</div><div style="font-size: 11px; color: var(--gray);">Calories</div></div>
+        <div><div style="font-size: 18px; font-weight: bold; color: var(--secondary);" id="totalProtein">0g</div><div style="font-size: 11px; color: var(--gray);">Protein</div></div>
+        <div><div style="font-size: 18px; font-weight: bold; color: var(--primary);" id="totalCarbs">0g</div><div style="font-size: 11px; color: var(--gray);">Carbs</div></div>
+        <div><div style="font-size: 18px; font-weight: bold; color: #f59e0b;" id="totalFat">0g</div><div style="font-size: 11px; color: var(--gray);">Fat</div></div>
+      </div>
+    </div>
+    
+    <button class="btn btn-primary" onclick="saveMeal()" style="width: 100%;" id="saveMealBtn" disabled>
+      <i class="fas fa-check"></i> Log Meal
+    </button>
+  `;
+  
+  openModal('Log Meal');
+}
+
+function selectMealType(type) {
+  state.mealTracking.currentMealType = type;
+  ['breakfast', 'lunch', 'dinner', 'snack'].forEach(t => {
+    const btn = document.getElementById(`meal-type-${t}`);
+    if (btn) {
+      btn.className = t === type ? 'btn btn-primary' : 'btn btn-outline';
+    }
+  });
+}
+
+// Debounced food search
+let foodSearchTimeout;
+function debounceSearchFoods(query) {
+  clearTimeout(foodSearchTimeout);
+  if (query.length < 2) {
+    document.getElementById('foodSearchResults').style.display = 'none';
+    return;
+  }
+  foodSearchTimeout = setTimeout(() => searchFoods(query), 300);
+}
+
+// Search foods in local database
+async function searchFoods(query) {
+  const container = document.getElementById('foodSearchResults');
+  container.style.display = 'block';
+  container.innerHTML = '<div style="text-align: center; padding: 12px;"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
+  
+  try {
+    const data = await api(`/nutrition/foods/search?q=${encodeURIComponent(query)}`);
+    renderFoodSearchResults(data.foods || [], 'local');
+  } catch (error) {
+    container.innerHTML = `<div style="color: var(--danger); padding: 12px;">Error: ${error.message}</div>`;
+  }
+}
+
+// Search USDA database
+async function searchFoodsUSDA() {
+  const query = document.getElementById('foodSearchInput')?.value;
+  if (!query || query.length < 2) {
+    showNotification('Enter at least 2 characters to search', 'warning');
+    return;
+  }
+  
+  const container = document.getElementById('foodSearchResults');
+  container.style.display = 'block';
+  container.innerHTML = '<div style="text-align: center; padding: 12px;"><i class="fas fa-spinner fa-spin"></i> Searching USDA database...</div>';
+  
+  try {
+    const data = await api(`/nutrition/foods/search/usda?q=${encodeURIComponent(query)}`);
+    renderFoodSearchResults(data.foods || [], 'usda');
+  } catch (error) {
+    container.innerHTML = `<div style="color: var(--danger); padding: 12px;">Error: ${error.message}</div>`;
+  }
+}
+
+// Load favorite foods
+async function loadFavoriteFoods() {
+  const container = document.getElementById('foodSearchResults');
+  container.style.display = 'block';
+  container.innerHTML = '<div style="text-align: center; padding: 12px;"><i class="fas fa-spinner fa-spin"></i> Loading favorites...</div>';
+  
+  try {
+    const data = await api('/nutrition/foods/favorites');
+    if (data.foods.length === 0) {
+      container.innerHTML = '<div style="padding: 12px; color: var(--gray); text-align: center;">No favorites yet. Add foods to build your favorites!</div>';
+    } else {
+      renderFoodSearchResults(data.foods, 'favorites');
+    }
+  } catch (error) {
+    container.innerHTML = `<div style="color: var(--danger); padding: 12px;">Error: ${error.message}</div>`;
+  }
+}
+
+// Render food search results
+function renderFoodSearchResults(foods, source) {
+  const container = document.getElementById('foodSearchResults');
+  
+  if (foods.length === 0) {
+    container.innerHTML = `
+      <div style="padding: 12px; text-align: center; color: var(--gray);">
+        No foods found. ${source === 'local' ? '<button class="btn btn-outline" onclick="searchFoodsUSDA()" style="margin-top: 8px;">Try USDA Database</button>' : ''}
+      </div>
+    `;
+    return;
+  }
+  
+  container.innerHTML = foods.map(food => `
+    <div style="padding: 12px; border-bottom: 1px solid var(--light); cursor: pointer; display: flex; justify-content: space-between; align-items: center;"
+         onclick="selectFood(${JSON.stringify(food).replace(/"/g, '&quot;')})">
+      <div style="flex: 1;">
+        <div style="font-weight: 600;">${food.name}</div>
+        <div style="font-size: 12px; color: var(--gray);">
+          ${food.brand ? food.brand + ' • ' : ''}${food.serving_description || food.serving_size + food.serving_unit}
+        </div>
+        <div style="font-size: 12px; margin-top: 4px;">
+          <span style="color: var(--primary);">${Math.round(food.calories)} cal</span> • 
+          <span style="color: var(--secondary);">${food.protein_g?.toFixed(1) || 0}g P</span> • 
+          <span>${food.carbs_g?.toFixed(1) || 0}g C</span> • 
+          <span style="color: #f59e0b;">${food.fat_g?.toFixed(1) || 0}g F</span>
+        </div>
+      </div>
+      <i class="fas fa-plus-circle" style="color: var(--primary); font-size: 20px;"></i>
+    </div>
+  `).join('');
+}
+
+// Select a food to add to meal
+async function selectFood(food) {
+  // If food doesn't have an ID (from external API), save it first
+  if (!food.id && food.source && food.source_id) {
+    try {
+      const result = await api('/nutrition/foods', {
+        method: 'POST',
+        body: JSON.stringify(food)
+      });
+      food = result.food;
+    } catch (error) {
+      showNotification('Error saving food: ' + error.message, 'error');
+      return;
+    }
+  }
+  
+  // Show quantity selector
+  const modalBody = document.getElementById('modalBody');
+  const existingContent = modalBody.innerHTML;
+  
+  modalBody.innerHTML = `
+    <div style="margin-bottom: 16px;">
+      <button class="btn btn-outline" onclick="document.getElementById('modalBody').innerHTML = \`${existingContent.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`" style="margin-bottom: 16px;">
+        <i class="fas fa-arrow-left"></i> Back
+      </button>
+      
+      <h3 style="margin-bottom: 8px;">${food.name}</h3>
+      <p style="color: var(--gray); font-size: 14px; margin-bottom: 16px;">
+        ${food.brand ? food.brand + ' • ' : ''}${food.serving_description || food.serving_size + food.serving_unit}
+      </p>
+      
+      <div style="background: var(--light); padding: 12px; border-radius: 8px; margin-bottom: 16px;">
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; text-align: center;">
+          <div><div style="font-weight: bold;">${Math.round(food.calories)}</div><div style="font-size: 11px; color: var(--gray);">Calories</div></div>
+          <div><div style="font-weight: bold; color: var(--secondary);">${food.protein_g?.toFixed(1) || 0}g</div><div style="font-size: 11px; color: var(--gray);">Protein</div></div>
+          <div><div style="font-weight: bold; color: var(--primary);">${food.carbs_g?.toFixed(1) || 0}g</div><div style="font-size: 11px; color: var(--gray);">Carbs</div></div>
+          <div><div style="font-weight: bold; color: #f59e0b;">${food.fat_g?.toFixed(1) || 0}g</div><div style="font-size: 11px; color: var(--gray);">Fat</div></div>
+        </div>
+        <div style="font-size: 11px; color: var(--gray); text-align: center; margin-top: 8px;">Per serving</div>
+      </div>
+      
+      <div class="form-group">
+        <label>Quantity:</label>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <button class="btn btn-outline" onclick="adjustFoodQty(-0.5)">-</button>
+          <input type="number" id="foodQuantity" value="1" min="0.25" step="0.25" style="width: 80px; text-align: center;">
+          <button class="btn btn-outline" onclick="adjustFoodQty(0.5)">+</button>
+          <select id="foodUnit" style="flex: 1;">
+            <option value="serving">serving(s)</option>
+            <option value="g">grams</option>
+            <option value="oz">ounces</option>
+            <option value="cup">cup(s)</option>
+          </select>
+        </div>
+      </div>
+      
+      <button class="btn btn-primary" onclick="addFoodToMeal(${food.id})" style="width: 100%;">
+        <i class="fas fa-plus"></i> Add to Meal
+      </button>
+    </div>
+  `;
+  
+  // Store the food temporarily
+  state.mealTracking.tempFood = food;
+}
+
+function adjustFoodQty(delta) {
+  const input = document.getElementById('foodQuantity');
+  const newVal = Math.max(0.25, parseFloat(input.value) + delta);
+  input.value = newVal;
+}
+
+// Add food to current meal
+function addFoodToMeal(foodId) {
+  const quantity = parseFloat(document.getElementById('foodQuantity').value) || 1;
+  const unit = document.getElementById('foodUnit').value;
+  const food = state.mealTracking.tempFood;
+  
+  if (!food) {
+    showNotification('Error: Food not found', 'error');
+    return;
+  }
+  
+  state.mealTracking.selectedFoods.push({
+    food_id: foodId,
+    food: food,
+    quantity: quantity,
+    unit: unit
+  });
+  
+  showNotification(`Added ${food.name}`, 'success');
+  
+  // Go back to meal modal and update display
+  showLogMealModal(state.mealTracking.currentMealType);
+  updateSelectedFoodsDisplay();
+}
+
+// Update the selected foods display
+function updateSelectedFoodsDisplay() {
+  const container = document.getElementById('selectedFoodsContainer');
+  const totalsContainer = document.getElementById('mealTotals');
+  const saveBtn = document.getElementById('saveMealBtn');
+  
+  if (state.mealTracking.selectedFoods.length === 0) {
+    container.innerHTML = '<div style="color: var(--gray); font-style: italic;">No foods selected yet</div>';
+    totalsContainer.style.display = 'none';
+    saveBtn.disabled = true;
+    return;
+  }
+  
+  let totals = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+  
+  container.innerHTML = state.mealTracking.selectedFoods.map((item, idx) => {
+    const multiplier = item.unit === 'serving' ? item.quantity : (item.quantity / item.food.serving_size);
+    const cals = (item.food.calories || 0) * multiplier;
+    const protein = (item.food.protein_g || 0) * multiplier;
+    const carbs = (item.food.carbs_g || 0) * multiplier;
+    const fat = (item.food.fat_g || 0) * multiplier;
+    
+    totals.calories += cals;
+    totals.protein += protein;
+    totals.carbs += carbs;
+    totals.fat += fat;
+    
+    return `
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: var(--light); border-radius: 8px; margin-bottom: 8px;">
+        <div>
+          <div style="font-weight: 600;">${item.food.name}</div>
+          <div style="font-size: 12px; color: var(--gray);">${item.quantity} ${item.unit} • ${Math.round(cals)} cal</div>
+        </div>
+        <button class="btn btn-outline" onclick="removeFoodFromMeal(${idx})" style="padding: 4px 8px; color: var(--danger);">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+    `;
+  }).join('');
+  
+  // Update totals
+  document.getElementById('totalCalories').textContent = Math.round(totals.calories);
+  document.getElementById('totalProtein').textContent = totals.protein.toFixed(1) + 'g';
+  document.getElementById('totalCarbs').textContent = totals.carbs.toFixed(1) + 'g';
+  document.getElementById('totalFat').textContent = totals.fat.toFixed(1) + 'g';
+  
+  totalsContainer.style.display = 'block';
+  saveBtn.disabled = false;
+}
+
+// Remove food from meal
+function removeFoodFromMeal(index) {
+  state.mealTracking.selectedFoods.splice(index, 1);
+  updateSelectedFoodsDisplay();
+}
+
+// Save the meal
+async function saveMeal() {
+  if (state.mealTracking.selectedFoods.length === 0) {
+    showNotification('Please add at least one food', 'warning');
+    return;
+  }
+  
+  try {
+    const mealData = {
+      date: new Date().toISOString().split('T')[0],
+      meal_type: state.mealTracking.currentMealType,
+      foods: state.mealTracking.selectedFoods.map(item => ({
+        food_id: item.food_id,
+        quantity: item.quantity,
+        unit: item.unit
+      }))
+    };
+    
+    await api('/nutrition/meals', {
+      method: 'POST',
+      body: JSON.stringify(mealData)
+    });
+    
+    showNotification('Meal logged successfully!', 'success');
+    closeModal();
+    loadNutrition();
+  } catch (error) {
+    showNotification('Error logging meal: ' + error.message, 'error');
+  }
+}
+
+// ========== BARCODE SCANNER ==========
+
+function showBarcodeScanner() {
+  const modalBody = document.getElementById('modalBody');
+  
+  modalBody.innerHTML = `
+    <div style="text-align: center;">
+      <div id="scanner-container" style="position: relative; width: 100%; max-width: 400px; margin: 0 auto;">
+        <video id="scanner-video" style="width: 100%; border-radius: 12px; background: #000;"></video>
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                    width: 200px; height: 100px; border: 3px solid var(--primary); border-radius: 8px;
+                    pointer-events: none;"></div>
+      </div>
+      
+      <p style="margin: 16px 0; color: var(--gray);">Position barcode within the frame</p>
+      
+      <div style="margin-bottom: 16px;">
+        <label style="font-weight: 600;">Or enter barcode manually:</label>
+        <div style="display: flex; gap: 8px; margin-top: 8px;">
+          <input type="text" id="manualBarcode" placeholder="Enter UPC/EAN code" style="flex: 1;">
+          <button class="btn btn-primary" onclick="lookupBarcode()">
+            <i class="fas fa-search"></i> Lookup
+          </button>
+        </div>
+      </div>
+      
+      <div id="barcode-result" style="display: none; margin-top: 16px;"></div>
+      
+      <button class="btn btn-outline" onclick="stopBarcodeScanner(); showLogMealModal('${state.mealTracking.currentMealType}');">
+        <i class="fas fa-arrow-left"></i> Back to Meal
+      </button>
+    </div>
+  `;
+  
+  openModal('Scan Barcode');
+  startBarcodeScanner();
+}
+
+async function startBarcodeScanner() {
+  const video = document.getElementById('scanner-video');
+  if (!video) return;
+  
+  try {
+    // Check for camera support
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      document.getElementById('scanner-container').innerHTML = `
+        <div style="padding: 40px; background: var(--light); border-radius: 12px;">
+          <i class="fas fa-camera-slash" style="font-size: 48px; color: var(--gray); margin-bottom: 16px;"></i>
+          <p>Camera not supported on this device.</p>
+          <p style="font-size: 14px; color: var(--gray);">Use manual barcode entry below.</p>
+        </div>
+      `;
+      return;
+    }
+    
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment' }
+    });
+    
+    video.srcObject = stream;
+    video.play();
+    state.mealTracking.scannerStream = stream;
+    state.mealTracking.scannerActive = true;
+    
+    // Start barcode detection
+    if ('BarcodeDetector' in window) {
+      const detector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'] });
+      detectBarcode(video, detector);
+    } else {
+      console.log('BarcodeDetector not supported, using manual entry only');
+    }
+    
+  } catch (error) {
+    console.error('Camera error:', error);
+    document.getElementById('scanner-container').innerHTML = `
+      <div style="padding: 40px; background: var(--light); border-radius: 12px;">
+        <i class="fas fa-exclamation-triangle" style="font-size: 48px; color: var(--warning); margin-bottom: 16px;"></i>
+        <p>Camera access denied or unavailable.</p>
+        <p style="font-size: 14px; color: var(--gray);">Use manual barcode entry below.</p>
+      </div>
+    `;
+  }
+}
+
+async function detectBarcode(video, detector) {
+  if (!state.mealTracking.scannerActive) return;
+  
+  try {
+    const barcodes = await detector.detect(video);
+    if (barcodes.length > 0) {
+      const barcode = barcodes[0].rawValue;
+      stopBarcodeScanner();
+      document.getElementById('manualBarcode').value = barcode;
+      await lookupBarcode(barcode);
+      return;
+    }
+  } catch (error) {
+    console.error('Barcode detection error:', error);
+  }
+  
+  // Continue scanning
+  if (state.mealTracking.scannerActive) {
+    requestAnimationFrame(() => detectBarcode(video, detector));
+  }
+}
+
+function stopBarcodeScanner() {
+  state.mealTracking.scannerActive = false;
+  if (state.mealTracking.scannerStream) {
+    state.mealTracking.scannerStream.getTracks().forEach(track => track.stop());
+    state.mealTracking.scannerStream = null;
+  }
+}
+
+async function lookupBarcode(barcode) {
+  barcode = barcode || document.getElementById('manualBarcode')?.value;
+  if (!barcode) {
+    showNotification('Please enter a barcode', 'warning');
+    return;
+  }
+  
+  const resultContainer = document.getElementById('barcode-result');
+  resultContainer.style.display = 'block';
+  resultContainer.innerHTML = '<div style="padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Looking up barcode...</div>';
+  
+  try {
+    const data = await api(`/nutrition/foods/barcode/${encodeURIComponent(barcode)}`);
+    
+    if (!data.food) {
+      resultContainer.innerHTML = `
+        <div style="padding: 20px; background: var(--light); border-radius: 8px;">
+          <i class="fas fa-question-circle" style="font-size: 32px; color: var(--gray); margin-bottom: 12px;"></i>
+          <p>Product not found for barcode: ${barcode}</p>
+          <p style="font-size: 14px; color: var(--gray);">Try searching by name instead.</p>
+        </div>
+      `;
+      return;
+    }
+    
+    const food = data.food;
+    resultContainer.innerHTML = `
+      <div style="padding: 16px; background: var(--light); border-radius: 8px; text-align: left;">
+        <h3 style="margin-bottom: 8px;">${food.name}</h3>
+        <p style="color: var(--gray); font-size: 14px; margin-bottom: 12px;">
+          ${food.brand ? food.brand + ' • ' : ''}${food.serving_description || food.serving_size + food.serving_unit}
+        </p>
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; text-align: center; margin-bottom: 12px;">
+          <div><div style="font-weight: bold;">${Math.round(food.calories)}</div><div style="font-size: 11px; color: var(--gray);">Cal</div></div>
+          <div><div style="font-weight: bold; color: var(--secondary);">${food.protein_g?.toFixed(1) || 0}g</div><div style="font-size: 11px; color: var(--gray);">P</div></div>
+          <div><div style="font-weight: bold; color: var(--primary);">${food.carbs_g?.toFixed(1) || 0}g</div><div style="font-size: 11px; color: var(--gray);">C</div></div>
+          <div><div style="font-weight: bold; color: #f59e0b;">${food.fat_g?.toFixed(1) || 0}g</div><div style="font-size: 11px; color: var(--gray);">F</div></div>
+        </div>
+        <button class="btn btn-primary" onclick="selectFood(${JSON.stringify(food).replace(/"/g, '&quot;')})" style="width: 100%;">
+          <i class="fas fa-plus"></i> Add to Meal
+        </button>
+      </div>
+    `;
+    
+  } catch (error) {
+    resultContainer.innerHTML = `
+      <div style="padding: 20px; background: var(--light); border-radius: 8px; color: var(--danger);">
+        Error: ${error.message}
+      </div>
+    `;
+  }
+}
+
+// Quick add to today's meal from favorites
+async function quickAddFood(foodId, mealType = 'snack') {
+  try {
+    await api('/nutrition/quick-add', {
+      method: 'POST',
+      body: JSON.stringify({
+        food_id: foodId,
+        quantity: 1,
+        unit: 'serving',
+        meal_type: mealType
+      })
+    });
+    
+    showNotification('Food added!', 'success');
+    loadNutrition();
+  } catch (error) {
+    showNotification('Error adding food: ' + error.message, 'error');
   }
 }
 
