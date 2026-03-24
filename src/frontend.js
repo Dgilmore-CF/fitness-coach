@@ -135,6 +135,46 @@ function convertWeightForStorage(displayWeight) {
   return isImperialSystem() ? lbsToKg(weight) : weight;
 }
 
+// Smart weight tracking for bodyweight exercises
+// Returns: { showWeight: boolean, useBodyweight: boolean, weightOptional: boolean }
+function getBodyweightExerciseConfig(exerciseName, muscleGroup) {
+  const name = (exerciseName || '').toLowerCase();
+  const group = (muscleGroup || '').toLowerCase();
+  
+  // Core exercises - typically no weight needed (reps only)
+  const noWeightExercises = [
+    'sit-up', 'situp', 'crunch', 'plank', 'dead bug', 'bird dog', 'mountain climber',
+    'leg raise', 'flutter kick', 'bicycle', 'v-up', 'hollow hold', 'superman',
+    'reverse crunch', 'toe touch', 'russian twist', 'side plank', 'windshield wiper',
+    'jumping jack', 'high knee', 'butt kick', 'burpee'
+  ];
+  
+  // Exercises where bodyweight is the primary resistance (optional to track)
+  const bodyweightOptionalExercises = [
+    'push-up', 'push up', 'pushup', 'pull-up', 'pull up', 'pullup', 
+    'chin-up', 'chin up', 'chinup', 'dip', 'inverted row', 'muscle-up',
+    'pistol squat', 'lunge', 'squat', 'glute bridge', 'hip thrust',
+    'nordic curl', 'calf raise', 'step-up', 'step up'
+  ];
+  
+  // Check if weight should be hidden completely
+  for (const pattern of noWeightExercises) {
+    if (name.includes(pattern)) {
+      return { showWeight: false, useBodyweight: false, weightOptional: true };
+    }
+  }
+  
+  // Check if it's a bodyweight exercise where weight is optional
+  for (const pattern of bodyweightOptionalExercises) {
+    if (name.includes(pattern)) {
+      return { showWeight: true, useBodyweight: true, weightOptional: true };
+    }
+  }
+  
+  // Default: show weight input normally
+  return { showWeight: true, useBodyweight: false, weightOptional: false };
+}
+
 function formatWeight(kg, system) {
   if (!kg) return 'N/A';
   system = system || (state.user && state.user.measurement_system) || 'metric';
@@ -5082,8 +5122,33 @@ async function loadNutrition() {
         </div>
       </div>
 
+      <!-- Quick Actions -->
       <div class="card">
-        <h2><i class="fas fa-plus-circle"></i> Log Nutrition</h2>
+        <h2><i class="fas fa-utensils"></i> Log Meal</h2>
+        <p style="color: var(--gray); margin-bottom: 16px;">Track full meals with macros, search foods, or scan barcodes</p>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+          <button class="btn btn-primary" onclick="showLogMealModal('breakfast')" style="padding: 16px;">
+            <i class="fas fa-sun"></i> Breakfast
+          </button>
+          <button class="btn btn-primary" onclick="showLogMealModal('lunch')" style="padding: 16px;">
+            <i class="fas fa-cloud-sun"></i> Lunch
+          </button>
+          <button class="btn btn-primary" onclick="showLogMealModal('dinner')" style="padding: 16px;">
+            <i class="fas fa-moon"></i> Dinner
+          </button>
+          <button class="btn btn-secondary" onclick="showLogMealModal('snack')" style="padding: 16px;">
+            <i class="fas fa-cookie"></i> Snack
+          </button>
+        </div>
+        <div style="margin-top: 12px; text-align: center;">
+          <button class="btn btn-outline" onclick="showBarcodeScanner()" style="width: 100%;">
+            <i class="fas fa-barcode"></i> Scan Barcode
+          </button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2><i class="fas fa-plus-circle"></i> Quick Log</h2>
         <div style="display: grid; gap: 16px;">
           <div class="form-group">
             <label>Protein (grams):</label>
@@ -5600,6 +5665,559 @@ async function deleteNutritionEntry(id) {
   }
 }
 
+// ========== MEAL TRACKING & FOOD DATABASE ==========
+
+// State for meal tracking
+state.mealTracking = {
+  searchResults: [],
+  selectedFoods: [],
+  currentMealType: 'snack',
+  scannerActive: false
+};
+
+// Show meal logging modal
+function showLogMealModal(mealType = 'snack') {
+  state.mealTracking.currentMealType = mealType;
+  state.mealTracking.selectedFoods = [];
+  
+  const modalBody = document.getElementById('modalBody');
+  modalBody.innerHTML = \`
+    <div style="margin-bottom: 16px;">
+      <label style="font-weight: 600; margin-bottom: 8px; display: block;">Meal Type:</label>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        \${['breakfast', 'lunch', 'dinner', 'snack'].map(type => \`
+          <button class="btn \${type === mealType ? 'btn-primary' : 'btn-outline'}" 
+                  onclick="selectMealType('\${type}')" id="meal-type-\${type}">
+            \${type.charAt(0).toUpperCase() + type.slice(1)}
+          </button>
+        \`).join('')}
+      </div>
+    </div>
+    
+    <div style="margin-bottom: 16px;">
+      <label style="font-weight: 600; margin-bottom: 8px; display: block;">Search Foods:</label>
+      <div style="display: flex; gap: 8px;">
+        <input type="text" id="foodSearchInput" placeholder="Search foods..." 
+               style="flex: 1;" oninput="debounceSearchFoods(this.value)">
+        <button class="btn btn-secondary" onclick="showBarcodeScanner()" title="Scan Barcode">
+          <i class="fas fa-barcode"></i>
+        </button>
+      </div>
+      <div style="display: flex; gap: 8px; margin-top: 8px;">
+        <button class="btn btn-outline" onclick="searchFoodsUSDA()" style="font-size: 12px;">
+          <i class="fas fa-database"></i> Search USDA
+        </button>
+        <button class="btn btn-outline" onclick="loadFavoriteFoods()" style="font-size: 12px;">
+          <i class="fas fa-star"></i> Favorites
+        </button>
+      </div>
+    </div>
+    
+    <div id="foodSearchResults" style="max-height: 200px; overflow-y: auto; margin-bottom: 16px; display: none;">
+    </div>
+    
+    <div id="selectedFoodsList" style="margin-bottom: 16px;">
+      <label style="font-weight: 600; margin-bottom: 8px; display: block;">Selected Foods:</label>
+      <div id="selectedFoodsContainer" style="color: var(--gray); font-style: italic;">
+        No foods selected yet
+      </div>
+    </div>
+    
+    <div id="mealTotals" style="background: var(--light); padding: 12px; border-radius: 8px; margin-bottom: 16px; display: none;">
+      <div style="font-weight: 600; margin-bottom: 8px;">Meal Totals:</div>
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; text-align: center;">
+        <div><div style="font-size: 18px; font-weight: bold;" id="totalCalories">0</div><div style="font-size: 11px; color: var(--gray);">Calories</div></div>
+        <div><div style="font-size: 18px; font-weight: bold; color: var(--secondary);" id="totalProtein">0g</div><div style="font-size: 11px; color: var(--gray);">Protein</div></div>
+        <div><div style="font-size: 18px; font-weight: bold; color: var(--primary);" id="totalCarbs">0g</div><div style="font-size: 11px; color: var(--gray);">Carbs</div></div>
+        <div><div style="font-size: 18px; font-weight: bold; color: #f59e0b;" id="totalFat">0g</div><div style="font-size: 11px; color: var(--gray);">Fat</div></div>
+      </div>
+    </div>
+    
+    <button class="btn btn-primary" onclick="saveMeal()" style="width: 100%;" id="saveMealBtn" disabled>
+      <i class="fas fa-check"></i> Log Meal
+    </button>
+  \`;
+  
+  openModal('Log Meal');
+}
+
+function selectMealType(type) {
+  state.mealTracking.currentMealType = type;
+  ['breakfast', 'lunch', 'dinner', 'snack'].forEach(t => {
+    const btn = document.getElementById(\`meal-type-\${t}\`);
+    if (btn) {
+      btn.className = t === type ? 'btn btn-primary' : 'btn btn-outline';
+    }
+  });
+}
+
+// Debounced food search
+let foodSearchTimeout;
+function debounceSearchFoods(query) {
+  clearTimeout(foodSearchTimeout);
+  if (query.length < 2) {
+    document.getElementById('foodSearchResults').style.display = 'none';
+    return;
+  }
+  foodSearchTimeout = setTimeout(() => searchFoods(query), 300);
+}
+
+// Search foods in local database
+async function searchFoods(query) {
+  const container = document.getElementById('foodSearchResults');
+  container.style.display = 'block';
+  container.innerHTML = '<div style="text-align: center; padding: 12px;"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
+  
+  try {
+    const data = await api(\`/nutrition/foods/search?q=\${encodeURIComponent(query)}\`);
+    renderFoodSearchResults(data.foods || [], 'local');
+  } catch (error) {
+    container.innerHTML = \`<div style="color: var(--danger); padding: 12px;">Error: \${error.message}</div>\`;
+  }
+}
+
+// Search USDA database
+async function searchFoodsUSDA() {
+  const query = document.getElementById('foodSearchInput')?.value;
+  if (!query || query.length < 2) {
+    showNotification('Enter at least 2 characters to search', 'warning');
+    return;
+  }
+  
+  const container = document.getElementById('foodSearchResults');
+  container.style.display = 'block';
+  container.innerHTML = '<div style="text-align: center; padding: 12px;"><i class="fas fa-spinner fa-spin"></i> Searching USDA database...</div>';
+  
+  try {
+    const data = await api(\`/nutrition/foods/search/usda?q=\${encodeURIComponent(query)}\`);
+    renderFoodSearchResults(data.foods || [], 'usda');
+  } catch (error) {
+    container.innerHTML = \`<div style="color: var(--danger); padding: 12px;">Error: \${error.message}</div>\`;
+  }
+}
+
+// Load favorite foods
+async function loadFavoriteFoods() {
+  const container = document.getElementById('foodSearchResults');
+  container.style.display = 'block';
+  container.innerHTML = '<div style="text-align: center; padding: 12px;"><i class="fas fa-spinner fa-spin"></i> Loading favorites...</div>';
+  
+  try {
+    const data = await api('/nutrition/foods/favorites');
+    if (data.foods.length === 0) {
+      container.innerHTML = '<div style="padding: 12px; color: var(--gray); text-align: center;">No favorites yet. Add foods to build your favorites!</div>';
+    } else {
+      renderFoodSearchResults(data.foods, 'favorites');
+    }
+  } catch (error) {
+    container.innerHTML = \`<div style="color: var(--danger); padding: 12px;">Error: \${error.message}</div>\`;
+  }
+}
+
+// Render food search results
+function renderFoodSearchResults(foods, source) {
+  const container = document.getElementById('foodSearchResults');
+  
+  if (foods.length === 0) {
+    container.innerHTML = \`
+      <div style="padding: 12px; text-align: center; color: var(--gray);">
+        No foods found. \${source === 'local' ? '<button class="btn btn-outline" onclick="searchFoodsUSDA()" style="margin-top: 8px;">Try USDA Database</button>' : ''}
+      </div>
+    \`;
+    return;
+  }
+  
+  container.innerHTML = foods.map(food => \`
+    <div style="padding: 12px; border-bottom: 1px solid var(--light); cursor: pointer; display: flex; justify-content: space-between; align-items: center;"
+         onclick="selectFood(\${JSON.stringify(food).replace(/"/g, '&quot;')})">
+      <div style="flex: 1;">
+        <div style="font-weight: 600;">\${food.name}</div>
+        <div style="font-size: 12px; color: var(--gray);">
+          \${food.brand ? food.brand + ' • ' : ''}\${food.serving_description || food.serving_size + food.serving_unit}
+        </div>
+        <div style="font-size: 12px; margin-top: 4px;">
+          <span style="color: var(--primary);">\${Math.round(food.calories)} cal</span> • 
+          <span style="color: var(--secondary);">\${food.protein_g?.toFixed(1) || 0}g P</span> • 
+          <span>\${food.carbs_g?.toFixed(1) || 0}g C</span> • 
+          <span style="color: #f59e0b;">\${food.fat_g?.toFixed(1) || 0}g F</span>
+        </div>
+      </div>
+      <i class="fas fa-plus-circle" style="color: var(--primary); font-size: 20px;"></i>
+    </div>
+  \`).join('');
+}
+
+// Select a food to add to meal
+async function selectFood(food) {
+  // If food doesn't have an ID (from external API), save it first
+  if (!food.id && food.source && food.source_id) {
+    try {
+      const result = await api('/nutrition/foods', {
+        method: 'POST',
+        body: JSON.stringify(food)
+      });
+      food = result.food;
+    } catch (error) {
+      showNotification('Error saving food: ' + error.message, 'error');
+      return;
+    }
+  }
+  
+  // Show quantity selector
+  const modalBody = document.getElementById('modalBody');
+  const existingContent = modalBody.innerHTML;
+  
+  modalBody.innerHTML = \`
+    <div style="margin-bottom: 16px;">
+      <button class="btn btn-outline" onclick="document.getElementById('modalBody').innerHTML = \\\`\${existingContent.replace(/\`/g, '\\\\\`').replace(/\\\$/g, '\\\\\$')}\\\`" style="margin-bottom: 16px;">
+        <i class="fas fa-arrow-left"></i> Back
+      </button>
+      
+      <h3 style="margin-bottom: 8px;">\${food.name}</h3>
+      <p style="color: var(--gray); font-size: 14px; margin-bottom: 16px;">
+        \${food.brand ? food.brand + ' • ' : ''}\${food.serving_description || food.serving_size + food.serving_unit}
+      </p>
+      
+      <div style="background: var(--light); padding: 12px; border-radius: 8px; margin-bottom: 16px;">
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; text-align: center;">
+          <div><div style="font-weight: bold;">\${Math.round(food.calories)}</div><div style="font-size: 11px; color: var(--gray);">Calories</div></div>
+          <div><div style="font-weight: bold; color: var(--secondary);">\${food.protein_g?.toFixed(1) || 0}g</div><div style="font-size: 11px; color: var(--gray);">Protein</div></div>
+          <div><div style="font-weight: bold; color: var(--primary);">\${food.carbs_g?.toFixed(1) || 0}g</div><div style="font-size: 11px; color: var(--gray);">Carbs</div></div>
+          <div><div style="font-weight: bold; color: #f59e0b;">\${food.fat_g?.toFixed(1) || 0}g</div><div style="font-size: 11px; color: var(--gray);">Fat</div></div>
+        </div>
+        <div style="font-size: 11px; color: var(--gray); text-align: center; margin-top: 8px;">Per serving</div>
+      </div>
+      
+      <div class="form-group">
+        <label>Quantity:</label>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <button class="btn btn-outline" onclick="adjustFoodQty(-0.5)">-</button>
+          <input type="number" id="foodQuantity" value="1" min="0.25" step="0.25" style="width: 80px; text-align: center;">
+          <button class="btn btn-outline" onclick="adjustFoodQty(0.5)">+</button>
+          <select id="foodUnit" style="flex: 1;">
+            <option value="serving">serving(s)</option>
+            <option value="g">grams</option>
+            <option value="oz">ounces</option>
+            <option value="cup">cup(s)</option>
+          </select>
+        </div>
+      </div>
+      
+      <button class="btn btn-primary" onclick="addFoodToMeal(\${food.id})" style="width: 100%;">
+        <i class="fas fa-plus"></i> Add to Meal
+      </button>
+    </div>
+  \`;
+  
+  // Store the food temporarily
+  state.mealTracking.tempFood = food;
+}
+
+function adjustFoodQty(delta) {
+  const input = document.getElementById('foodQuantity');
+  const newVal = Math.max(0.25, parseFloat(input.value) + delta);
+  input.value = newVal;
+}
+
+// Add food to current meal
+function addFoodToMeal(foodId) {
+  const quantity = parseFloat(document.getElementById('foodQuantity').value) || 1;
+  const unit = document.getElementById('foodUnit').value;
+  const food = state.mealTracking.tempFood;
+  
+  if (!food) {
+    showNotification('Error: Food not found', 'error');
+    return;
+  }
+  
+  state.mealTracking.selectedFoods.push({
+    food_id: foodId,
+    food: food,
+    quantity: quantity,
+    unit: unit
+  });
+  
+  showNotification(\`Added \${food.name}\`, 'success');
+  
+  // Go back to meal modal and update display
+  showLogMealModal(state.mealTracking.currentMealType);
+  updateSelectedFoodsDisplay();
+}
+
+// Update the selected foods display
+function updateSelectedFoodsDisplay() {
+  const container = document.getElementById('selectedFoodsContainer');
+  const totalsContainer = document.getElementById('mealTotals');
+  const saveBtn = document.getElementById('saveMealBtn');
+  
+  if (state.mealTracking.selectedFoods.length === 0) {
+    container.innerHTML = '<div style="color: var(--gray); font-style: italic;">No foods selected yet</div>';
+    totalsContainer.style.display = 'none';
+    saveBtn.disabled = true;
+    return;
+  }
+  
+  let totals = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+  
+  container.innerHTML = state.mealTracking.selectedFoods.map((item, idx) => {
+    const multiplier = item.unit === 'serving' ? item.quantity : (item.quantity / item.food.serving_size);
+    const cals = (item.food.calories || 0) * multiplier;
+    const protein = (item.food.protein_g || 0) * multiplier;
+    const carbs = (item.food.carbs_g || 0) * multiplier;
+    const fat = (item.food.fat_g || 0) * multiplier;
+    
+    totals.calories += cals;
+    totals.protein += protein;
+    totals.carbs += carbs;
+    totals.fat += fat;
+    
+    return \`
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: var(--light); border-radius: 8px; margin-bottom: 8px;">
+        <div>
+          <div style="font-weight: 600;">\${item.food.name}</div>
+          <div style="font-size: 12px; color: var(--gray);">\${item.quantity} \${item.unit} • \${Math.round(cals)} cal</div>
+        </div>
+        <button class="btn btn-outline" onclick="removeFoodFromMeal(\${idx})" style="padding: 4px 8px; color: var(--danger);">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+    \`;
+  }).join('');
+  
+  // Update totals
+  document.getElementById('totalCalories').textContent = Math.round(totals.calories);
+  document.getElementById('totalProtein').textContent = totals.protein.toFixed(1) + 'g';
+  document.getElementById('totalCarbs').textContent = totals.carbs.toFixed(1) + 'g';
+  document.getElementById('totalFat').textContent = totals.fat.toFixed(1) + 'g';
+  
+  totalsContainer.style.display = 'block';
+  saveBtn.disabled = false;
+}
+
+// Remove food from meal
+function removeFoodFromMeal(index) {
+  state.mealTracking.selectedFoods.splice(index, 1);
+  updateSelectedFoodsDisplay();
+}
+
+// Save the meal
+async function saveMeal() {
+  if (state.mealTracking.selectedFoods.length === 0) {
+    showNotification('Please add at least one food', 'warning');
+    return;
+  }
+  
+  try {
+    const mealData = {
+      date: new Date().toISOString().split('T')[0],
+      meal_type: state.mealTracking.currentMealType,
+      foods: state.mealTracking.selectedFoods.map(item => ({
+        food_id: item.food_id,
+        quantity: item.quantity,
+        unit: item.unit
+      }))
+    };
+    
+    await api('/nutrition/meals', {
+      method: 'POST',
+      body: JSON.stringify(mealData)
+    });
+    
+    showNotification('Meal logged successfully!', 'success');
+    closeModal();
+    loadNutrition();
+  } catch (error) {
+    showNotification('Error logging meal: ' + error.message, 'error');
+  }
+}
+
+// ========== BARCODE SCANNER ==========
+
+function showBarcodeScanner() {
+  const modalBody = document.getElementById('modalBody');
+  
+  modalBody.innerHTML = \`
+    <div style="text-align: center;">
+      <div id="scanner-container" style="position: relative; width: 100%; max-width: 400px; margin: 0 auto;">
+        <video id="scanner-video" style="width: 100%; border-radius: 12px; background: #000;"></video>
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                    width: 200px; height: 100px; border: 3px solid var(--primary); border-radius: 8px;
+                    pointer-events: none;"></div>
+      </div>
+      
+      <p style="margin: 16px 0; color: var(--gray);">Position barcode within the frame</p>
+      
+      <div style="margin-bottom: 16px;">
+        <label style="font-weight: 600;">Or enter barcode manually:</label>
+        <div style="display: flex; gap: 8px; margin-top: 8px;">
+          <input type="text" id="manualBarcode" placeholder="Enter UPC/EAN code" style="flex: 1;">
+          <button class="btn btn-primary" onclick="lookupBarcode()">
+            <i class="fas fa-search"></i> Lookup
+          </button>
+        </div>
+      </div>
+      
+      <div id="barcode-result" style="display: none; margin-top: 16px;"></div>
+      
+      <button class="btn btn-outline" onclick="stopBarcodeScanner(); showLogMealModal('\${state.mealTracking.currentMealType}');">
+        <i class="fas fa-arrow-left"></i> Back to Meal
+      </button>
+    </div>
+  \`;
+  
+  openModal('Scan Barcode');
+  startBarcodeScanner();
+}
+
+async function startBarcodeScanner() {
+  const video = document.getElementById('scanner-video');
+  if (!video) return;
+  
+  try {
+    // Check for camera support
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      document.getElementById('scanner-container').innerHTML = \`
+        <div style="padding: 40px; background: var(--light); border-radius: 12px;">
+          <i class="fas fa-camera-slash" style="font-size: 48px; color: var(--gray); margin-bottom: 16px;"></i>
+          <p>Camera not supported on this device.</p>
+          <p style="font-size: 14px; color: var(--gray);">Use manual barcode entry below.</p>
+        </div>
+      \`;
+      return;
+    }
+    
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment' }
+    });
+    
+    video.srcObject = stream;
+    video.play();
+    state.mealTracking.scannerStream = stream;
+    state.mealTracking.scannerActive = true;
+    
+    // Start barcode detection
+    if ('BarcodeDetector' in window) {
+      const detector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'] });
+      detectBarcode(video, detector);
+    } else {
+      console.log('BarcodeDetector not supported, using manual entry only');
+    }
+    
+  } catch (error) {
+    console.error('Camera error:', error);
+    document.getElementById('scanner-container').innerHTML = \`
+      <div style="padding: 40px; background: var(--light); border-radius: 12px;">
+        <i class="fas fa-exclamation-triangle" style="font-size: 48px; color: var(--warning); margin-bottom: 16px;"></i>
+        <p>Camera access denied or unavailable.</p>
+        <p style="font-size: 14px; color: var(--gray);">Use manual barcode entry below.</p>
+      </div>
+    \`;
+  }
+}
+
+async function detectBarcode(video, detector) {
+  if (!state.mealTracking.scannerActive) return;
+  
+  try {
+    const barcodes = await detector.detect(video);
+    if (barcodes.length > 0) {
+      const barcode = barcodes[0].rawValue;
+      stopBarcodeScanner();
+      document.getElementById('manualBarcode').value = barcode;
+      await lookupBarcode(barcode);
+      return;
+    }
+  } catch (error) {
+    console.error('Barcode detection error:', error);
+  }
+  
+  // Continue scanning
+  if (state.mealTracking.scannerActive) {
+    requestAnimationFrame(() => detectBarcode(video, detector));
+  }
+}
+
+function stopBarcodeScanner() {
+  state.mealTracking.scannerActive = false;
+  if (state.mealTracking.scannerStream) {
+    state.mealTracking.scannerStream.getTracks().forEach(track => track.stop());
+    state.mealTracking.scannerStream = null;
+  }
+}
+
+async function lookupBarcode(barcode) {
+  barcode = barcode || document.getElementById('manualBarcode')?.value;
+  if (!barcode) {
+    showNotification('Please enter a barcode', 'warning');
+    return;
+  }
+  
+  const resultContainer = document.getElementById('barcode-result');
+  resultContainer.style.display = 'block';
+  resultContainer.innerHTML = '<div style="padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Looking up barcode...</div>';
+  
+  try {
+    const data = await api(\`/nutrition/foods/barcode/\${encodeURIComponent(barcode)}\`);
+    
+    if (!data.food) {
+      resultContainer.innerHTML = \`
+        <div style="padding: 20px; background: var(--light); border-radius: 8px;">
+          <i class="fas fa-question-circle" style="font-size: 32px; color: var(--gray); margin-bottom: 12px;"></i>
+          <p>Product not found for barcode: \${barcode}</p>
+          <p style="font-size: 14px; color: var(--gray);">Try searching by name instead.</p>
+        </div>
+      \`;
+      return;
+    }
+    
+    const food = data.food;
+    resultContainer.innerHTML = \`
+      <div style="padding: 16px; background: var(--light); border-radius: 8px; text-align: left;">
+        <h3 style="margin-bottom: 8px;">\${food.name}</h3>
+        <p style="color: var(--gray); font-size: 14px; margin-bottom: 12px;">
+          \${food.brand ? food.brand + ' • ' : ''}\${food.serving_description || food.serving_size + food.serving_unit}
+        </p>
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; text-align: center; margin-bottom: 12px;">
+          <div><div style="font-weight: bold;">\${Math.round(food.calories)}</div><div style="font-size: 11px; color: var(--gray);">Cal</div></div>
+          <div><div style="font-weight: bold; color: var(--secondary);">\${food.protein_g?.toFixed(1) || 0}g</div><div style="font-size: 11px; color: var(--gray);">P</div></div>
+          <div><div style="font-weight: bold; color: var(--primary);">\${food.carbs_g?.toFixed(1) || 0}g</div><div style="font-size: 11px; color: var(--gray);">C</div></div>
+          <div><div style="font-weight: bold; color: #f59e0b;">\${food.fat_g?.toFixed(1) || 0}g</div><div style="font-size: 11px; color: var(--gray);">F</div></div>
+        </div>
+        <button class="btn btn-primary" onclick="selectFood(\${JSON.stringify(food).replace(/"/g, '&quot;')})" style="width: 100%;">
+          <i class="fas fa-plus"></i> Add to Meal
+        </button>
+      </div>
+    \`;
+    
+  } catch (error) {
+    resultContainer.innerHTML = \`
+      <div style="padding: 20px; background: var(--light); border-radius: 8px; color: var(--danger);">
+        Error: \${error.message}
+      </div>
+    \`;
+  }
+}
+
+// Quick add to today's meal from favorites
+async function quickAddFood(foodId, mealType = 'snack') {
+  try {
+    await api('/nutrition/quick-add', {
+      method: 'POST',
+      body: JSON.stringify({
+        food_id: foodId,
+        quantity: 1,
+        unit: 'serving',
+        meal_type: mealType
+      })
+    });
+    
+    showNotification('Food added!', 'success');
+    loadNutrition();
+  } catch (error) {
+    showNotification('Error adding food: ' + error.message, 'error');
+  }
+}
+
 // Profile modal
 function showProfile() {
   const modalBody = document.getElementById('modalBody');
@@ -5990,102 +6608,167 @@ async function showExerciseHistory(exerciseId, exerciseName) {
     
     const formatHistoryWeight = (kg) => isImperialSystem() ? (kg * 2.20462).toFixed(1) : kg?.toFixed(1) || '0';
     
-    // Build chart data points
-    const chartData = data.progression || [];
-    const maxWeight = Math.max(...chartData.map(d => d.max_weight || 0), 1);
-    const max1RM = Math.max(...chartData.map(d => d.max_1rm || 0), 1);
+    // Build chart data points (last 20 workouts)
+    const chartData = (data.progression || []).slice(-20);
+    const weights = chartData.map(d => d.max_weight || 0);
+    const minWeight = Math.min(...weights) * 0.9 || 0;
+    const maxWeight = Math.max(...weights) * 1.05 || 1;
+    const weightRange = maxWeight - minWeight || 1;
+    
+    // SVG line chart dimensions
+    const chartWidth = 700;
+    const chartHeight = 180;
+    const padding = { top: 20, right: 20, bottom: 40, left: 50 };
+    const graphWidth = chartWidth - padding.left - padding.right;
+    const graphHeight = chartHeight - padding.top - padding.bottom;
+    
+    // Generate SVG path for line chart
+    let linePath = '';
+    let dots = '';
+    let labels = '';
+    
+    if (chartData.length > 1) {
+      const points = chartData.map((d, i) => {
+        const x = padding.left + (i / (chartData.length - 1)) * graphWidth;
+        const y = padding.top + graphHeight - ((d.max_weight - minWeight) / weightRange) * graphHeight;
+        return { x, y, data: d };
+      });
+      
+      // Create smooth line path
+      linePath = points.map((p, i) => \`\${i === 0 ? 'M' : 'L'} \${p.x} \${p.y}\`).join(' ');
+      
+      // Create area fill path
+      const areaPath = linePath + \` L \${points[points.length-1].x} \${padding.top + graphHeight} L \${points[0].x} \${padding.top + graphHeight} Z\`;
+      
+      // Create dots and labels
+      dots = points.map((p, i) => {
+        const date = new Date(p.data.workout_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        return \`
+          <circle cx="\${p.x}" cy="\${p.y}" r="5" fill="var(--primary)" stroke="white" stroke-width="2"/>
+          <title>\${date}: \${formatHistoryWeight(p.data.max_weight)} \${weightUnit}</title>
+        \`;
+      }).join('');
+      
+      // X-axis labels (show first, middle, last)
+      const labelIndices = [0, Math.floor(chartData.length / 2), chartData.length - 1];
+      labels = labelIndices.map(i => {
+        const p = points[i];
+        const date = new Date(chartData[i].workout_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        return \`<text x="\${p.x}" y="\${chartHeight - 5}" text-anchor="middle" fill="var(--text-secondary)" font-size="11">\${date}</text>\`;
+      }).join('');
+      
+      // Y-axis labels
+      const yLabels = [minWeight, (minWeight + maxWeight) / 2, maxWeight].map((val, i) => {
+        const y = padding.top + graphHeight - (i * graphHeight / 2);
+        return \`<text x="\${padding.left - 8}" y="\${y + 4}" text-anchor="end" fill="var(--text-secondary)" font-size="11">\${formatHistoryWeight(val)}</text>\`;
+      }).join('');
+      
+      labels += yLabels;
+      
+      // Grid lines
+      const gridLines = [0, 1, 2].map(i => {
+        const y = padding.top + (i * graphHeight / 2);
+        return \`<line x1="\${padding.left}" y1="\${y}" x2="\${chartWidth - padding.right}" y2="\${y}" stroke="var(--border)" stroke-dasharray="4"/>\`;
+      }).join('');
+      
+      var svgChart = \`
+        <svg width="100%" viewBox="0 0 \${chartWidth} \${chartHeight}" style="max-width: 100%;">
+          \${gridLines}
+          <defs>
+            <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" style="stop-color:var(--primary);stop-opacity:0.3" />
+              <stop offset="100%" style="stop-color:var(--primary);stop-opacity:0.05" />
+            </linearGradient>
+          </defs>
+          <path d="\${areaPath}" fill="url(#areaGradient)"/>
+          <path d="\${linePath}" fill="none" stroke="var(--primary)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          \${dots}
+          \${labels}
+        </svg>
+      \`;
+    }
     
     modal.innerHTML = \`
       <div style="background: var(--bg-primary); border-radius: 16px; max-width: 800px; width: 100%; max-height: 90vh; overflow-y: auto;">
         <!-- Header -->
-        <div style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); padding: 24px; border-radius: 16px 16px 0 0; color: white;">
+        <div style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); padding: 20px; border-radius: 16px 16px 0 0; color: white; position: sticky; top: 0; z-index: 1;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <div>
-              <h2 style="margin: 0 0 8px 0; font-size: 22px; color: white;">\${exerciseName}</h2>
-              <p style="margin: 0; opacity: 0.9; font-size: 14px;">
+              <h2 style="margin: 0 0 4px 0; font-size: 20px; color: white;">\${exerciseName}</h2>
+              <p style="margin: 0; opacity: 0.9; font-size: 13px;">
                 <i class="fas fa-bullseye"></i> \${data.exercise?.muscle_group || 'N/A'} • 
                 <i class="fas fa-dumbbell"></i> \${data.exercise?.equipment || 'N/A'}
               </p>
             </div>
             <button onclick="document.getElementById('exercise-history-modal').remove()" 
-              style="background: rgba(255,255,255,0.2); border: none; color: white; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font-size: 18px;">
+              style="background: rgba(255,255,255,0.2); border: none; color: white; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font-size: 16px;">
               <i class="fas fa-times"></i>
             </button>
           </div>
         </div>
         
         <!-- Personal Records -->
-        <div style="padding: 20px; border-bottom: 1px solid var(--border);">
-          <h3 style="margin: 0 0 12px 0; font-size: 14px; text-transform: uppercase; color: var(--text-secondary);">
+        <div style="padding: 16px 20px; border-bottom: 1px solid var(--border);">
+          <h3 style="margin: 0 0 10px 0; font-size: 13px; text-transform: uppercase; color: var(--text-secondary);">
             <i class="fas fa-trophy" style="color: gold;"></i> Personal Records
           </h3>
-          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
-            <div style="background: var(--bg-secondary); padding: 16px; border-radius: 12px; text-align: center;">
-              <div style="font-size: 24px; font-weight: bold; color: var(--primary);">\${formatHistoryWeight(data.personal_records?.max_weight)} \${weightUnit}</div>
-              <div style="font-size: 12px; color: var(--text-secondary);">Max Weight</div>
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+            <div style="background: var(--bg-secondary); padding: 12px; border-radius: 10px; text-align: center;">
+              <div style="font-size: 20px; font-weight: bold; color: var(--primary);">\${formatHistoryWeight(data.personal_records?.max_weight)} \${weightUnit}</div>
+              <div style="font-size: 11px; color: var(--text-secondary);">Max Weight</div>
             </div>
-            <div style="background: var(--bg-secondary); padding: 16px; border-radius: 12px; text-align: center;">
-              <div style="font-size: 24px; font-weight: bold; color: var(--secondary);">\${formatHistoryWeight(data.personal_records?.max_1rm)} \${weightUnit}</div>
-              <div style="font-size: 12px; color: var(--text-secondary);">Est. 1RM</div>
+            <div style="background: var(--bg-secondary); padding: 12px; border-radius: 10px; text-align: center;">
+              <div style="font-size: 20px; font-weight: bold; color: var(--secondary);">\${formatHistoryWeight(data.personal_records?.max_1rm)} \${weightUnit}</div>
+              <div style="font-size: 11px; color: var(--text-secondary);">Est. 1RM</div>
             </div>
-            <div style="background: var(--bg-secondary); padding: 16px; border-radius: 12px; text-align: center;">
-              <div style="font-size: 24px; font-weight: bold; color: #f59e0b;">\${data.personal_records?.max_reps || 0}</div>
-              <div style="font-size: 12px; color: var(--text-secondary);">Max Reps</div>
+            <div style="background: var(--bg-secondary); padding: 12px; border-radius: 10px; text-align: center;">
+              <div style="font-size: 20px; font-weight: bold; color: #f59e0b;">\${data.personal_records?.max_reps || 0}</div>
+              <div style="font-size: 11px; color: var(--text-secondary);">Max Reps</div>
             </div>
           </div>
         </div>
         
-        <!-- Weight Progression Chart -->
+        <!-- Weight Progression Line Chart -->
         \${chartData.length > 1 ? \`
-        <div style="padding: 20px; border-bottom: 1px solid var(--border);">
-          <h3 style="margin: 0 0 16px 0; font-size: 14px; text-transform: uppercase; color: var(--text-secondary);">
-            <i class="fas fa-chart-line"></i> Weight Progression
+        <div style="padding: 16px 20px; border-bottom: 1px solid var(--border);">
+          <h3 style="margin: 0 0 12px 0; font-size: 13px; text-transform: uppercase; color: var(--text-secondary);">
+            <i class="fas fa-chart-line"></i> Weight Progression (\${weightUnit})
           </h3>
-          <div style="height: 150px; display: flex; align-items: flex-end; gap: 4px; padding: 10px 0;">
-            \${chartData.slice(-20).map((d, i) => {
-              const heightPercent = (d.max_weight / maxWeight) * 100;
-              const date = new Date(d.workout_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-              return \`
-                <div style="flex: 1; display: flex; flex-direction: column; align-items: center; min-width: 30px;">
-                  <div style="font-size: 10px; color: var(--text-secondary); margin-bottom: 4px;">\${formatHistoryWeight(d.max_weight)}</div>
-                  <div style="width: 100%; background: linear-gradient(180deg, var(--primary) 0%, var(--secondary) 100%); height: \${heightPercent}%; min-height: 4px; border-radius: 4px 4px 0 0;" title="\${date}: \${formatHistoryWeight(d.max_weight)} \${weightUnit}"></div>
-                  <div style="font-size: 9px; color: var(--text-secondary); margin-top: 4px; writing-mode: vertical-rl; transform: rotate(180deg); height: 40px; overflow: hidden;">\${date}</div>
-                </div>
-              \`;
-            }).join('')}
+          <div style="background: var(--bg-secondary); border-radius: 10px; padding: 12px;">
+            \${svgChart}
           </div>
         </div>
-        \` : '<div style="padding: 20px; text-align: center; color: var(--text-secondary);">Not enough data for progression chart</div>'}
+        \` : '<div style="padding: 16px 20px; text-align: center; color: var(--text-secondary); border-bottom: 1px solid var(--border);">Not enough data for progression chart</div>'}
         
-        <!-- History Table -->
-        <div style="padding: 20px;">
-          <h3 style="margin: 0 0 16px 0; font-size: 14px; text-transform: uppercase; color: var(--text-secondary);">
+        <!-- History Table (no inner scroll) -->
+        <div style="padding: 16px 20px;">
+          <h3 style="margin: 0 0 12px 0; font-size: 13px; text-transform: uppercase; color: var(--text-secondary);">
             <i class="fas fa-history"></i> Workout History
           </h3>
           \${data.history && data.history.length > 0 ? \`
-            <div style="max-height: 300px; overflow-y: auto;">
-              \${data.history.slice(0, 20).map(workout => \`
-                <div style="background: var(--bg-secondary); border-radius: 10px; margin-bottom: 12px; overflow: hidden;">
-                  <div style="background: var(--primary); color: white; padding: 10px 14px; font-weight: 600; font-size: 14px;">
+            <div>
+              \${data.history.slice(0, 10).map(workout => \`
+                <div style="background: var(--bg-secondary); border-radius: 10px; margin-bottom: 10px; overflow: hidden;">
+                  <div style="background: var(--primary); color: white; padding: 8px 12px; font-weight: 600; font-size: 13px;">
                     <i class="fas fa-calendar"></i> \${new Date(workout.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
                   </div>
-                  <div style="padding: 12px;">
-                    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                  <div style="padding: 10px;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
                       <thead>
-                        <tr style="color: var(--text-secondary); font-size: 12px; text-transform: uppercase;">
-                          <th style="text-align: left; padding: 4px 8px;">Set</th>
-                          <th style="text-align: right; padding: 4px 8px;">Weight</th>
-                          <th style="text-align: right; padding: 4px 8px;">Reps</th>
-                          <th style="text-align: right; padding: 4px 8px;">Est. 1RM</th>
+                        <tr style="color: var(--text-secondary); font-size: 11px; text-transform: uppercase;">
+                          <th style="text-align: left; padding: 4px 6px;">Set</th>
+                          <th style="text-align: right; padding: 4px 6px;">Weight</th>
+                          <th style="text-align: right; padding: 4px 6px;">Reps</th>
+                          <th style="text-align: right; padding: 4px 6px;">Est. 1RM</th>
                         </tr>
                       </thead>
                       <tbody>
                         \${workout.sets.map(set => \`
                           <tr style="border-top: 1px solid var(--border);">
-                            <td style="padding: 8px; font-weight: 600;">\${set.set_number}</td>
-                            <td style="padding: 8px; text-align: right;">\${formatHistoryWeight(set.weight_kg)} \${weightUnit}</td>
-                            <td style="padding: 8px; text-align: right;">\${set.reps}</td>
-                            <td style="padding: 8px; text-align: right; color: var(--primary);">\${formatHistoryWeight(set.one_rep_max_kg)}</td>
+                            <td style="padding: 6px; font-weight: 600;">\${set.set_number}</td>
+                            <td style="padding: 6px; text-align: right;">\${formatHistoryWeight(set.weight_kg)} \${weightUnit}</td>
+                            <td style="padding: 6px; text-align: right;">\${set.reps}</td>
+                            <td style="padding: 6px; text-align: right; color: var(--primary);">\${formatHistoryWeight(set.one_rep_max_kg)}</td>
                           </tr>
                         \`).join('')}
                       </tbody>
@@ -6095,13 +6778,6 @@ async function showExerciseHistory(exerciseId, exerciseName) {
               \`).join('')}
             </div>
           \` : '<p style="text-align: center; color: var(--text-secondary);">No history available for this exercise</p>'}
-        </div>
-        
-        <!-- Close Button -->
-        <div style="padding: 20px; border-top: 1px solid var(--border); text-align: center;">
-          <button class="btn btn-primary" onclick="document.getElementById('exercise-history-modal').remove()" style="min-width: 150px;">
-            <i class="fas fa-check"></i> Close
-          </button>
         </div>
       </div>
     \`;
@@ -7189,9 +7865,9 @@ function renderWorkoutExerciseTabs() {
       };
     }
     
-    // Restore rest timer display if it was active
-    if (state.restTimerActive && state.restTimeRemaining > 0) {
-      updateRestTimerDisplay();
+    // Resume rest timer if it was active (handles minimize/restore)
+    if (state.restTimerActive && state.restTimerEndTime) {
+      resumeRestTimer();
     }
     
   }, 0); // Changed to 0 - no need to wait, elements are immediately available
@@ -7204,6 +7880,11 @@ function renderExerciseContent(exercise, index) {
   const completedSets = (exercise.sets || []).length;
   const targetSets = exercise.target_sets || 3;
   const showNewSetRow = completedSets < targetSets && completedSets < 10;
+  
+  // Check if this is a bodyweight exercise and how to handle weight
+  const bwConfig = getBodyweightExerciseConfig(exercise.name, exercise.muscle_group);
+  const isBodyweightOnly = !bwConfig.showWeight; // No weight input at all
+  const isBodyweightOptional = bwConfig.weightOptional && bwConfig.showWeight; // Weight shown but optional
   
   // Pre-populate from historical data (previous workout) or current workout's last set
   let defaultWeight = '';
@@ -7298,7 +7979,11 @@ function renderExerciseContent(exercise, index) {
       <div class="card" style="background: linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%); color: var(--white); text-align: center; padding: 20px;">
         <div style="font-size: 14px; opacity: 0.9; margin-bottom: 8px;"><i class="fas fa-clock"></i> Rest Timer</div>
         <div id="inline-rest-time" style="font-size: clamp(36px, 10vw, 56px); font-weight: bold; font-family: monospace; line-height: 1;">0:00</div>
-        <div style="display: flex; gap: 8px; margin-top: 16px; justify-content: center; flex-wrap: wrap;">
+        <!-- Progress Bar (reverse - full to empty) -->
+        <div style="margin: 16px 0; background: rgba(255,255,255,0.2); height: 8px; border-radius: 4px; overflow: hidden;">
+          <div id="rest-timer-progress" style="background: var(--white); height: 100%; width: 100%; border-radius: 4px; transition: width 0.1s linear;"></div>
+        </div>
+        <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
           <button class="btn" onclick="adjustRestTimer(-15)" style="background: rgba(255,255,255,0.2); color: var(--white); border: none; padding: 8px 16px; font-size: 14px;">-15s</button>
           <button class="btn" onclick="skipRestTimer()" style="background: var(--white); color: var(--primary); border: none; padding: 8px 20px; font-size: 14px; font-weight: 600;">Skip</button>
           <button class="btn" onclick="adjustRestTimer(15)" style="background: rgba(255,255,255,0.2); color: var(--white); border: none; padding: 8px 16px; font-size: 14px;">+15s</button>
@@ -7364,15 +8049,20 @@ function renderExerciseContent(exercise, index) {
                 \${completedSets + 1}
               </div>
               <div style="font-weight: 600; color: var(--text-primary);">Log Next Set</div>
+              \${isBodyweightOnly ? '<span style="font-size: 11px; color: var(--text-secondary); margin-left: auto;"><i class="fas fa-feather"></i> Bodyweight</span>' : ''}
+              \${isBodyweightOptional ? '<span style="font-size: 11px; color: var(--text-secondary); margin-left: auto;"><i class="fas fa-feather"></i> Weight optional</span>' : ''}
             </div>
             \${hasHistoricalData ? '<div style="font-size: 11px; color: var(--primary); margin-bottom: 8px; text-align: center;"><i class="fas fa-history"></i> Pre-filled from last workout</div>' : ''}
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+            <div style="display: grid; grid-template-columns: \${isBodyweightOnly ? '1fr' : '1fr 1fr'}; gap: 12px; margin-bottom: 12px;">
+              \${!isBodyweightOnly ? \`
               <div>
-                <label style="font-size: 12px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Weight (\${weightUnit})</label>
-                <input type="number" id="newSetWeight" value="\${defaultWeight}" placeholder="0" step="\${getWeightStep()}" 
+                <label style="font-size: 12px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Weight (\${weightUnit})\${isBodyweightOptional ? ' <span style="opacity: 0.7;">optional</span>' : ''}</label>
+                <input type="number" id="newSetWeight" value="\${defaultWeight}" placeholder="\${isBodyweightOptional ? 'BW' : '0'}" step="\${getWeightStep()}" 
                   data-prepopulated="\${hasHistoricalData}"
+                  data-bodyweight-optional="\${isBodyweightOptional}"
                   style="width: 100%; padding: 12px; border: 2px solid \${hasHistoricalData ? 'var(--primary)' : 'var(--border)'}; border-radius: 8px; font-size: 18px; font-weight: bold; background: var(--bg-secondary); \${inputTextStyle}">
               </div>
+              \` : '<input type="hidden" id="newSetWeight" value="0" data-bodyweight-only="true">'}
               <div>
                 <label style="font-size: 12px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Reps</label>
                 <input type="number" id="newSetReps" value="\${defaultReps}" placeholder="0" min="1"
@@ -7437,11 +8127,14 @@ async function addExerciseSet(exerciseId) {
     return;
   }
 
-  let weight = parseFloat(weightInput.value);
+  let weight = parseFloat(weightInput.value) || 0;
   const reps = parseInt(repsInput.value);
+  const isBodyweightOnly = weightInput.getAttribute('data-bodyweight-only') === 'true';
+  const isBodyweightOptional = weightInput.getAttribute('data-bodyweight-optional') === 'true';
   
-  if (!weight || !reps || isNaN(weight) || isNaN(reps)) {
-    showNotification('Please enter valid weight and reps', 'warning');
+  // Validate: reps always required, weight required unless bodyweight exercise
+  if (!reps || isNaN(reps)) {
+    showNotification('Please enter valid reps', 'warning');
     isAddingSet = false;
     if (logButton) {
       logButton.disabled = false;
@@ -7451,13 +8144,29 @@ async function addExerciseSet(exerciseId) {
     return;
   }
   
-  // Convert to kg if imperial
-  if (isImperialSystem()) {
+  // Weight validation: required unless bodyweight exercise
+  if (!isBodyweightOnly && !isBodyweightOptional && (!weight || isNaN(weight))) {
+    showNotification('Please enter valid weight', 'warning');
+    isAddingSet = false;
+    if (logButton) {
+      logButton.disabled = false;
+      logButton.style.opacity = '1';
+      logButton.innerHTML = '<i class="fas fa-plus"></i> Log Set';
+    }
+    return;
+  }
+  
+  // Convert to kg if imperial (only if weight > 0)
+  if (weight > 0 && isImperialSystem()) {
     weight = lbsToKg(weight);
   }
   
+  // Get current exercise for PR checking
+  const currentExercise = state.currentWorkout.exercises.find(ex => ex.id === exerciseId);
+  const previousMaxWeight = currentExercise ? Math.max(...(currentExercise.sets || []).map(s => s.weight_kg || 0), 0) : 0;
+  
   try {
-    await api(\`/workouts/\${state.currentWorkout.id}/exercises/\${exerciseId}/sets\`, {
+    const result = await api(\`/workouts/\${state.currentWorkout.id}/exercises/\${exerciseId}/sets\`, {
       method: 'POST',
       body: JSON.stringify({ weight_kg: weight, reps, rest_seconds: 90 })
     });
@@ -7466,7 +8175,14 @@ async function addExerciseSet(exerciseId) {
     const data = await api(\`/workouts/\${state.currentWorkout.id}\`);
     state.currentWorkout = data.workout;
     
-    showNotification('Set logged!', 'success');
+    // Check for PR (new max weight for this exercise in this workout)
+    const isPR = weight > 0 && weight > previousMaxWeight && previousMaxWeight > 0;
+    
+    if (isPR) {
+      showPRNotification(currentExercise?.name || 'Exercise', weight);
+    } else {
+      showNotification('Set logged!', 'success');
+    }
     
     // Start rest timer after logging set
     startRestTimer(90);
@@ -7647,11 +8363,13 @@ function minimizeWorkout() {
   }
   restoreBodyScroll();
   
-  // Stop the rest timer display but keep workout state
+  // Stop the rest timer interval but keep the end time so it can resume
+  // The timer will continue counting down and will be resumed when modal reopens
   if (state.restTimerInterval) {
     clearInterval(state.restTimerInterval);
     state.restTimerInterval = null;
   }
+  // Note: We keep state.restTimerActive and state.restTimerEndTime intact
   
   showNotification('Workout minimized. Resume from dashboard.', 'info');
   switchTab('dashboard');
@@ -8247,27 +8965,56 @@ async function finishWorkoutSummary() {
 
 // ========== PHASE 4: POLISH & REFINEMENTS ==========
 
-// Rest Timer System - Uses inline display within workout modal
+// Rest Timer System - Uses end time for persistence across modal minimize/restore
 function startRestTimer(seconds = 90) {
   // Clear any existing timer
   if (state.restTimerInterval) {
     clearInterval(state.restTimerInterval);
   }
   
-  state.restTimeRemaining = seconds;
+  state.restTimerDuration = seconds;
+  state.restTimerEndTime = Date.now() + (seconds * 1000);
   state.restTimerActive = true;
   
   // Show and update inline timer immediately
   showInlineRestTimer();
   
-  // Start countdown
+  // Start countdown using requestAnimationFrame for smoother updates
+  runRestTimerLoop();
+}
+
+// Resume rest timer if it was active (called when modal is restored)
+function resumeRestTimer() {
+  if (!state.restTimerActive || !state.restTimerEndTime) return;
+  
+  const remaining = state.restTimerEndTime - Date.now();
+  if (remaining <= 0) {
+    // Timer already expired while minimized
+    state.restTimerActive = false;
+    state.restTimerEndTime = null;
+    showNotification('Rest complete! Ready for next set 💪', 'success');
+    playRestCompleteSound();
+    return;
+  }
+  
+  // Resume the timer loop
+  showInlineRestTimer();
+  runRestTimerLoop();
+}
+
+function runRestTimerLoop() {
+  if (state.restTimerInterval) {
+    clearInterval(state.restTimerInterval);
+  }
+  
   state.restTimerInterval = setInterval(() => {
-    state.restTimeRemaining--;
+    const remaining = Math.max(0, Math.ceil((state.restTimerEndTime - Date.now()) / 1000));
     
-    if (state.restTimeRemaining <= 0) {
+    if (remaining <= 0) {
       clearInterval(state.restTimerInterval);
       state.restTimerInterval = null;
       state.restTimerActive = false;
+      state.restTimerEndTime = null;
       
       // Hide inline timer
       const inlineTimer = document.getElementById('inline-rest-timer');
@@ -8283,13 +9030,12 @@ function startRestTimer(seconds = 90) {
     } else {
       updateRestTimerDisplay();
     }
-  }, 1000);
+  }, 100); // Update more frequently for smoother progress bar
 }
 
 // Show and update inline rest timer (finds element fresh each time)
 function showInlineRestTimer() {
   const inlineTimer = document.getElementById('inline-rest-timer');
-  const inlineTimeDisplay = document.getElementById('inline-rest-time');
   
   if (inlineTimer && state.restTimerActive) {
     inlineTimer.style.display = 'block';
@@ -8300,20 +9046,110 @@ function showInlineRestTimer() {
   updateRestTimerDisplay();
 }
 
-// Update rest timer display (inline version) - finds element fresh each call
+// Update rest timer display with reverse progress bar
 function updateRestTimerDisplay() {
   const inlineTimer = document.getElementById('inline-rest-timer');
   const inlineTimeDisplay = document.getElementById('inline-rest-time');
+  const progressBar = document.getElementById('rest-timer-progress');
   
   // Show timer if it exists and timer is active
   if (inlineTimer && state.restTimerActive) {
     inlineTimer.style.display = 'block';
   }
   
-  if (inlineTimeDisplay && state.restTimeRemaining > 0) {
-    const mins = Math.floor(state.restTimeRemaining / 60);
-    const secs = state.restTimeRemaining % 60;
+  if (!state.restTimerEndTime) return;
+  
+  const remaining = Math.max(0, (state.restTimerEndTime - Date.now()) / 1000);
+  const duration = state.restTimerDuration || 90;
+  const progressPercent = (remaining / duration) * 100;
+  
+  if (inlineTimeDisplay) {
+    const mins = Math.floor(remaining / 60);
+    const secs = Math.ceil(remaining % 60);
     inlineTimeDisplay.textContent = \`\${mins}:\${secs.toString().padStart(2, '0')}\`;
+  }
+  
+  if (progressBar) {
+    progressBar.style.width = \`\${progressPercent}%\`;
+  }
+}
+
+// Show PR notification within workout modal
+function showPRNotification(exerciseName, weightKg) {
+  const weightDisplay = formatWeight(weightKg);
+  
+  // Create PR celebration overlay within the modal
+  const modal = document.getElementById('workout-modal');
+  if (!modal) {
+    showNotification(\`🏆 NEW PR! \${exerciseName}: \${weightDisplay}\`, 'success');
+    return;
+  }
+  
+  const prOverlay = document.createElement('div');
+  prOverlay.id = 'pr-celebration';
+  prOverlay.style.cssText = \`
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.8); z-index: 30000;
+    display: flex; align-items: center; justify-content: center;
+    animation: fadeIn 0.3s ease;
+  \`;
+  
+  prOverlay.innerHTML = \`
+    <div style="text-align: center; color: white; padding: 40px; animation: bounceIn 0.5s ease;">
+      <div style="font-size: 80px; margin-bottom: 20px;">🏆</div>
+      <div style="font-size: 32px; font-weight: bold; margin-bottom: 12px; color: gold;">NEW PR!</div>
+      <div style="font-size: 24px; margin-bottom: 8px;">\${exerciseName}</div>
+      <div style="font-size: 48px; font-weight: bold; color: var(--primary);">\${weightDisplay}</div>
+      <div style="margin-top: 24px; font-size: 16px; opacity: 0.8;">Keep pushing! 💪</div>
+    </div>
+  \`;
+  
+  document.body.appendChild(prOverlay);
+  
+  // Play celebration sound
+  playPRSound();
+  
+  // Auto-dismiss after 2.5 seconds
+  setTimeout(() => {
+    prOverlay.style.animation = 'fadeOut 0.3s ease';
+    setTimeout(() => prOverlay.remove(), 300);
+  }, 2500);
+  
+  // Also allow tap to dismiss
+  prOverlay.onclick = () => {
+    prOverlay.style.animation = 'fadeOut 0.3s ease';
+    setTimeout(() => prOverlay.remove(), 300);
+  };
+}
+
+function playPRSound() {
+  try {
+    if (!state.audioContext) {
+      state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    
+    // Play a triumphant chord
+    const notes = [523.25, 659.25, 783.99]; // C5, E5, G5 (C major chord)
+    notes.forEach((freq, i) => {
+      setTimeout(() => {
+        const oscillator = state.audioContext.createOscillator();
+        const gainNode = state.audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(state.audioContext.destination);
+        
+        oscillator.frequency.value = freq;
+        oscillator.type = 'sine';
+        
+        gainNode.gain.setValueAtTime(0.2, state.audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, state.audioContext.currentTime + 0.5);
+        
+        oscillator.start(state.audioContext.currentTime);
+        oscillator.stop(state.audioContext.currentTime + 0.5);
+      }, i * 100);
+    });
+  } catch (e) {
+    console.log('Could not play PR sound:', e);
   }
 }
 
@@ -8324,6 +9160,7 @@ function skipRestTimer() {
   }
   
   state.restTimerActive = false;
+  state.restTimerEndTime = null;
   
   // Hide inline timer
   const inlineTimer = document.getElementById('inline-rest-timer');
@@ -8336,9 +9173,10 @@ function skipRestTimer() {
 
 // Adjust rest timer by seconds (can be negative)
 function adjustRestTimer(seconds) {
-  if (!state.restTimerInterval) return;
+  if (!state.restTimerActive || !state.restTimerEndTime) return;
   
-  state.restTimeRemaining = Math.max(5, state.restTimeRemaining + seconds);
+  state.restTimerEndTime += seconds * 1000;
+  state.restTimerDuration = Math.max(5, (state.restTimerDuration || 90) + seconds);
   
   // Update inline display
   updateRestTimerDisplay();

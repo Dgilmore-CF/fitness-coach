@@ -383,7 +383,12 @@ async function loadDashboard() {
       </div>
 
       <div class="card">
-        <h2><i class="fas fa-history"></i> Recent Workouts</h2>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h2 style="margin: 0;"><i class="fas fa-history"></i> Recent Workouts</h2>
+          <button class="btn btn-outline" onclick="showLogPastWorkout()" style="padding: 8px 16px;">
+            <i class="fas fa-calendar-plus"></i> Log Past Workout
+          </button>
+        </div>
         ${recentWorkouts.workouts.length > 0 ? `
           <div style="display: flex; flex-direction: column; gap: 12px;">
             ${recentWorkouts.workouts.map(w => `
@@ -3823,23 +3828,29 @@ function renderWorkoutCalendar() {
     const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const hasWorkout = workoutsByDate[dateKey] && workoutsByDate[dateKey].length > 0;
     const isToday = dateKey === todayKey;
+    const isFuture = new Date(dateKey) > today;
     const workoutCount = hasWorkout ? workoutsByDate[dateKey].length : 0;
+    
+    // Click action: show workouts if has workout, or allow logging past workout if not future
+    const clickAction = hasWorkout ? `showCalendarWorkouts('${dateKey}')` : (!isFuture ? `showLogPastWorkout('${dateKey}')` : '');
     
     html += `
       <div 
-        onclick="${hasWorkout ? `showCalendarWorkouts('${dateKey}')` : ''}"
+        onclick="${clickAction}"
+        title="${hasWorkout ? 'View workouts' : (!isFuture ? 'Click to log a workout' : '')}"
         style="
           padding: 8px;
           min-height: 50px;
           border-radius: 8px;
-          cursor: ${hasWorkout ? 'pointer' : 'default'};
+          cursor: ${clickAction ? 'pointer' : 'default'};
           background: ${isToday ? 'var(--primary-light)' : 'var(--bg-secondary)'};
           border: ${isToday ? '2px solid var(--primary)' : '1px solid var(--border)'};
           position: relative;
           transition: transform 0.1s;
           ${hasWorkout ? 'box-shadow: 0 2px 4px rgba(0,0,0,0.1);' : ''}
+          ${isFuture ? 'opacity: 0.5;' : ''}
         "
-        ${hasWorkout ? 'onmouseover="this.style.transform=\'scale(1.05)\'" onmouseout="this.style.transform=\'scale(1)\'"' : ''}
+        ${clickAction ? 'onmouseover="this.style.transform=\'scale(1.05)\'" onmouseout="this.style.transform=\'scale(1)\'"' : ''}
       >
         <div style="font-size: 14px; ${isToday ? 'font-weight: bold; color: var(--primary);' : ''}">${day}</div>
         ${hasWorkout ? `
@@ -3856,7 +3867,20 @@ function renderWorkoutCalendar() {
             font-size: 11px;
             font-weight: bold;
           ">${workoutCount > 1 ? workoutCount : '<i class="fas fa-dumbbell" style="font-size: 10px;"></i>'}</div>
-        ` : ''}
+        ` : (!isFuture ? `
+          <div style="
+            width: 24px; 
+            height: 24px; 
+            margin: 4px auto 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--gray);
+            font-size: 10px;
+            opacity: 0;
+            transition: opacity 0.2s;
+          " class="add-workout-hint"><i class="fas fa-plus"></i></div>
+        ` : '')}
       </div>
     `;
   }
@@ -7322,6 +7346,345 @@ function toggleWorkoutDetails(workoutId) {
   } else {
     details.style.display = 'none';
     if (chevron) chevron.style.transform = 'rotate(0deg)';
+  }
+}
+
+// ========== LOG PAST WORKOUT ==========
+
+// State for past workout logging
+state.pastWorkout = {
+  exercises: [],
+  date: null
+};
+
+// Show log past workout modal
+async function showLogPastWorkout(preselectedDate = null, preserveExercises = false) {
+  if (!preserveExercises) {
+    state.pastWorkout.exercises = [];
+  }
+  state.pastWorkout.date = preselectedDate || state.pastWorkout.date || new Date().toISOString().split('T')[0];
+  
+  // Fetch available exercises
+  let exercises = [];
+  try {
+    const data = await api('/exercises');
+    exercises = data.exercises || [];
+  } catch (error) {
+    showNotification('Error loading exercises', 'error');
+    return;
+  }
+  
+  // Store exercises for later use
+  state.availableExercises = exercises;
+  
+  const modalBody = document.getElementById('modalBody');
+  modalBody.innerHTML = `
+    <div style="max-height: 70vh; overflow-y: auto;">
+      <p style="color: var(--gray); margin-bottom: 16px;">
+        <i class="fas fa-info-circle"></i> Log a workout you completed but didn't record in real-time.
+      </p>
+      
+      <div class="form-group">
+        <label><i class="fas fa-calendar"></i> Workout Date:</label>
+        <input type="date" id="pastWorkoutDate" value="${state.pastWorkout.date}" 
+               max="${new Date().toISOString().split('T')[0]}"
+               onchange="state.pastWorkout.date = this.value"
+               style="width: 100%;">
+      </div>
+      
+      <div class="form-group">
+        <label><i class="fas fa-clock"></i> Duration (minutes):</label>
+        <input type="number" id="pastWorkoutDuration" value="60" min="5" max="300" style="width: 100%;">
+      </div>
+      
+      <div class="form-group">
+        <label><i class="fas fa-sticky-note"></i> Notes (optional):</label>
+        <textarea id="pastWorkoutNotes" rows="2" placeholder="How did the workout feel?" style="width: 100%;"></textarea>
+      </div>
+      
+      <hr style="margin: 20px 0; border: none; border-top: 1px solid var(--border);">
+      
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <label style="font-weight: 600;"><i class="fas fa-dumbbell"></i> Exercises:</label>
+        <button class="btn btn-secondary" onclick="showAddExerciseToPastWorkout()" style="padding: 8px 16px;">
+          <i class="fas fa-plus"></i> Add Exercise
+        </button>
+      </div>
+      
+      <div id="pastWorkoutExercises">
+        <div style="text-align: center; padding: 30px; color: var(--gray); background: var(--light); border-radius: 8px;">
+          <i class="fas fa-dumbbell" style="font-size: 32px; margin-bottom: 12px; opacity: 0.5;"></i>
+          <p>No exercises added yet.<br>Click "Add Exercise" to get started.</p>
+        </div>
+      </div>
+      
+      <div style="margin-top: 20px;">
+        <button class="btn btn-primary" onclick="savePastWorkout()" style="width: 100%;" id="savePastWorkoutBtn" disabled>
+          <i class="fas fa-save"></i> Save Workout
+        </button>
+      </div>
+    </div>
+  `;
+  
+  openModal('Log Past Workout');
+}
+
+// Show exercise picker for past workout
+function showAddExerciseToPastWorkout() {
+  const exercises = state.availableExercises || [];
+  
+  // Group exercises by muscle group
+  const grouped = {};
+  for (const ex of exercises) {
+    const group = ex.muscle_group || 'Other';
+    if (!grouped[group]) grouped[group] = [];
+    grouped[group].push(ex);
+  }
+  
+  const modalBody = document.getElementById('modalBody');
+  modalBody.innerHTML = `
+    <div style="max-height: 70vh; overflow-y: auto;">
+      <button class="btn btn-outline" onclick="showLogPastWorkout(state.pastWorkout.date, true)" style="margin-bottom: 16px;">
+        <i class="fas fa-arrow-left"></i> Back
+      </button>
+      
+      <div class="form-group">
+        <input type="text" id="exerciseSearchPast" placeholder="Search exercises..." 
+               oninput="filterPastWorkoutExercises(this.value)" style="width: 100%;">
+      </div>
+      
+      <div id="exerciseListPast">
+        ${Object.entries(grouped).map(([group, exs]) => `
+          <div class="exercise-group-past" data-group="${group}">
+            <h4 style="margin: 16px 0 8px; color: var(--primary);">${group}</h4>
+            ${exs.map(ex => `
+              <div class="exercise-item-past" onclick="selectExerciseForPastWorkout(${ex.id}, '${ex.name.replace(/'/g, "\\'")}')"
+                   data-name="${ex.name.toLowerCase()}"
+                   style="padding: 12px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; cursor: pointer; transition: all 0.2s;">
+                <strong>${ex.name}</strong>
+                <div style="font-size: 12px; color: var(--gray);">${ex.equipment || 'Bodyweight'}</div>
+              </div>
+            `).join('')}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+// Filter exercises in past workout picker
+function filterPastWorkoutExercises(query) {
+  const items = document.querySelectorAll('.exercise-item-past');
+  const groups = document.querySelectorAll('.exercise-group-past');
+  const q = query.toLowerCase();
+  
+  items.forEach(item => {
+    const name = item.getAttribute('data-name');
+    item.style.display = name.includes(q) ? 'block' : 'none';
+  });
+  
+  // Hide empty groups
+  groups.forEach(group => {
+    const visibleItems = group.querySelectorAll('.exercise-item-past[style*="block"], .exercise-item-past:not([style*="none"])');
+    group.style.display = visibleItems.length > 0 ? 'block' : 'none';
+  });
+}
+
+// Select exercise and show set entry
+function selectExerciseForPastWorkout(exerciseId, exerciseName) {
+  const modalBody = document.getElementById('modalBody');
+  
+  modalBody.innerHTML = `
+    <div>
+      <button class="btn btn-outline" onclick="showAddExerciseToPastWorkout()" style="margin-bottom: 16px;">
+        <i class="fas fa-arrow-left"></i> Back to Exercises
+      </button>
+      
+      <h3 style="margin-bottom: 16px;">${exerciseName}</h3>
+      
+      <div id="pastExerciseSets">
+        <div style="display: flex; gap: 8px; margin-bottom: 12px; font-weight: 600; padding: 0 8px;">
+          <div style="width: 50px;">Set</div>
+          <div style="flex: 1;">Weight (${state.user?.measurement_system === 'imperial' ? 'lbs' : 'kg'})</div>
+          <div style="flex: 1;">Reps</div>
+          <div style="width: 40px;"></div>
+        </div>
+        <div id="pastSetsContainer"></div>
+      </div>
+      
+      <button class="btn btn-outline" onclick="addSetToPastExercise()" style="width: 100%; margin: 12px 0;">
+        <i class="fas fa-plus"></i> Add Set
+      </button>
+      
+      <button class="btn btn-primary" onclick="confirmAddExerciseToPastWorkout(${exerciseId}, '${exerciseName.replace(/'/g, "\\'")}')" style="width: 100%;">
+        <i class="fas fa-check"></i> Add to Workout
+      </button>
+    </div>
+  `;
+  
+  // Add first set by default
+  state.pastWorkout.tempSets = [];
+  addSetToPastExercise();
+}
+
+// Add a set row for past exercise
+function addSetToPastExercise() {
+  const container = document.getElementById('pastSetsContainer');
+  const setNum = container.children.length + 1;
+  
+  const setRow = document.createElement('div');
+  setRow.className = 'past-set-row';
+  setRow.style.cssText = 'display: flex; gap: 8px; margin-bottom: 8px; align-items: center;';
+  setRow.innerHTML = `
+    <div style="width: 50px; text-align: center; font-weight: 600;">${setNum}</div>
+    <input type="number" class="past-set-weight" placeholder="0" min="0" step="2.5" style="flex: 1;">
+    <input type="number" class="past-set-reps" placeholder="0" min="1" max="100" style="flex: 1;">
+    <button class="btn btn-outline" onclick="this.parentElement.remove(); renumberPastSets()" style="width: 40px; padding: 8px; color: var(--danger);">
+      <i class="fas fa-times"></i>
+    </button>
+  `;
+  
+  container.appendChild(setRow);
+}
+
+// Renumber sets after deletion
+function renumberPastSets() {
+  const rows = document.querySelectorAll('.past-set-row');
+  rows.forEach((row, idx) => {
+    row.querySelector('div').textContent = idx + 1;
+  });
+}
+
+// Confirm adding exercise with sets to past workout
+function confirmAddExerciseToPastWorkout(exerciseId, exerciseName) {
+  const weightInputs = document.querySelectorAll('.past-set-weight');
+  const repInputs = document.querySelectorAll('.past-set-reps');
+  
+  const sets = [];
+  const isImperial = state.user?.measurement_system === 'imperial';
+  
+  for (let i = 0; i < weightInputs.length; i++) {
+    const weight = parseFloat(weightInputs[i].value) || 0;
+    const reps = parseInt(repInputs[i].value) || 0;
+    
+    if (reps > 0) {
+      sets.push({
+        weight_kg: isImperial ? weight / 2.205 : weight,
+        reps: reps
+      });
+    }
+  }
+  
+  if (sets.length === 0) {
+    showNotification('Please add at least one set with reps', 'warning');
+    return;
+  }
+  
+  state.pastWorkout.exercises.push({
+    exercise_id: exerciseId,
+    name: exerciseName,
+    sets: sets
+  });
+  
+  showNotification(`Added ${exerciseName}`, 'success');
+  renderPastWorkoutUI();
+}
+
+// Render the past workout UI with added exercises
+function renderPastWorkoutUI() {
+  showLogPastWorkout(state.pastWorkout.date, true);
+  
+  // Wait for modal to render, then update exercises list
+  setTimeout(() => {
+    const container = document.getElementById('pastWorkoutExercises');
+    const saveBtn = document.getElementById('savePastWorkoutBtn');
+    
+    if (state.pastWorkout.exercises.length === 0) {
+      container.innerHTML = `
+        <div style="text-align: center; padding: 30px; color: var(--gray); background: var(--light); border-radius: 8px;">
+          <i class="fas fa-dumbbell" style="font-size: 32px; margin-bottom: 12px; opacity: 0.5;"></i>
+          <p>No exercises added yet.<br>Click "Add Exercise" to get started.</p>
+        </div>
+      `;
+      saveBtn.disabled = true;
+      return;
+    }
+    
+    const isImperial = state.user?.measurement_system === 'imperial';
+    
+    container.innerHTML = state.pastWorkout.exercises.map((ex, idx) => {
+      const totalVolume = ex.sets.reduce((sum, s) => sum + (s.weight_kg * s.reps), 0);
+      const displayVolume = isImperial ? (totalVolume * 2.205).toFixed(0) : totalVolume.toFixed(0);
+      
+      return `
+        <div style="background: var(--light); padding: 16px; border-radius: 8px; margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <strong>${ex.name}</strong>
+            <button class="btn btn-outline" onclick="removeExerciseFromPastWorkout(${idx})" style="padding: 4px 8px; color: var(--danger);">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+          <div style="font-size: 13px; color: var(--gray);">
+            ${ex.sets.length} sets • ${displayVolume} ${isImperial ? 'lbs' : 'kg'} volume
+          </div>
+          <div style="font-size: 12px; margin-top: 8px;">
+            ${ex.sets.map((s, i) => {
+              const displayWeight = isImperial ? (s.weight_kg * 2.205).toFixed(0) : s.weight_kg.toFixed(1);
+              return `<span style="background: var(--white); padding: 4px 8px; border-radius: 4px; margin-right: 4px;">Set ${i+1}: ${displayWeight} × ${s.reps}</span>`;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    }).join('');
+    
+    saveBtn.disabled = false;
+  }, 50);
+}
+
+// Remove exercise from past workout
+function removeExerciseFromPastWorkout(index) {
+  state.pastWorkout.exercises.splice(index, 1);
+  renderPastWorkoutUI();
+}
+
+// Save the past workout
+async function savePastWorkout() {
+  const date = document.getElementById('pastWorkoutDate')?.value || state.pastWorkout.date;
+  const duration = parseInt(document.getElementById('pastWorkoutDuration')?.value) || 60;
+  const notes = document.getElementById('pastWorkoutNotes')?.value || '';
+  
+  if (!date) {
+    showNotification('Please select a date', 'warning');
+    return;
+  }
+  
+  if (state.pastWorkout.exercises.length === 0) {
+    showNotification('Please add at least one exercise', 'warning');
+    return;
+  }
+  
+  try {
+    const result = await api('/workouts/retroactive', {
+      method: 'POST',
+      body: JSON.stringify({
+        date: date,
+        duration_minutes: duration,
+        exercises: state.pastWorkout.exercises,
+        notes: notes
+      })
+    });
+    
+    showNotification('Past workout logged successfully!', 'success');
+    closeModal();
+    
+    // Reset state
+    state.pastWorkout = { exercises: [], date: null };
+    
+    // Refresh dashboard
+    loadDashboard();
+    
+  } catch (error) {
+    showNotification('Error saving workout: ' + error.message, 'error');
   }
 }
 

@@ -239,6 +239,112 @@ workouts.post('/cardio', async (c) => {
   });
 });
 
+// Log past workout (retroactive entry)
+workouts.post('/retroactive', async (c) => {
+  const user = requireAuth(c);
+  const body = await c.req.json();
+  const { 
+    date,
+    duration_minutes,
+    program_id,
+    program_day_id,
+    exercises,
+    notes,
+    perceived_exertion
+  } = body;
+  const db = c.env.DB;
+
+  if (!date) {
+    return c.json({ error: 'Date is required' }, 400);
+  }
+
+  if (!exercises || exercises.length === 0) {
+    return c.json({ error: 'At least one exercise is required' }, 400);
+  }
+
+  // Validate date is not in the future
+  const workoutDate = new Date(date);
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  if (workoutDate > today) {
+    return c.json({ error: 'Cannot log workouts in the future' }, 400);
+  }
+
+  // Calculate total volume from exercises
+  let totalWeightKg = 0;
+  let totalSets = 0;
+  for (const ex of exercises) {
+    for (const set of (ex.sets || [])) {
+      totalWeightKg += (set.weight_kg || 0) * (set.reps || 0);
+      totalSets++;
+    }
+  }
+
+  // Create the workout with the specified date
+  const startTime = `${date}T09:00:00.000Z`;
+  const durationSeconds = (duration_minutes || 60) * 60;
+  const endTime = new Date(new Date(startTime).getTime() + durationSeconds * 1000).toISOString();
+
+  const workout = await db.prepare(
+    `INSERT INTO workouts (
+      user_id, program_id, program_day_id, start_time, end_time,
+      total_duration_seconds, total_weight_kg, completed, notes, perceived_exertion
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+    RETURNING *`
+  ).bind(
+    user.id,
+    program_id || null,
+    program_day_id || null,
+    startTime,
+    endTime,
+    durationSeconds,
+    totalWeightKg,
+    notes || null,
+    perceived_exertion || null
+  ).first();
+
+  // Add exercises and sets
+  for (let i = 0; i < exercises.length; i++) {
+    const ex = exercises[i];
+    
+    // Insert workout_exercise
+    const workoutExercise = await db.prepare(
+      `INSERT INTO workout_exercises (workout_id, exercise_id, order_index, target_sets)
+       VALUES (?, ?, ?, ?)
+       RETURNING id`
+    ).bind(workout.id, ex.exercise_id, i, ex.sets?.length || 3).first();
+
+    // Insert sets
+    for (let j = 0; j < (ex.sets || []).length; j++) {
+      const set = ex.sets[j];
+      await db.prepare(
+        `INSERT INTO sets (workout_exercise_id, set_number, weight_kg, reps, completed, logged_at)
+         VALUES (?, ?, ?, ?, 1, ?)`
+      ).bind(
+        workoutExercise.id,
+        j + 1,
+        set.weight_kg || 0,
+        set.reps || 0,
+        startTime
+      ).run();
+    }
+  }
+
+  // Check for achievements
+  try {
+    await checkAndAwardAchievements(db, user.id, workout.id);
+  } catch (e) {
+    console.error('Error checking achievements:', e);
+  }
+
+  return c.json({ 
+    workout, 
+    message: 'Past workout logged successfully',
+    exercises_added: exercises.length,
+    total_sets: totalSets
+  });
+});
+
 // Update workout
 workouts.put('/:id', async (c) => {
   const user = requireAuth(c);
