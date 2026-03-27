@@ -7364,16 +7364,16 @@ async function showLogPastWorkout(preselectedDate = null, preserveExercises = fa
   }
   state.pastWorkout.date = preselectedDate || state.pastWorkout.date || new Date().toISOString().split('T')[0];
   
-  // Fetch available exercises and programs in parallel
+  // Fetch available exercises and programs list
   let exercises = [];
-  let programs = [];
+  let programsList = [];
   try {
     const [exerciseData, programData] = await Promise.all([
       api('/exercises'),
       api('/programs')
     ]);
     exercises = exerciseData.exercises || [];
-    programs = programData.programs || [];
+    programsList = programData.programs || [];
   } catch (error) {
     showNotification('Error loading data', 'error');
     return;
@@ -7381,17 +7381,12 @@ async function showLogPastWorkout(preselectedDate = null, preserveExercises = fa
   
   // Store for later use
   state.availableExercises = exercises;
-  state.availablePrograms = programs;
+  state.programsList = programsList;
   
-  // Build program day options
+  // Build program options (we'll fetch days when selected)
   let programOptions = '<option value="">-- Select a workout template --</option>';
-  for (const program of programs) {
-    if (program.days && program.days.length > 0) {
-      for (const day of program.days) {
-        const exerciseCount = day.exercises?.length || 0;
-        programOptions += `<option value="${program.id}-${day.id}">${program.name}: ${day.name || 'Day ' + day.day_number} (${exerciseCount} exercises)</option>`;
-      }
-    }
+  for (const program of programsList) {
+    programOptions += `<option value="${program.id}">${program.name}</option>`;
   }
   
   const hasExercises = state.pastWorkout.exercises.length > 0;
@@ -7426,11 +7421,17 @@ async function showLogPastWorkout(preselectedDate = null, preserveExercises = fa
       ${!hasExercises ? `
         <div class="form-group">
           <label><i class="fas fa-clipboard-list"></i> Use Workout Template:</label>
-          <select id="pastWorkoutTemplate" onchange="loadPastWorkoutTemplate(this.value)" style="width: 100%;">
+          <select id="pastWorkoutProgram" onchange="loadProgramDays(this.value)" style="width: 100%;">
             ${programOptions}
           </select>
+        </div>
+        
+        <div id="pastWorkoutDayContainer" style="display: none;" class="form-group">
+          <label><i class="fas fa-calendar-day"></i> Select Workout Day:</label>
+          <select id="pastWorkoutDay" onchange="loadPastWorkoutTemplate(this.value)" style="width: 100%;">
+          </select>
           <p style="font-size: 12px; color: var(--gray); margin-top: 4px;">
-            Select a template to auto-fill exercises, or add them manually below.
+            Select a day to auto-fill exercises, or add them manually below.
           </p>
         </div>
         
@@ -7462,25 +7463,68 @@ async function showLogPastWorkout(preselectedDate = null, preserveExercises = fa
   openModal('Log Past Workout');
 }
 
+// Load program days when a program is selected
+async function loadProgramDays(programId) {
+  if (!programId) {
+    document.getElementById('pastWorkoutDayContainer').style.display = 'none';
+    return;
+  }
+  
+  try {
+    const data = await api(`/programs/${programId}`);
+    const program = data.program;
+    
+    if (!program || !program.days || program.days.length === 0) {
+      showNotification('No workout days found in this program', 'warning');
+      return;
+    }
+    
+    // Store the loaded program
+    state.selectedProgram = program;
+    
+    // Build day options
+    const daySelect = document.getElementById('pastWorkoutDay');
+    daySelect.innerHTML = '<option value="">-- Select a day --</option>' +
+      program.days.map(day => {
+        const exerciseCount = day.exercises?.length || 0;
+        const isCardio = day.is_cardio_day;
+        return `<option value="${day.id}">${day.name || 'Day ' + day.day_number}${isCardio ? ' (Cardio)' : ` (${exerciseCount} exercises)`}</option>`;
+      }).join('');
+    
+    // Show the day selector
+    document.getElementById('pastWorkoutDayContainer').style.display = 'block';
+    
+  } catch (error) {
+    showNotification('Error loading program: ' + error.message, 'error');
+  }
+}
+
 // Load exercises from a workout template
-async function loadPastWorkoutTemplate(templateValue) {
-  if (!templateValue) return;
+async function loadPastWorkoutTemplate(dayId) {
+  if (!dayId) return;
   
-  const [programId, dayId] = templateValue.split('-').map(Number);
-  
-  // Find the program and day
-  const program = state.availablePrograms?.find(p => p.id === programId);
+  const program = state.selectedProgram;
   if (!program) return;
   
-  const day = program.days?.find(d => d.id === dayId);
-  if (!day || !day.exercises || day.exercises.length === 0) {
+  const day = program.days?.find(d => d.id === parseInt(dayId));
+  if (!day) {
+    showNotification('Day not found', 'error');
+    return;
+  }
+  
+  if (day.is_cardio_day) {
+    showNotification('Cardio days are not supported for retroactive logging yet', 'warning');
+    return;
+  }
+  
+  if (!day.exercises || day.exercises.length === 0) {
     showNotification('No exercises found in this workout', 'warning');
     return;
   }
   
   // Store program/day info for saving
-  state.pastWorkout.programId = programId;
-  state.pastWorkout.programDayId = dayId;
+  state.pastWorkout.programId = program.id;
+  state.pastWorkout.programDayId = day.id;
   
   // Add exercises from template with default sets
   state.pastWorkout.exercises = day.exercises.map(ex => ({
