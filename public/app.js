@@ -7364,18 +7364,37 @@ async function showLogPastWorkout(preselectedDate = null, preserveExercises = fa
   }
   state.pastWorkout.date = preselectedDate || state.pastWorkout.date || new Date().toISOString().split('T')[0];
   
-  // Fetch available exercises
+  // Fetch available exercises and programs in parallel
   let exercises = [];
+  let programs = [];
   try {
-    const data = await api('/exercises');
-    exercises = data.exercises || [];
+    const [exerciseData, programData] = await Promise.all([
+      api('/exercises'),
+      api('/programs')
+    ]);
+    exercises = exerciseData.exercises || [];
+    programs = programData.programs || [];
   } catch (error) {
-    showNotification('Error loading exercises', 'error');
+    showNotification('Error loading data', 'error');
     return;
   }
   
-  // Store exercises for later use
+  // Store for later use
   state.availableExercises = exercises;
+  state.availablePrograms = programs;
+  
+  // Build program day options
+  let programOptions = '<option value="">-- Select a workout template --</option>';
+  for (const program of programs) {
+    if (program.days && program.days.length > 0) {
+      for (const day of program.days) {
+        const exerciseCount = day.exercises?.length || 0;
+        programOptions += `<option value="${program.id}-${day.id}">${program.name}: ${day.name || 'Day ' + day.day_number} (${exerciseCount} exercises)</option>`;
+      }
+    }
+  }
+  
+  const hasExercises = state.pastWorkout.exercises.length > 0;
   
   const modalBody = document.getElementById('modalBody');
   modalBody.innerHTML = `
@@ -7404,6 +7423,20 @@ async function showLogPastWorkout(preselectedDate = null, preserveExercises = fa
       
       <hr style="margin: 20px 0; border: none; border-top: 1px solid var(--border);">
       
+      ${!hasExercises ? `
+        <div class="form-group">
+          <label><i class="fas fa-clipboard-list"></i> Use Workout Template:</label>
+          <select id="pastWorkoutTemplate" onchange="loadPastWorkoutTemplate(this.value)" style="width: 100%;">
+            ${programOptions}
+          </select>
+          <p style="font-size: 12px; color: var(--gray); margin-top: 4px;">
+            Select a template to auto-fill exercises, or add them manually below.
+          </p>
+        </div>
+        
+        <div style="text-align: center; color: var(--gray); margin: 16px 0;">— or —</div>
+      ` : ''}
+      
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
         <label style="font-weight: 600;"><i class="fas fa-dumbbell"></i> Exercises:</label>
         <button class="btn btn-secondary" onclick="showAddExerciseToPastWorkout()" style="padding: 8px 16px;">
@@ -7427,6 +7460,192 @@ async function showLogPastWorkout(preselectedDate = null, preserveExercises = fa
   `;
   
   openModal('Log Past Workout');
+}
+
+// Load exercises from a workout template
+async function loadPastWorkoutTemplate(templateValue) {
+  if (!templateValue) return;
+  
+  const [programId, dayId] = templateValue.split('-').map(Number);
+  
+  // Find the program and day
+  const program = state.availablePrograms?.find(p => p.id === programId);
+  if (!program) return;
+  
+  const day = program.days?.find(d => d.id === dayId);
+  if (!day || !day.exercises || day.exercises.length === 0) {
+    showNotification('No exercises found in this workout', 'warning');
+    return;
+  }
+  
+  // Store program/day info for saving
+  state.pastWorkout.programId = programId;
+  state.pastWorkout.programDayId = dayId;
+  
+  // Add exercises from template with default sets
+  state.pastWorkout.exercises = day.exercises.map(ex => ({
+    exercise_id: ex.exercise_id || ex.id,
+    name: ex.name || ex.exercise_name,
+    sets: Array.from({ length: ex.target_sets || 3 }, () => ({
+      weight_kg: 0,
+      reps: 0
+    }))
+  }));
+  
+  showNotification(`Loaded ${day.exercises.length} exercises from template`, 'success');
+  
+  // Re-render with exercises but show entry UI
+  showPastWorkoutWithSets();
+}
+
+// Show past workout with set entry UI for template exercises
+function showPastWorkoutWithSets() {
+  const isImperial = state.user?.measurement_system === 'imperial';
+  const exercises = state.pastWorkout.exercises;
+  
+  const modalBody = document.getElementById('modalBody');
+  modalBody.innerHTML = `
+    <div style="max-height: 70vh; overflow-y: auto;">
+      <p style="color: var(--gray); margin-bottom: 16px;">
+        <i class="fas fa-info-circle"></i> Enter the weights and reps for each set.
+      </p>
+      
+      <div class="form-group">
+        <label><i class="fas fa-calendar"></i> Workout Date:</label>
+        <input type="date" id="pastWorkoutDate" value="${state.pastWorkout.date}" 
+               max="${new Date().toISOString().split('T')[0]}"
+               onchange="state.pastWorkout.date = this.value"
+               style="width: 100%;">
+      </div>
+      
+      <div class="form-group">
+        <label><i class="fas fa-clock"></i> Duration (minutes):</label>
+        <input type="number" id="pastWorkoutDuration" value="60" min="5" max="300" style="width: 100%;">
+      </div>
+      
+      <hr style="margin: 20px 0; border: none; border-top: 1px solid var(--border);">
+      
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <label style="font-weight: 600;"><i class="fas fa-dumbbell"></i> Exercises (${exercises.length}):</label>
+        <button class="btn btn-outline" onclick="showLogPastWorkout(state.pastWorkout.date, false)" style="padding: 6px 12px; font-size: 12px;">
+          <i class="fas fa-redo"></i> Start Over
+        </button>
+      </div>
+      
+      <div id="pastWorkoutExerciseSets">
+        ${exercises.map((ex, exIdx) => `
+          <div style="background: var(--light); padding: 16px; border-radius: 8px; margin-bottom: 12px;">
+            <div style="font-weight: 600; margin-bottom: 12px;">${ex.name}</div>
+            <div style="display: flex; gap: 8px; margin-bottom: 8px; font-size: 12px; color: var(--gray); padding: 0 4px;">
+              <div style="width: 40px;">Set</div>
+              <div style="flex: 1;">${isImperial ? 'lbs' : 'kg'}</div>
+              <div style="flex: 1;">Reps</div>
+            </div>
+            ${ex.sets.map((set, setIdx) => `
+              <div style="display: flex; gap: 8px; margin-bottom: 6px; align-items: center;">
+                <div style="width: 40px; text-align: center; font-weight: 500;">${setIdx + 1}</div>
+                <input type="number" class="template-weight" data-ex="${exIdx}" data-set="${setIdx}" 
+                       placeholder="0" min="0" step="2.5" style="flex: 1;"
+                       value="${set.weight_kg > 0 ? (isImperial ? (set.weight_kg * 2.205).toFixed(0) : set.weight_kg) : ''}">
+                <input type="number" class="template-reps" data-ex="${exIdx}" data-set="${setIdx}" 
+                       placeholder="0" min="0" max="100" style="flex: 1;"
+                       value="${set.reps > 0 ? set.reps : ''}">
+              </div>
+            `).join('')}
+            <button class="btn btn-outline" onclick="addSetToTemplateExercise(${exIdx})" style="width: 100%; padding: 6px; font-size: 12px; margin-top: 4px;">
+              <i class="fas fa-plus"></i> Add Set
+            </button>
+          </div>
+        `).join('')}
+      </div>
+      
+      <button class="btn btn-secondary" onclick="showAddExerciseToPastWorkout()" style="width: 100%; margin-bottom: 12px;">
+        <i class="fas fa-plus"></i> Add Another Exercise
+      </button>
+      
+      <div class="form-group">
+        <label><i class="fas fa-sticky-note"></i> Notes (optional):</label>
+        <textarea id="pastWorkoutNotes" rows="2" placeholder="How did the workout feel?" style="width: 100%;"></textarea>
+      </div>
+      
+      <button class="btn btn-primary" onclick="saveTemplateWorkout()" style="width: 100%;">
+        <i class="fas fa-save"></i> Save Workout
+      </button>
+    </div>
+  `;
+  
+  openModal('Log Past Workout');
+}
+
+// Add a set to a template exercise
+function addSetToTemplateExercise(exerciseIndex) {
+  // Save current values first
+  collectTemplateValues();
+  
+  // Add new set
+  state.pastWorkout.exercises[exerciseIndex].sets.push({ weight_kg: 0, reps: 0 });
+  
+  // Re-render
+  showPastWorkoutWithSets();
+}
+
+// Collect values from template inputs
+function collectTemplateValues() {
+  const isImperial = state.user?.measurement_system === 'imperial';
+  
+  document.querySelectorAll('.template-weight').forEach(input => {
+    const exIdx = parseInt(input.dataset.ex);
+    const setIdx = parseInt(input.dataset.set);
+    const weight = parseFloat(input.value) || 0;
+    state.pastWorkout.exercises[exIdx].sets[setIdx].weight_kg = isImperial ? weight / 2.205 : weight;
+  });
+  
+  document.querySelectorAll('.template-reps').forEach(input => {
+    const exIdx = parseInt(input.dataset.ex);
+    const setIdx = parseInt(input.dataset.set);
+    state.pastWorkout.exercises[exIdx].sets[setIdx].reps = parseInt(input.value) || 0;
+  });
+}
+
+// Save workout from template
+async function saveTemplateWorkout() {
+  collectTemplateValues();
+  
+  const date = document.getElementById('pastWorkoutDate')?.value || state.pastWorkout.date;
+  const duration = parseInt(document.getElementById('pastWorkoutDuration')?.value) || 60;
+  const notes = document.getElementById('pastWorkoutNotes')?.value || '';
+  
+  // Filter out sets with no reps
+  const exercisesWithSets = state.pastWorkout.exercises.map(ex => ({
+    ...ex,
+    sets: ex.sets.filter(s => s.reps > 0)
+  })).filter(ex => ex.sets.length > 0);
+  
+  if (exercisesWithSets.length === 0) {
+    showNotification('Please enter at least one set with reps', 'warning');
+    return;
+  }
+  
+  try {
+    await api('/workouts/retroactive', {
+      method: 'POST',
+      body: JSON.stringify({
+        date: date,
+        duration_minutes: duration,
+        program_id: state.pastWorkout.programId || null,
+        program_day_id: state.pastWorkout.programDayId || null,
+        exercises: exercisesWithSets,
+        notes: notes
+      })
+    });
+    
+    showNotification('Past workout logged successfully!', 'success');
+    closeModal();
+    state.pastWorkout = { exercises: [], date: null };
+    loadDashboard();
+  } catch (error) {
+    showNotification('Error saving workout: ' + error.message, 'error');
+  }
 }
 
 // Show exercise picker for past workout
