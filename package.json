@@ -21,7 +21,7 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "wrangler": "^4.53.0"
+    "wrangler": "^4.77.0"
   },
   "dependencies": {
     "hono": "^3.11.7",
