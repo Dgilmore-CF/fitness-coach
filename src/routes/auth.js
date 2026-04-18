@@ -35,18 +35,25 @@ auth.post('/login', async (c) => {
 
 auth.get('/user', async (c) => {
   const jwtToken = c.req.header('Cf-Access-Jwt-Assertion');
-  
-  if (!jwtToken) {
-    return c.json({ error: 'No JWT token provided' }, 401);
-  }
-
-  const payload = parseJWT(jwtToken);
-  
-  if (!payload || !payload.email) {
-    return c.json({ error: 'Invalid JWT token' }, 401);
-  }
-
   const db = c.env.DB;
+  
+  // Check if running locally
+  const host = c.req.header('host') || '';
+  const isLocalDev = host.includes('localhost') || host.includes('127.0.0.1');
+  
+  let payload;
+  
+  // Allow local development bypass
+  if (!jwtToken && isLocalDev) {
+    payload = { email: 'dev@localhost', name: 'Dev User' };
+  } else if (!jwtToken) {
+    return c.json({ error: 'No JWT token provided' }, 401);
+  } else {
+    payload = parseJWT(jwtToken);
+    if (!payload || !payload.email) {
+      return c.json({ error: 'Invalid JWT token' }, 401);
+    }
+  }
   
   let user = await db.prepare(
     'SELECT * FROM users WHERE email = ?'
@@ -66,13 +73,23 @@ auth.get('/user', async (c) => {
 
 auth.put('/user', async (c) => {
   const jwtToken = c.req.header('Cf-Access-Jwt-Assertion');
-  
-  if (!jwtToken) {
-    return c.json({ error: 'No JWT token provided' }, 401);
-  }
-
-  const payload = parseJWT(jwtToken);
   const db = c.env.DB;
+  
+  // Check if running locally
+  const host = c.req.header('host') || '';
+  const isLocalDev = host.includes('localhost') || host.includes('127.0.0.1');
+  
+  let payload;
+  
+  // Allow local development bypass
+  if (!jwtToken && isLocalDev) {
+    payload = { email: 'dev@localhost', name: 'Dev User' };
+  } else if (!jwtToken) {
+    return c.json({ error: 'No JWT token provided' }, 401);
+  } else {
+    payload = parseJWT(jwtToken);
+  }
+  
   const body = await c.req.json();
 
   const { age, height_cm, weight_kg, name, gender, measurement_system } = body;

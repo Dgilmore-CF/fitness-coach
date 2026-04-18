@@ -373,6 +373,154 @@ function getIndexHTML() {
             color: var(--primary);
         }
         
+        /* Mobile Menu Drawer */
+        .mobile-menu-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1100;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .mobile-menu-overlay.active {
+            display: block;
+            opacity: 1;
+        }
+        
+        .mobile-menu-drawer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--bg-primary);
+            border-radius: 20px 20px 0 0;
+            z-index: 1200;
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            max-height: 85vh;
+            overflow-y: auto;
+            padding-bottom: max(20px, env(safe-area-inset-bottom));
+        }
+        
+        .mobile-menu-drawer.active {
+            transform: translateY(0);
+        }
+        
+        .mobile-menu-handle {
+            width: 40px;
+            height: 4px;
+            background: var(--border);
+            border-radius: 2px;
+            margin: 12px auto 16px;
+        }
+        
+        .mobile-menu-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .mobile-menu-header h3 {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        
+        .mobile-menu-close {
+            background: var(--light);
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: var(--text-secondary);
+            font-size: 16px;
+        }
+        
+        .mobile-menu-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            padding: 20px;
+        }
+        
+        .mobile-menu-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px 12px;
+            border: none;
+            background: var(--light);
+            border-radius: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-height: 90px;
+        }
+        
+        .mobile-menu-item:hover {
+            background: var(--primary-light);
+            transform: scale(1.02);
+        }
+        
+        .mobile-menu-item.active {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .mobile-menu-item.active .mobile-menu-icon {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+        
+        .mobile-menu-item.active .mobile-menu-label {
+            color: white;
+        }
+        
+        .mobile-menu-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            background: var(--bg-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 8px;
+            font-size: 20px;
+            color: var(--primary);
+        }
+        
+        .mobile-menu-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-primary);
+            text-align: center;
+        }
+        
+        .mobile-menu-section {
+            padding: 0 20px 16px;
+        }
+        
+        .mobile-menu-section-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+            padding-left: 4px;
+        }
+        
         /* Add padding to container when mobile nav is visible */
         @media (max-width: 480px) {
             .container {
@@ -1237,29 +1385,55 @@ function getIndexHTML() {
                 <i class="fas fa-home"></i>
                 <span>Home</span>
             </button>
-            <button class="mobile-nav-item" onclick="switchTab('program')" data-tab="program">
-                <i class="fas fa-list"></i>
-                <span>Program</span>
-            </button>
             <button class="mobile-nav-item" onclick="switchTab('workout')" data-tab="workout">
                 <i class="fas fa-dumbbell"></i>
                 <span>Workout</span>
+            </button>
+            <button class="mobile-nav-item" onclick="switchTab('nutrition')" data-tab="nutrition">
+                <i class="fas fa-apple-alt"></i>
+                <span>Nutrition</span>
             </button>
             <button class="mobile-nav-item" onclick="switchTab('analytics')" data-tab="analytics">
                 <i class="fas fa-chart-line"></i>
                 <span>Stats</span>
             </button>
-            <button class="mobile-nav-item" onclick="showMobileMoreMenu()" data-tab="more">
-                <i class="fas fa-ellipsis-h"></i>
-                <span>More</span>
+            <button class="mobile-nav-item" onclick="openMobileMenu()" data-tab="menu">
+                <i class="fas fa-th-large"></i>
+                <span>Menu</span>
             </button>
         </div>
     </nav>
 
+    <!-- Mobile Menu Drawer -->
+    <div class="mobile-menu-overlay" id="mobileMenuOverlay" onclick="closeMobileMenu()"></div>
+    <div class="mobile-menu-drawer" id="mobileMenuDrawer">
+        <div class="mobile-menu-handle"></div>
+        <div class="mobile-menu-header">
+            <h3>Menu</h3>
+            <button class="mobile-menu-close" onclick="closeMobileMenu()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="mobile-menu-grid" id="mobileMenuGrid">
+            <!-- Menu items populated by JS -->
+        </div>
+        <div class="mobile-menu-section">
+            <div class="mobile-menu-section-title">Quick Actions</div>
+            <div style="display: flex; gap: 8px;">
+                <button class="btn btn-outline" onclick="closeMobileMenu(); showProfile();" style="flex: 1;">
+                    <i class="fas fa-user"></i> Profile
+                </button>
+                <button class="btn btn-outline" onclick="closeMobileMenu(); toggleTheme();" style="flex: 1;">
+                    <i class="fas fa-moon" id="menuThemeIcon"></i> Theme
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div id="modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 id="modalTitle">Modal</h2>
+                <h2 id="modalTitle"></h2>
                 <span class="modal-close" onclick="closeModal()">&times;</span>
             </div>
             <div id="modalBody"></div>

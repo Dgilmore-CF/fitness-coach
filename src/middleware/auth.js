@@ -20,14 +20,23 @@ export async function authMiddleware(c, next) {
   // Get JWT from Cloudflare Access header
   const jwtToken = c.req.header('Cf-Access-Jwt-Assertion');
   
-  if (!jwtToken) {
-    return c.json({ error: 'Unauthorized - No JWT token' }, 401);
-  }
-
-  const payload = parseJWT(jwtToken);
+  // Check if running locally (wrangler dev)
+  const host = c.req.header('host') || '';
+  const isLocalDev = host.includes('localhost') || host.includes('127.0.0.1');
   
-  if (!payload || !payload.email) {
-    return c.json({ error: 'Unauthorized - Invalid JWT' }, 401);
+  let payload;
+  
+  if (!jwtToken && isLocalDev) {
+    // Use dev user for local testing
+    payload = { email: 'dev@localhost', name: 'Dev User' };
+  } else if (!jwtToken) {
+    return c.json({ error: 'Unauthorized - No JWT token' }, 401);
+  } else {
+    payload = parseJWT(jwtToken);
+    
+    if (!payload || !payload.email) {
+      return c.json({ error: 'Unauthorized - Invalid JWT' }, 401);
+    }
   }
 
   // Get or create user in database

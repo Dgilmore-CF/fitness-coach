@@ -814,9 +814,10 @@ nutrition.get('/foods/search/usda', async (c) => {
   }
   
   try {
-    // USDA FoodData Central API (free, no key required for basic search)
+    // USDA FoodData Central API requires an API key
+    const apiKey = c.env.USDA_API_KEY || 'DEMO_KEY';
     const response = await fetch(
-      `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(query)}&pageSize=${pageSize}&dataType=Foundation,SR%20Legacy,Survey%20(FNDDS)`,
+      `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${apiKey}&query=${encodeURIComponent(query)}&pageSize=${pageSize}&dataType=Foundation,SR%20Legacy,Survey%20(FNDDS)`,
       {
         headers: {
           'Content-Type': 'application/json'
@@ -825,6 +826,8 @@ nutrition.get('/foods/search/usda', async (c) => {
     );
     
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('USDA API response:', response.status, errorText);
       throw new Error(`USDA API error: ${response.status}`);
     }
     
@@ -931,6 +934,13 @@ nutrition.get('/foods/barcode/:barcode', async (c) => {
     const product = data.product;
     const nutrients = product.nutriments || {};
     
+    // Get serving size - prefer per-serving values if available
+    const servingSize = parseFloat(product.serving_quantity) || 100;
+    const hasPerServing = nutrients['energy-kcal_serving'] !== undefined;
+    
+    // Use per-serving values if available, otherwise calculate from per-100g
+    const multiplier = hasPerServing ? 1 : (servingSize / 100);
+    
     const food = {
       id: null,
       name: product.product_name || product.generic_name || 'Unknown Product',
@@ -938,17 +948,33 @@ nutrition.get('/foods/barcode/:barcode', async (c) => {
       barcode: barcode,
       source: 'openfoodfacts',
       source_id: barcode,
-      serving_size: parseFloat(product.serving_quantity) || 100,
+      serving_size: servingSize,
       serving_unit: 'g',
-      serving_description: product.serving_size || '100g',
-      calories: nutrients['energy-kcal_100g'] || nutrients['energy-kcal'] || 0,
-      protein_g: nutrients.proteins_100g || nutrients.proteins || 0,
-      carbs_g: nutrients.carbohydrates_100g || nutrients.carbohydrates || 0,
-      fat_g: nutrients.fat_100g || nutrients.fat || 0,
-      fiber_g: nutrients.fiber_100g || nutrients.fiber || 0,
-      sugar_g: nutrients.sugars_100g || nutrients.sugars || 0,
-      sodium_mg: (nutrients.sodium_100g || 0) * 1000, // Convert g to mg
-      saturated_fat_g: nutrients['saturated-fat_100g'] || 0,
+      serving_description: product.serving_size || `${servingSize}g`,
+      calories: hasPerServing 
+        ? (nutrients['energy-kcal_serving'] || 0)
+        : ((nutrients['energy-kcal_100g'] || nutrients['energy-kcal'] || 0) * multiplier),
+      protein_g: hasPerServing
+        ? (nutrients.proteins_serving || 0)
+        : ((nutrients.proteins_100g || nutrients.proteins || 0) * multiplier),
+      carbs_g: hasPerServing
+        ? (nutrients.carbohydrates_serving || 0)
+        : ((nutrients.carbohydrates_100g || nutrients.carbohydrates || 0) * multiplier),
+      fat_g: hasPerServing
+        ? (nutrients.fat_serving || 0)
+        : ((nutrients.fat_100g || nutrients.fat || 0) * multiplier),
+      fiber_g: hasPerServing
+        ? (nutrients.fiber_serving || 0)
+        : ((nutrients.fiber_100g || nutrients.fiber || 0) * multiplier),
+      sugar_g: hasPerServing
+        ? (nutrients.sugars_serving || 0)
+        : ((nutrients.sugars_100g || nutrients.sugars || 0) * multiplier),
+      sodium_mg: hasPerServing
+        ? ((nutrients.sodium_serving || 0) * 1000)
+        : ((nutrients.sodium_100g || 0) * 1000 * multiplier),
+      saturated_fat_g: hasPerServing
+        ? (nutrients['saturated-fat_serving'] || 0)
+        : ((nutrients['saturated-fat_100g'] || 0) * multiplier),
       verified: 1,
       image_url: product.image_url || null
     };
@@ -1388,6 +1414,284 @@ nutrition.post('/quick-add', async (c) => {
     },
     message: 'Food added'
   });
+});
+
+// ========== SAVED MEALS ==========
+
+// Get user's saved meals
+nutrition.get('/saved-meals', async (c) => {
+  const user = requireAuth(c);
+  const db = c.env.DB;
+  
+  const meals = await db.prepare(
+    `SELECT * FROM saved_meals 
+     WHERE user_id = ? 
+     ORDER BY is_favorite DESC, use_count DESC, name ASC`
+  ).bind(user.id).all();
+  
+  return c.json({ saved_meals: meals.results || [] });
+});
+
+// Create a saved meal
+nutrition.post('/saved-meals', async (c) => {
+  const user = requireAuth(c);
+  const body = await c.req.json();
+  const db = c.env.DB;
+  
+  const { name, description, meal_type, calories, protein_g, carbs_g, fat_g, fiber_g, recipe_url, foods } = body;
+  
+  if (!name) {
+    return c.json({ error: 'Meal name is required' }, 400);
+  }
+  
+  // Calculate totals if foods provided
+  let totalCalories = calories || 0;
+  let totalProtein = protein_g || 0;
+  let totalCarbs = carbs_g || 0;
+  let totalFat = fat_g || 0;
+  let totalFiber = fiber_g || 0;
+  
+  if (foods && foods.length > 0) {
+    totalCalories = foods.reduce((sum, f) => sum + (f.calories || 0), 0);
+    totalProtein = foods.reduce((sum, f) => sum + (f.protein_g || 0), 0);
+    totalCarbs = foods.reduce((sum, f) => sum + (f.carbs_g || 0), 0);
+    totalFat = foods.reduce((sum, f) => sum + (f.fat_g || 0), 0);
+    totalFiber = foods.reduce((sum, f) => sum + (f.fiber_g || 0), 0);
+  }
+  
+  const meal = await db.prepare(
+    `INSERT INTO saved_meals (user_id, name, description, meal_type, calories, protein_g, carbs_g, fat_g, fiber_g, recipe_url)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     RETURNING *`
+  ).bind(user.id, name, description || null, meal_type || 'any', totalCalories, totalProtein, totalCarbs, totalFat, totalFiber, recipe_url || null).first();
+  
+  // Add foods if provided
+  if (foods && foods.length > 0) {
+    for (const food of foods) {
+      await db.prepare(
+        `INSERT INTO saved_meal_foods (saved_meal_id, food_id, custom_name, quantity, unit, calories, protein_g, carbs_g, fat_g)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(meal.id, food.food_id || null, food.custom_name || null, food.quantity || 1, food.unit || 'serving',
+             food.calories || 0, food.protein_g || 0, food.carbs_g || 0, food.fat_g || 0).run();
+    }
+  }
+  
+  return c.json({ saved_meal: meal, message: 'Meal saved' });
+});
+
+// Update a saved meal
+nutrition.put('/saved-meals/:id', async (c) => {
+  const user = requireAuth(c);
+  const mealId = c.req.param('id');
+  const body = await c.req.json();
+  const db = c.env.DB;
+  
+  const { name, description, meal_type, calories, protein_g, carbs_g, fat_g, fiber_g, recipe_url, is_favorite } = body;
+  
+  const meal = await db.prepare(
+    `UPDATE saved_meals 
+     SET name = COALESCE(?, name),
+         description = COALESCE(?, description),
+         meal_type = COALESCE(?, meal_type),
+         calories = COALESCE(?, calories),
+         protein_g = COALESCE(?, protein_g),
+         carbs_g = COALESCE(?, carbs_g),
+         fat_g = COALESCE(?, fat_g),
+         fiber_g = COALESCE(?, fiber_g),
+         recipe_url = COALESCE(?, recipe_url),
+         is_favorite = COALESCE(?, is_favorite),
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = ? AND user_id = ?
+     RETURNING *`
+  ).bind(name, description, meal_type, calories, protein_g, carbs_g, fat_g, fiber_g, recipe_url, is_favorite, mealId, user.id).first();
+  
+  if (!meal) {
+    return c.json({ error: 'Meal not found' }, 404);
+  }
+  
+  return c.json({ saved_meal: meal, message: 'Meal updated' });
+});
+
+// Delete a saved meal
+nutrition.delete('/saved-meals/:id', async (c) => {
+  const user = requireAuth(c);
+  const mealId = c.req.param('id');
+  const db = c.env.DB;
+  
+  await db.prepare('DELETE FROM saved_meals WHERE id = ? AND user_id = ?').bind(mealId, user.id).run();
+  
+  return c.json({ message: 'Meal deleted' });
+});
+
+// Log a saved meal (add to today's nutrition)
+nutrition.post('/saved-meals/:id/log', async (c) => {
+  const user = requireAuth(c);
+  const mealId = c.req.param('id');
+  const body = await c.req.json();
+  const db = c.env.DB;
+  
+  const { date, meal_type } = body;
+  const logDate = date || new Date().toISOString().split('T')[0];
+  
+  // Get the saved meal
+  const savedMeal = await db.prepare(
+    'SELECT * FROM saved_meals WHERE id = ? AND user_id = ?'
+  ).bind(mealId, user.id).first();
+  
+  if (!savedMeal) {
+    return c.json({ error: 'Saved meal not found' }, 404);
+  }
+  
+  // Create or get today's meal entry
+  let meal = await db.prepare(
+    'SELECT * FROM meals WHERE user_id = ? AND date = ? AND meal_type = ?'
+  ).bind(user.id, logDate, meal_type || savedMeal.meal_type || 'snack').first();
+  
+  if (!meal) {
+    meal = await db.prepare(
+      `INSERT INTO meals (user_id, date, meal_type, name) VALUES (?, ?, ?, ?) RETURNING *`
+    ).bind(user.id, logDate, meal_type || savedMeal.meal_type || 'snack', savedMeal.name).first();
+  }
+  
+  // Get saved meal foods and add them
+  const savedFoods = await db.prepare(
+    'SELECT * FROM saved_meal_foods WHERE saved_meal_id = ?'
+  ).bind(mealId).all();
+  
+  for (const food of (savedFoods.results || [])) {
+    await db.prepare(
+      `INSERT INTO meal_foods (meal_id, food_id, quantity, unit, calories, protein_g, carbs_g, fat_g, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(meal.id, food.food_id, food.quantity, food.unit, food.calories, food.protein_g, food.carbs_g, food.fat_g, food.custom_name).run();
+  }
+  
+  // Update nutrition log
+  await db.prepare(
+    `INSERT INTO nutrition_log (user_id, date, protein_grams, updated_at)
+     VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+     ON CONFLICT(user_id, date) DO UPDATE SET
+       protein_grams = protein_grams + excluded.protein_grams,
+       updated_at = CURRENT_TIMESTAMP`
+  ).bind(user.id, logDate, Math.round(savedMeal.protein_g)).run();
+  
+  // Update saved meal usage
+  await db.prepare(
+    `UPDATE saved_meals SET use_count = use_count + 1, last_used = CURRENT_TIMESTAMP WHERE id = ?`
+  ).bind(mealId).run();
+  
+  return c.json({ 
+    logged: {
+      meal_name: savedMeal.name,
+      calories: savedMeal.calories,
+      protein_g: savedMeal.protein_g,
+      carbs_g: savedMeal.carbs_g,
+      fat_g: savedMeal.fat_g
+    },
+    message: 'Meal logged' 
+  });
+});
+
+// ========== RECIPE URL PARSING ==========
+
+// Parse nutrition from a recipe URL
+nutrition.post('/parse-recipe', async (c) => {
+  const user = requireAuth(c);
+  const body = await c.req.json();
+  const { url } = body;
+  
+  if (!url) {
+    return c.json({ error: 'URL is required' }, 400);
+  }
+  
+  try {
+    // Fetch the recipe page
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; FitnessCoach/1.0; +https://example.com)'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch recipe: ${response.status}`);
+    }
+    
+    const html = await response.text();
+    
+    // Try to extract JSON-LD structured data (most recipe sites use this)
+    const jsonLdMatch = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi);
+    let recipeData = null;
+    
+    if (jsonLdMatch) {
+      for (const match of jsonLdMatch) {
+        try {
+          const jsonStr = match.replace(/<script type="application\/ld\+json">/i, '').replace(/<\/script>/i, '');
+          const data = JSON.parse(jsonStr);
+          
+          // Handle array or single object
+          const items = Array.isArray(data) ? data : [data];
+          for (const item of items) {
+            if (item['@type'] === 'Recipe' || (item['@graph'] && item['@graph'].find(g => g['@type'] === 'Recipe'))) {
+              recipeData = item['@type'] === 'Recipe' ? item : item['@graph'].find(g => g['@type'] === 'Recipe');
+              break;
+            }
+          }
+          if (recipeData) break;
+        } catch (e) {
+          continue;
+        }
+      }
+    }
+    
+    if (!recipeData) {
+      // Fallback: try to extract from meta tags
+      const nameMatch = html.match(/<meta property="og:title" content="([^"]+)"/i);
+      const name = nameMatch ? nameMatch[1] : 'Recipe';
+      
+      return c.json({
+        recipe: {
+          name: name,
+          url: url,
+          calories: null,
+          protein_g: null,
+          carbs_g: null,
+          fat_g: null,
+          servings: null,
+          parsed: false,
+          message: 'Could not automatically parse nutrition. Please enter manually.'
+        }
+      });
+    }
+    
+    // Extract nutrition from structured data
+    const nutrition = recipeData.nutrition || {};
+    
+    const parseNutrientValue = (value) => {
+      if (!value) return null;
+      const numMatch = String(value).match(/[\d.]+/);
+      return numMatch ? parseFloat(numMatch[0]) : null;
+    };
+    
+    const recipe = {
+      name: recipeData.name || 'Recipe',
+      description: recipeData.description || null,
+      url: url,
+      servings: parseNutrientValue(recipeData.recipeYield) || 1,
+      calories: parseNutrientValue(nutrition.calories),
+      protein_g: parseNutrientValue(nutrition.proteinContent),
+      carbs_g: parseNutrientValue(nutrition.carbohydrateContent),
+      fat_g: parseNutrientValue(nutrition.fatContent),
+      fiber_g: parseNutrientValue(nutrition.fiberContent),
+      sugar_g: parseNutrientValue(nutrition.sugarContent),
+      sodium_mg: parseNutrientValue(nutrition.sodiumContent),
+      parsed: true
+    };
+    
+    return c.json({ recipe });
+    
+  } catch (error) {
+    console.error('Recipe parsing error:', error);
+    return c.json({ error: error.message, recipe: null }, 500);
+  }
 });
 
 export default nutrition;
