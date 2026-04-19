@@ -13,10 +13,14 @@
  */
 
 import '../css/design-system.css';
+import '../css/animations.css';
 import '../css/layouts.css';
 import '../css/components.css';
-import '../css/animations.css';
 import '../css/active-workout.css';
+// Shell CSS loads LAST so its legacy-compatible classes (container, header,
+// tabs, .tab-content, mobile-nav, mobile-menu-*, #modal) take precedence
+// over any conflicting utility classes.
+import '../css/shell.css';
 
 import { html } from '@core/html';
 import { store } from '@core/state';
