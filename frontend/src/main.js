@@ -23,6 +23,7 @@ import { initBridge, registerScreen } from './bridge.js';
 import { loadLearn } from './screens/learn.js';
 import { loadAchievements } from './screens/achievements.js';
 import { loadDashboard } from './screens/dashboard.js';
+import { showProfile } from './screens/profile.js';
 
 // Expose for debugging and for legacy-code bridging
 window.__fitnessApp = {
@@ -41,6 +42,10 @@ window.__fitnessApp = {
 registerScreen('learn', 'loadLearn', loadLearn);
 registerScreen('achievements', 'loadAchievements', loadAchievements);
 registerScreen('dashboard', 'loadDashboard', loadDashboard);
+
+// showProfile is a modal opener, not a tab loader — override directly.
+// The bridge's initBridge() will pick up the legacy override pattern.
+registerScreen('profile', 'showProfile', showProfile);
 
 // Install overrides once legacy globals are defined.
 // (In Vite dev mode there are no legacy globals, so this is a no-op.)
