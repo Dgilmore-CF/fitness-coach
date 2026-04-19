@@ -72,3 +72,36 @@ wrangler d1 migrations create fitness-coach-db "your_migration_name"
 ```
 
 Use unique sequential numbers (next available: 0027).
+
+## Nutrition Data Model
+
+The nutrition system intentionally uses three related tables that serve
+distinct purposes. They are NOT duplicates — each is the source of truth
+for a different concern:
+
+| Table               | Role                                    | Contains                           |
+|---------------------|------------------------------------------|-------------------------------------|
+| `nutrition_log`     | Daily aggregates (denormalized roll-up) | 1 row per user per date            |
+| `nutrition_entries` | Individual timestamped events           | Many rows per day (e.g. "30g protein @ 2pm") |
+| `meals` + `meal_foods` + `foods` | Detailed meal tracking with ingredient-level macros | Rich food database + per-meal ingredient list |
+
+**Data flow**:
+- When a user logs a single macro entry (via quick-add), we insert into
+  `nutrition_entries` **and** increment the corresponding column in
+  `nutrition_log` (protein_grams, water_ml, creatine_grams).
+- When a user logs a full meal, we insert into `meals` (+ `meal_foods`) and
+  increment `nutrition_log.protein_grams` with the computed total.
+- The Nutrition screen reads from `nutrition_log` for the daily rings and
+  from `meals` for the meal list.
+
+**Rationale for keeping all three**:
+- `nutrition_log` is O(1) read for daily progress; without it we'd need
+  expensive per-user aggregations on every dashboard view.
+- `nutrition_entries` preserves the timeline of events for auditing and
+  editing of individual logs.
+- `meals`/`foods` is needed for the full meal-logger UX (search, macros,
+  barcode) and integration with USDA / Open Food Facts.
+
+**Future consolidation** could remove `nutrition_log` and compute daily
+aggregates on read with materialized views or caching, but the current
+model is correct and performant.
