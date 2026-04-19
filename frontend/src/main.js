@@ -50,6 +50,11 @@ import { showLogPastWorkout } from './features/past-workout/controller.js';
 import { showExerciseHistory } from './features/exercise-history.js';
 import { loadWorkoutCalendar, loadWorkoutHistory } from './features/workout-calendar.js';
 import { viewWorkout } from './features/view-workout.js';
+import {
+  startWorkout,
+  startWorkoutFromProgram,
+  startWorkoutDay
+} from './features/start-workout.js';
 
 // Expose for debugging and for legacy-code bridging
 window.__fitnessApp = {
@@ -128,6 +133,11 @@ registerScreen('workout-calendar', 'loadWorkoutHistory', loadWorkoutHistory);
 
 // View completed workout modal
 registerScreen('view-workout', 'viewWorkout', viewWorkout);
+
+// Start workout flows
+registerScreen('start-workout', 'startWorkout', startWorkout);
+registerScreen('start-workout-program', 'startWorkoutFromProgram', startWorkoutFromProgram);
+registerScreen('start-workout-day', 'startWorkoutDay', startWorkoutDay);
 
 // Install overrides once legacy globals are defined.
 // (In Vite dev mode there are no legacy globals, so this is a no-op.)
