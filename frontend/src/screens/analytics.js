@@ -14,6 +14,7 @@
 
 import { html, raw } from '@core/html';
 import { api } from '@core/api';
+import { delegate } from '@core/delegate';
 import { toast } from '@ui/Toast';
 import { confirmDialog } from '@ui/Modal';
 import {
@@ -251,7 +252,7 @@ async function recalculatePRs() {
 }
 
 function attachAnalyticsHandlers(container) {
-  container.addEventListener('click', (event) => {
+  delegate(container, 'click', (event) => {
     const recalcBtn = event.target.closest('[data-action="recalc-prs"]');
     if (recalcBtn) {
       recalculatePRs();

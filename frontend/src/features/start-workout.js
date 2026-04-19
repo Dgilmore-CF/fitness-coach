@@ -81,7 +81,17 @@ export async function startWorkoutFromProgram(programId) {
   }
 }
 
+// Module-level mutex to prevent concurrent startWorkoutDay calls. Without
+// this, duplicate click listeners (from tab re-renders) would spawn multiple
+// AI preview modals stacked on top of each other.
+let _startingWorkout = false;
+
 export async function startWorkoutDay(programId, programDayId) {
+  if (_startingWorkout) {
+    console.warn('startWorkoutDay called while another is in progress — ignoring');
+    return;
+  }
+  _startingWorkout = true;
   try {
     const programData = await withLoading('Starting your workout…', async () => {
       return await api.get(`/programs/${programId}`);
@@ -117,6 +127,8 @@ export async function startWorkoutDay(programId, programDayId) {
     }
   } catch (err) {
     toast.error(`Error starting workout: ${err.message}`);
+  } finally {
+    _startingWorkout = false;
   }
 }
 

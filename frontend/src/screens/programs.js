@@ -9,6 +9,7 @@
 import { html, raw } from '@core/html';
 import { api } from '@core/api';
 import { store } from '@core/state';
+import { delegate } from '@core/delegate';
 import { openModal, confirmDialog } from '@ui/Modal';
 import { toast } from '@ui/Toast';
 import { formatDate } from '@utils/formatters';
@@ -149,7 +150,7 @@ export async function loadPrograms() {
 }
 
 function attachListHandlers(container) {
-  container.addEventListener('click', (event) => {
+  delegate(container, 'click', (event) => {
     const target = event.target.closest('[data-action]');
     if (!target) return;
     const action = target.getAttribute('data-action');
