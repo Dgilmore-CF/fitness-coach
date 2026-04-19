@@ -6,6 +6,11 @@ import {
   getExerciseCoaching,
   chatWithCoach 
 } from '../services/ai-coach.js';
+import {
+  buildPreWorkoutContext,
+  predictNextSet,
+  analyzePostSet
+} from '../services/ai-realtime.js';
 
 const ai = new Hono();
 
@@ -454,6 +459,93 @@ ai.post('/coach/save-recommendation', async (c) => {
   } catch (error) {
     console.error('Error saving recommendation:', error);
     return c.json({ error: 'Failed to save recommendation' }, 500);
+  }
+});
+
+// ============================================================================
+// Real-time AI coaching (Phase 4)
+// ============================================================================
+
+/**
+ * Pre-workout briefing: readiness score, per-exercise weight suggestions.
+ * Designed for <500ms latency — all rule-based by default.
+ *
+ * GET /api/ai/realtime/preview/:programDayId
+ */
+ai.get('/realtime/preview/:programDayId', async (c) => {
+  const user = requireAuth(c);
+  const programDayId = parseInt(c.req.param('programDayId'), 10);
+  const db = c.env.DB;
+
+  if (!programDayId || Number.isNaN(programDayId)) {
+    return c.json({ error: 'Invalid program day id' }, 400);
+  }
+
+  try {
+    const context = await buildPreWorkoutContext(db, user.id, programDayId);
+    return c.json({ success: true, data: context });
+  } catch (error) {
+    console.error('Pre-workout preview error:', error);
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+/**
+ * Smart weight/rep suggestion for a specific exercise.
+ *
+ * GET /api/ai/realtime/predict/:exerciseId?target_reps=10&completed_sets=0
+ */
+ai.get('/realtime/predict/:exerciseId', async (c) => {
+  const user = requireAuth(c);
+  const exerciseId = parseInt(c.req.param('exerciseId'), 10);
+  const targetReps = parseInt(c.req.query('target_reps') || '10', 10);
+  const completedSetsToday = parseInt(c.req.query('completed_sets') || '0', 10);
+  const db = c.env.DB;
+
+  try {
+    const result = await db.prepare(`
+      SELECT s.weight_kg, s.reps, s.one_rep_max_kg
+      FROM sets s
+      JOIN workout_exercises we ON s.workout_exercise_id = we.id
+      JOIN workouts w ON we.workout_id = w.id
+      WHERE we.exercise_id = ? AND w.user_id = ? AND w.completed = 1
+      ORDER BY w.start_time DESC, s.set_number ASC
+      LIMIT 10
+    `).bind(exerciseId, user.id).all();
+
+    const prediction = predictNextSet({
+      recentSets: result.results || [],
+      targetReps,
+      completedSetsToday
+    });
+
+    return c.json({ success: true, ...prediction });
+  } catch (error) {
+    console.error('Weight prediction error:', error);
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+/**
+ * Post-set analysis: suggest rest-time adjustments, form warnings, progression cues.
+ *
+ * POST /api/ai/realtime/analyze
+ * Body: { current_sets: [{weight_kg, reps}, ...], target_reps, target_sets }
+ */
+ai.post('/realtime/analyze', async (c) => {
+  requireAuth(c);
+
+  try {
+    const body = await c.req.json();
+    const insight = analyzePostSet({
+      currentSets: body.current_sets || [],
+      targetReps: body.target_reps || 10,
+      targetSets: body.target_sets || 3
+    });
+    return c.json({ success: true, insight });
+  } catch (error) {
+    console.error('Post-set analysis error:', error);
+    return c.json({ error: error.message }, 500);
   }
 });
 

@@ -1,6 +1,14 @@
 name = "ai-fitness-coach"
 main = "src/index.js"
-compatibility_date = "2024-01-01"
+# Bumped for Static Assets binding + modern Workers features.
+compatibility_date = "2024-11-06"
+
+# Cloudflare Static Assets — serves the frontend directly from the edge.
+# The Worker still runs for /api/* routes; everything else is served from assets.
+[assets]
+directory = "./frontend-dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
 
 # Cloudflare D1 Database
 [[d1_databases]]

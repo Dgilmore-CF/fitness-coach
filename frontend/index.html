@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#2563eb" />
+  <meta name="description" content="AI-powered fitness coach with personalized programs, real-time guidance, and comprehensive analytics." />
+  <title>AI Fitness Coach</title>
+
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+  <!-- Legacy CDN libs still used by export / PDF features -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+
+  <!-- Prevent flash of unstyled theme -->
+  <script>
+    (function () {
+      const saved = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = saved || (prefersDark ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1><i class="fas fa-dumbbell"></i> AI Fitness Coach</h1>
+      <div class="user-info">
+        <button class="theme-toggle" data-action="toggle-theme" title="Toggle Dark/Light Mode">
+          <i class="fas fa-moon" id="themeIcon"></i>
+        </button>
+        <span id="userName">Loading...</span>
+        <button class="btn btn-outline" data-action="show-profile">
+          <i class="fas fa-user"></i> Profile
+        </button>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-action="switch-tab" data-tab="dashboard">
+        <i class="fas fa-home"></i> Dashboard
+      </button>
+      <button class="tab" data-action="switch-tab" data-tab="program">
+        <i class="fas fa-list"></i> Program
+      </button>
+      <button class="tab" data-action="switch-tab" data-tab="workout">
+        <i class="fas fa-dumbbell"></i> Workout
+      </button>
+      <button class="tab" data-action="switch-tab" data-tab="analytics">
+        <i class="fas fa-chart-line"></i> Analytics
+      </button>
+      <button class="tab" data-action="switch-tab" data-tab="insights">
+        <i class="fas fa-robot"></i> AI Coach
+      </button>
+      <button class="tab" data-action="switch-tab" data-tab="achievements">
+        <i class="fas fa-trophy"></i> Achievements
+      </button>
+      <button class="tab" data-action="switch-tab" data-tab="nutrition">
+        <i class="fas fa-apple-alt"></i> Nutrition
+      </button>
+      <button class="tab" data-action="switch-tab" data-tab="learn">
+        <i class="fas fa-graduation-cap"></i> Learn
+      </button>
+    </div>
+
+    <div id="dashboard" class="tab-content active"></div>
+    <div id="program" class="tab-content"></div>
+    <div id="workout" class="tab-content"></div>
+    <div id="analytics" class="tab-content"></div>
+    <div id="insights" class="tab-content"></div>
+    <div id="achievements" class="tab-content"></div>
+    <div id="nutrition" class="tab-content"></div>
+    <div id="learn" class="tab-content"></div>
+  </div>
+
+  <!-- Mobile Bottom Navigation -->
+  <nav class="mobile-nav" id="mobileNav">
+    <div class="mobile-nav-inner">
+      <button class="mobile-nav-item active" data-action="switch-tab" data-tab="dashboard">
+        <i class="fas fa-home"></i>
+        <span>Home</span>
+      </button>
+      <button class="mobile-nav-item" data-action="switch-tab" data-tab="workout">
+        <i class="fas fa-dumbbell"></i>
+        <span>Workout</span>
+      </button>
+      <button class="mobile-nav-item" data-action="switch-tab" data-tab="nutrition">
+        <i class="fas fa-apple-alt"></i>
+        <span>Nutrition</span>
+      </button>
+      <button class="mobile-nav-item" data-action="switch-tab" data-tab="analytics">
+        <i class="fas fa-chart-line"></i>
+        <span>Stats</span>
+      </button>
+      <button class="mobile-nav-item" data-action="open-mobile-menu" data-tab="menu">
+        <i class="fas fa-th-large"></i>
+        <span>Menu</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Mobile Menu Drawer -->
+  <div class="mobile-menu-overlay" id="mobileMenuOverlay" data-action="close-mobile-menu"></div>
+  <div class="mobile-menu-drawer" id="mobileMenuDrawer">
+    <div class="mobile-menu-handle"></div>
+    <div class="mobile-menu-header">
+      <h3>Menu</h3>
+      <button class="mobile-menu-close" data-action="close-mobile-menu">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="mobile-menu-grid" id="mobileMenuGrid"></div>
+    <div class="mobile-menu-section">
+      <div class="mobile-menu-section-title">Quick Actions</div>
+      <div class="cluster" style="gap: var(--space-2);">
+        <button class="btn btn-outline" data-action="show-profile-from-menu" style="flex: 1;">
+          <i class="fas fa-user"></i> Profile
+        </button>
+        <button class="btn btn-outline" data-action="toggle-theme-from-menu" style="flex: 1;">
+          <i class="fas fa-moon" id="menuThemeIcon"></i> Theme
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Legacy modal (kept for any unmigrated callers) -->
+  <div id="modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modalTitle"></h2>
+        <span class="modal-close" data-action="close-modal">&times;</span>
+      </div>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <!-- Modular modal root (for new openModal() calls) -->
+  <div id="modal-root"></div>
+
+  <!-- Toast container -->
+  <div id="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- Shell event delegation (theme, switchTab, mobile menu, etc.) -->
+  <script src="/app.js"></script>
+
+  <!-- Modular app entry (Vite bundles and replaces legacy globals via the bridge) -->
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

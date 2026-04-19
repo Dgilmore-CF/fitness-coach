@@ -32,8 +32,8 @@ exports.get('/workouts', async (c) => {
         s.reps,
         s.rest_seconds,
         s.one_rep_max_kg,
-        s.is_warmup,
-        s.recorded_at
+        s.completed AS is_warmup, -- kept for backward compat with CSV column name
+        s.created_at AS recorded_at
       FROM workouts w
       LEFT JOIN programs p ON w.program_id = p.id
       LEFT JOIN program_days pd ON w.program_day_id = pd.id
@@ -264,8 +264,8 @@ exports.get('/measurements', async (c) => {
       SELECT 
         data_type,
         value,
-        unit,
-        recorded_at,
+        NULL AS unit,
+        timestamp AS recorded_at,
         source
       FROM health_data
       WHERE user_id = ?
@@ -274,15 +274,15 @@ exports.get('/measurements', async (c) => {
     const params = [user.id];
     
     if (startDate) {
-      query += ` AND recorded_at >= ?`;
+      query += ` AND timestamp >= ?`;
       params.push(startDate);
     }
     if (endDate) {
-      query += ` AND recorded_at <= ?`;
+      query += ` AND timestamp <= ?`;
       params.push(endDate + 'T23:59:59');
     }
     
-    query += ` ORDER BY recorded_at DESC`;
+    query += ` ORDER BY timestamp DESC`;
     
     const result = await db.prepare(query).bind(...params).all();
     const data = result.results || [];
@@ -373,7 +373,8 @@ exports.get('/all', async (c) => {
       const exercises = [];
       for (const ex of exercisesResult.results || []) {
         const setsResult = await db.prepare(`
-          SELECT set_number, weight_kg, reps, rest_seconds, one_rep_max_kg, is_warmup, recorded_at
+          SELECT set_number, weight_kg, reps, rest_seconds, one_rep_max_kg,
+                 completed AS is_warmup, created_at AS recorded_at
           FROM sets WHERE workout_exercise_id = ? ORDER BY set_number
         `).bind(ex.id).all();
         
@@ -406,24 +407,24 @@ exports.get('/all', async (c) => {
     const nutritionResult = await db.prepare(nutritionQuery).bind(...nutritionParams).all();
 
     // Build health query with proper parameter binding
-    let healthQuery = `SELECT data_type, value, unit, recorded_at, source FROM health_data WHERE user_id = ?`;
+    let healthQuery = `SELECT data_type, value, NULL AS unit, timestamp AS recorded_at, source FROM health_data WHERE user_id = ?`;
     const healthParams = [user.id];
     
     if (startDate) {
-      healthQuery += ` AND recorded_at >= ?`;
+      healthQuery += ` AND timestamp >= ?`;
       healthParams.push(startDate);
     }
     if (endDate) {
-      healthQuery += ` AND recorded_at <= ?`;
+      healthQuery += ` AND timestamp <= ?`;
       healthParams.push(endDate + 'T23:59:59');
     }
-    healthQuery += ` ORDER BY recorded_at DESC`;
+    healthQuery += ` ORDER BY timestamp DESC`;
     
     const healthResult = await db.prepare(healthQuery).bind(...healthParams).all();
 
     // Get programs
     const programsResult = await db.prepare(`
-      SELECT id, name, days_per_week, goal, is_active, created_at
+      SELECT id, name, days_per_week, goal, active AS is_active, created_at
       FROM programs WHERE user_id = ?
       ORDER BY created_at DESC
     `).bind(user.id).all();

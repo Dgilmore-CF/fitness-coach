@@ -1,13 +1,25 @@
 {
   "name": "ai-fitness-coach",
-  "version": "1.0.0",
+  "version": "2.0.0-refactor",
   "description": "AI-driven fitness coaching application built on Cloudflare Workers",
   "main": "src/index.js",
+  "type": "module",
   "scripts": {
-    "build": "node build-frontend.js",
-    "dev": "npm run build && wrangler dev",
+    "build": "vite build",
+    "build:frontend": "vite build",
+    "dev:frontend": "vite",
+    "dev:worker": "wrangler dev --port 8787",
+    "dev": "concurrently -n vite,worker -c cyan,magenta \"npm:dev:frontend\" \"npm:dev:worker\"",
+    "preview": "vite preview",
     "deploy": "npm run build && git add -A && git commit -m 'Deploy' --allow-empty && git push",
     "deploy:direct": "npm run build && wrangler deploy",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:unit": "vitest run tests/unit",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:coverage": "vitest run --coverage",
     "db:create": "wrangler d1 create fitness-coach-db",
     "db:migrate": "wrangler d1 migrations apply fitness-coach-db",
     "db:migrate:local": "wrangler d1 migrations apply fitness-coach-db --local"
@@ -21,10 +33,16 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@playwright/test": "^1.48.0",
+    "@vitest/ui": "^2.1.0",
+    "concurrently": "^9.0.0",
+    "jsdom": "^25.0.1",
+    "vite": "^5.4.0",
+    "vitest": "^2.1.0",
     "wrangler": "^4.77.0"
   },
   "dependencies": {
-    "hono": "^3.11.7",
+    "hono": "^4.12.14",
     "jsonwebtoken": "^9.0.2"
   }
 }
