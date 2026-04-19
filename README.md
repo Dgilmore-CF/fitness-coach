@@ -5,6 +5,10 @@
 [![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-orange)](https://workers.cloudflare.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
+> ⚙️ **v2 Refactor in progress.** This repo is being modernized on the
+> `refactor/v2-modernization` branch. See [REFACTOR_NOTES.md](./REFACTOR_NOTES.md)
+> for architecture, migration status, and conventions.
+
 ## 📋 Table of Contents
 
 - [Overview](#overview)
@@ -33,7 +37,8 @@ AI Fitness Coach is a production-ready, serverless fitness tracking application 
 - **Storage**: Cloudflare R2
 - **AI**: Cloudflare Workers AI (Llama 3)
 - **Authentication**: Cloudflare Access (JWT)
-- **Frontend**: Vanilla JavaScript + Modern CSS
+- **Frontend**: Vanilla JS + custom Component class (no runtime deps) — bundled by Vite
+- **Testing**: Vitest (unit) + Playwright (E2E)
 
 ### Equipment Supported
 
