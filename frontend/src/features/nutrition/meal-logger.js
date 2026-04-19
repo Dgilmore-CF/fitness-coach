@@ -157,6 +157,9 @@ async function searchFoods(query) {
 
   try {
     const data = await api.get(`/nutrition/foods/search?q=${encodeURIComponent(query)}`);
+    if (data.error) {
+      console.warn('Local food search returned error:', data.error);
+    }
     renderResults(data.foods || [], 'local');
   } catch (err) {
     console.warn('Food search failed:', err);
@@ -165,20 +168,52 @@ async function searchFoods(query) {
 
 async function searchFoodsUSDA() {
   const input = document.getElementById('meal-food-search');
-  const query = input?.value;
-  if (!query) {
-    toast.warning('Enter a search term first');
+  const query = input?.value?.trim();
+  if (!query || query.length < 2) {
+    toast.warning('Enter at least 2 characters to search USDA');
     return;
   }
 
   const resultsEl = document.getElementById('meal-search-results');
-  if (resultsEl) resultsEl.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Searching USDA…</div>';
+  if (resultsEl) {
+    resultsEl.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Searching USDA…</div>';
+  }
 
   try {
     const data = await api.get(`/nutrition/foods/search/usda?q=${encodeURIComponent(query)}`);
-    renderResults(data.foods || [], 'USDA');
+
+    // Backend returns 200 with `{ foods: [], error, source }` for recoverable
+    // failures (rate limits, network blips, etc.). Surface that to the user.
+    if (data.error) {
+      toast.error(data.error);
+    }
+
+    if (!data.foods || data.foods.length === 0) {
+      if (resultsEl) {
+        const msg = data.error || `No USDA results found for "${query}".`;
+        resultsEl.innerHTML = String(html`
+          <div class="empty-state">
+            <div class="empty-state-icon">🔍</div>
+            <div class="empty-state-description">${msg}</div>
+          </div>
+        `);
+      }
+      return;
+    }
+
+    renderResults(data.foods, 'USDA');
   } catch (err) {
+    // Uncaught failures (network, auth, unexpected 500) bubble here
+    console.error('USDA search failed:', err);
     toast.error(`USDA search failed: ${err.message}`);
+    if (resultsEl) {
+      resultsEl.innerHTML = String(html`
+        <div class="empty-state">
+          <div class="empty-state-icon">⚠️</div>
+          <div class="empty-state-description">${err.message}</div>
+        </div>
+      `);
+    }
   }
 }
 
@@ -309,11 +344,21 @@ async function saveMeal() {
     await api.post('/nutrition/meals', {
       date: new Date().toISOString().split('T')[0],
       meal_type: state.mealType,
-      foods: state.selectedFoods.map((item) => ({
-        food_id: item.food_id,
-        quantity: item.quantity,
-        unit: item.unit
-      }))
+      foods: state.selectedFoods.map((item) => {
+        const payload = {
+          quantity: item.quantity,
+          unit: item.unit
+        };
+        // For local-DB foods (already saved), send the id.
+        // For USDA / Open Food Facts results (id: null), send the full food
+        // object so the backend can persist it before linking to the meal.
+        if (item.food_id) {
+          payload.food_id = item.food_id;
+        } else if (item.food) {
+          payload.food = item.food;
+        }
+        return payload;
+      })
     });
     toast.success('Meal logged!');
   } catch (err) {
