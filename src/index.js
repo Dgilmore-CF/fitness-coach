@@ -38,9 +38,24 @@ app.route('/api/ai', aiRoutes);
 app.route('/api/reports', reportsRoutes);
 app.route('/api/exports', exportsRoutes);
 
-// Non-API requests fall through to Cloudflare Static Assets (configured in
-// wrangler.toml via the [assets] binding).
-// When running under `wrangler dev`, the platform automatically forwards
-// non-matching requests to the assets directory.
+// Non-API requests fall through to Cloudflare Static Assets. With the
+// [assets] binding configured in wrangler.toml, Cloudflare serves assets
+// first and only calls the Worker for API paths. This explicit fallback
+// guarantees correct behavior if the platform ever delivers a non-API
+// request to the Worker (e.g. during `wrangler dev` or if routing
+// settings change).
+app.all('*', async (c) => {
+  // Block /api/* from falling through — unmatched API routes should 404.
+  const url = new URL(c.req.url);
+  if (url.pathname.startsWith('/api/')) {
+    return c.json({ error: 'Not found' }, 404);
+  }
+  // Let Static Assets serve the request (SPA fallback is handled by the
+  // `not_found_handling = "single-page-application"` setting).
+  if (c.env?.ASSETS && typeof c.env.ASSETS.fetch === 'function') {
+    return c.env.ASSETS.fetch(c.req.raw);
+  }
+  return c.text('Not found', 404);
+});
 
 export default app;
