@@ -262,5 +262,28 @@ export async function loadWorkoutCalendar(hostEl) {
   }
 }
 
-// Legacy compat: function originally named loadWorkoutHistory(container)
-export const loadWorkoutHistory = loadWorkoutCalendar;
+/**
+ * Legacy compat: function originally named loadWorkoutHistory(container).
+ *
+ * The legacy callers pass the *Analytics tab* as the container, expecting
+ * this function to find the `#workoutCalendarContainer` placeholder INSIDE
+ * it and render there. If we naively treated the passed element as the
+ * render host we would wipe the entire Analytics screen — which is exactly
+ * what was happening in production (all sections disappeared except the
+ * calendar). Resolve the actual target before rendering.
+ *
+ * @param {HTMLElement} container - usually the Analytics tab div
+ */
+export async function loadWorkoutHistory(container) {
+  if (!container) return;
+
+  // Prefer an explicit placeholder inside the container; fall back to
+  // searching the entire document; only use the container itself if neither
+  // is found (fully legacy fallback).
+  const placeholder =
+    container.querySelector?.('#workoutCalendarContainer') ||
+    document.getElementById('workoutCalendarContainer') ||
+    container;
+
+  return loadWorkoutCalendar(placeholder);
+}
