@@ -12,6 +12,12 @@
  *      without breaking the others.
  */
 
+import '../css/design-system.css';
+import '../css/layouts.css';
+import '../css/components.css';
+import '../css/animations.css';
+import '../css/active-workout.css';
+
 import { html } from '@core/html';
 import { store } from '@core/state';
 import { api } from '@core/api';
@@ -38,6 +44,7 @@ import { loadNutrition } from './screens/nutrition.js';
 import { loadInsights } from './screens/insights.js';
 import { showWorkoutPreview } from './features/ai-coach/WorkoutPreview.js';
 import { liveCoach } from './features/ai-coach/LiveCoachOverlay.js';
+import activeWorkout from './features/active-workout/controller.js';
 
 // Expose for debugging and for legacy-code bridging
 window.__fitnessApp = {
@@ -62,6 +69,12 @@ window.aiCoach = {
   destroyLive: liveCoach.destroy,
   analyzeSet: liveCoach.analyzeSet
 };
+
+// Active workout modal — replaces legacy show/resume/start functions
+window.activeWorkout = activeWorkout;
+window.showWorkoutWarmupScreen = activeWorkout.showWarmup;
+window.resumeWorkoutModal = activeWorkout.resume;
+window.startWorkoutExercises = activeWorkout.startExercises;
 
 // -----------------------------------------------------------------------------
 // Register modular screens that replace legacy `load*` functions.
