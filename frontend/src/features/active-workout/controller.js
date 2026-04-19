@@ -72,6 +72,9 @@ let minimizedState = null;
 
 function lockBodyScroll() {
   document.body.dataset.scrollY = String(window.scrollY);
+  // Signal to Modal.js that body scroll is externally managed — nested
+  // confirm dialogs (e.g. when ending the workout) won't unlock on close.
+  document.body.dataset.externalScrollLock = 'active-workout';
   document.body.style.overflow = 'hidden';
   document.body.style.position = 'fixed';
   document.body.style.width = '100%';
@@ -85,6 +88,7 @@ function unlockBodyScroll() {
   document.body.style.width = '';
   document.body.style.top = '';
   delete document.body.dataset.scrollY;
+  delete document.body.dataset.externalScrollLock;
   if (scrollY) window.scrollTo(0, parseInt(scrollY, 10));
 }
 
