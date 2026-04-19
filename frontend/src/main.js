@@ -56,6 +56,22 @@ import {
   startWorkoutDay
 } from './features/start-workout.js';
 import { openUnifiedExporter } from './features/analytics/export-center.js';
+import {
+  loadAdvancedAnalytics,
+  generateRecommendations,
+  applyRecommendation,
+  dismissRecommendation,
+  viewRecommendationDetails,
+  toggleAutoApply,
+  toggleWeeklyAnalysis,
+  toggleRealtimeSuggestions
+} from './features/analytics/advanced-analytics.js';
+import {
+  generateAICoaching,
+  getExerciseCoaching,
+  sendAIChat,
+  askQuickQuestion
+} from './features/ai-coach/coaching-modals.js';
 
 // Expose for debugging and for legacy-code bridging
 window.__fitnessApp = {
@@ -143,6 +159,22 @@ registerScreen('start-workout-day', 'startWorkoutDay', startWorkoutDay);
 // Export Center (called from Analytics screen)
 registerScreen('export-center', 'openUnifiedExporter', openUnifiedExporter);
 registerScreen('export-center-alias', 'openReportBuilder', openUnifiedExporter);
+
+// Advanced Analytics (rendered into #advancedAnalyticsSection by Insights)
+registerScreen('advanced-analytics', 'loadAdvancedAnalytics', loadAdvancedAnalytics);
+registerScreen('ai-recs-generate', 'generateRecommendations', generateRecommendations);
+registerScreen('ai-recs-apply', 'applyRecommendation', applyRecommendation);
+registerScreen('ai-recs-dismiss', 'dismissRecommendation', dismissRecommendation);
+registerScreen('ai-recs-details', 'viewRecommendationDetails', viewRecommendationDetails);
+registerScreen('ai-toggle-auto', 'toggleAutoApply', toggleAutoApply);
+registerScreen('ai-toggle-weekly', 'toggleWeeklyAnalysis', toggleWeeklyAnalysis);
+registerScreen('ai-toggle-realtime', 'toggleRealtimeSuggestions', toggleRealtimeSuggestions);
+
+// AI coaching modals and chat
+registerScreen('ai-coaching', 'generateAICoaching', generateAICoaching);
+registerScreen('ai-exercise-coaching', 'getExerciseCoaching', getExerciseCoaching);
+registerScreen('ai-send-chat', 'sendAIChat', sendAIChat);
+registerScreen('ai-quick-q', 'askQuickQuestion', askQuickQuestion);
 
 // Install overrides once legacy globals are defined.
 // (In Vite dev mode there are no legacy globals, so this is a no-op.)
