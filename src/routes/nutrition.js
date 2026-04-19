@@ -745,104 +745,171 @@ function calculateMacros(food, quantity, unit) {
 
 // Search foods in local database
 nutrition.get('/foods/search', async (c) => {
-  const user = requireAuth(c);
-  const db = c.env.DB;
-  const query = c.req.query('q') || '';
-  const limit = Math.min(parseInt(c.req.query('limit') || '20'), 50);
-  
-  if (query.length < 2) {
-    return c.json({ foods: [], message: 'Query too short' });
+  try {
+    const user = requireAuth(c);
+    const db = c.env.DB;
+    const query = c.req.query('q') || '';
+    const limit = Math.min(parseInt(c.req.query('limit') || '20'), 50);
+
+    if (query.length < 2) {
+      return c.json({ foods: [], message: 'Query too short' });
+    }
+
+    // Check cache first (best-effort — never fail the request on cache issues)
+    try {
+      const cached = await db.prepare(
+        `SELECT results_json FROM food_search_cache 
+         WHERE query = ? AND source = 'local' AND expires_at > datetime('now')
+         LIMIT 1`
+      ).bind(query.toLowerCase()).first();
+
+      if (cached?.results_json) {
+        try {
+          const parsed = JSON.parse(cached.results_json);
+          return c.json({ foods: parsed, source: 'cache' });
+        } catch {
+          // Corrupt cache row — ignore and fall through to fresh search
+        }
+      }
+    } catch (cacheErr) {
+      console.warn('Food search cache read failed:', cacheErr.message);
+    }
+
+    // Search local database - prioritize user favorites and verified foods
+    const foods = await db.prepare(
+      `SELECT f.*, 
+              COALESCE(uf.use_count, 0) as user_use_count,
+              COALESCE(uf.is_favorite, 0) as is_user_favorite
+       FROM foods f
+       LEFT JOIN user_favorite_foods uf ON f.id = uf.food_id AND uf.user_id = ?
+       WHERE f.name LIKE ? OR f.brand LIKE ?
+       ORDER BY 
+         is_user_favorite DESC,
+         user_use_count DESC,
+         f.verified DESC,
+         f.popularity_score DESC,
+         f.name ASC
+       LIMIT ?`
+    ).bind(user.id, `%${query}%`, `%${query}%`, limit).all();
+
+    // Cache results for 1 hour (best-effort)
+    try {
+      await db.prepare(
+        `INSERT OR REPLACE INTO food_search_cache (query, results_json, source, expires_at)
+         VALUES (?, ?, 'local', datetime('now', '+1 hour'))`
+      ).bind(query.toLowerCase(), JSON.stringify(foods.results || [])).run();
+    } catch (cacheErr) {
+      console.warn('Food search cache write failed:', cacheErr.message);
+    }
+
+    return c.json({ foods: foods.results || [], source: 'local' });
+  } catch (error) {
+    console.error('Local food search error:', error);
+    return c.json({ foods: [], error: error.message, source: 'local_error' });
   }
-  
-  // Check cache first
-  const cached = await db.prepare(
-    `SELECT results_json FROM food_search_cache 
-     WHERE query = ? AND source = 'local' AND expires_at > datetime('now')
-     LIMIT 1`
-  ).bind(query.toLowerCase()).first();
-  
-  if (cached) {
-    return c.json({ foods: JSON.parse(cached.results_json), source: 'cache' });
-  }
-  
-  // Search local database - prioritize user favorites and verified foods
-  const foods = await db.prepare(
-    `SELECT f.*, 
-            COALESCE(uf.use_count, 0) as user_use_count,
-            COALESCE(uf.is_favorite, 0) as is_user_favorite
-     FROM foods f
-     LEFT JOIN user_favorite_foods uf ON f.id = uf.food_id AND uf.user_id = ?
-     WHERE f.name LIKE ? OR f.brand LIKE ?
-     ORDER BY 
-       is_user_favorite DESC,
-       user_use_count DESC,
-       f.verified DESC,
-       f.popularity_score DESC,
-       f.name ASC
-     LIMIT ?`
-  ).bind(user.id, `%${query}%`, `%${query}%`, limit).all();
-  
-  // Cache results for 1 hour
-  await db.prepare(
-    `INSERT OR REPLACE INTO food_search_cache (query, results_json, source, expires_at)
-     VALUES (?, ?, 'local', datetime('now', '+1 hour'))`
-  ).bind(query.toLowerCase(), JSON.stringify(foods.results || [])).run();
-  
-  return c.json({ foods: foods.results || [], source: 'local' });
 });
 
 // Search USDA FoodData Central API
 nutrition.get('/foods/search/usda', async (c) => {
-  const user = requireAuth(c);
-  const db = c.env.DB;
-  const query = c.req.query('q') || '';
-  const pageSize = Math.min(parseInt(c.req.query('limit') || '25'), 50);
-  
-  if (query.length < 2) {
-    return c.json({ foods: [], message: 'Query too short' });
-  }
-  
-  // Check cache first (24 hour expiry for external APIs)
-  const cached = await db.prepare(
-    `SELECT results_json FROM food_search_cache 
-     WHERE query = ? AND source = 'usda' AND expires_at > datetime('now')
-     LIMIT 1`
-  ).bind(query.toLowerCase()).first();
-  
-  if (cached) {
-    return c.json({ foods: JSON.parse(cached.results_json), source: 'usda_cache' });
-  }
-  
+  // Wrap the entire handler so NO error path returns 500 — the frontend
+  // relies on getting a structured { foods, error?, source } response to
+  // show a useful message to the user.
   try {
-    // USDA FoodData Central API requires an API key
-    const apiKey = c.env.USDA_API_KEY || 'DEMO_KEY';
-    const response = await fetch(
-      `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${apiKey}&query=${encodeURIComponent(query)}&pageSize=${pageSize}&dataType=Foundation,SR%20Legacy,Survey%20(FNDDS)`,
-      {
-        headers: {
-          'Content-Type': 'application/json'
+    const user = requireAuth(c);
+    const db = c.env.DB;
+    const query = c.req.query('q') || '';
+    const pageSize = Math.min(parseInt(c.req.query('limit') || '25'), 50);
+
+    if (query.length < 2) {
+      return c.json({ foods: [], message: 'Query too short' });
+    }
+
+    // Check cache first (24 hour expiry for external APIs). Best-effort —
+    // never fail the request on cache issues.
+    try {
+      const cached = await db.prepare(
+        `SELECT results_json FROM food_search_cache 
+         WHERE query = ? AND source = 'usda' AND expires_at > datetime('now')
+         LIMIT 1`
+      ).bind(query.toLowerCase()).first();
+
+      if (cached?.results_json) {
+        try {
+          const parsed = JSON.parse(cached.results_json);
+          return c.json({ foods: parsed, source: 'usda_cache' });
+        } catch {
+          // Corrupt cache row — ignore and hit the API fresh
         }
       }
-    );
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('USDA API response:', response.status, errorText);
-      throw new Error(`USDA API error: ${response.status}`);
+    } catch (cacheErr) {
+      console.warn('USDA cache read failed:', cacheErr.message);
     }
-    
-    const data = await response.json();
-    
+
+    // USDA FoodData Central API requires an API key. Without USDA_API_KEY
+    // set we fall back to DEMO_KEY, which has strict rate limits.
+    const apiKey = c.env.USDA_API_KEY || 'DEMO_KEY';
+    const usingDemoKey = !c.env.USDA_API_KEY;
+
+    let response;
+    try {
+      response = await fetch(
+        `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${apiKey}&query=${encodeURIComponent(query)}&pageSize=${pageSize}&dataType=Foundation,SR%20Legacy,Survey%20(FNDDS)`,
+        {
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+    } catch (fetchErr) {
+      console.error('USDA fetch failed:', fetchErr);
+      return c.json({
+        foods: [],
+        error: 'Could not reach USDA (network error).',
+        source: 'usda_error'
+      });
+    }
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => '');
+      console.error('USDA API returned', response.status, errorText.slice(0, 500));
+
+      let friendlyMessage;
+      if (response.status === 403 || response.status === 401) {
+        friendlyMessage = usingDemoKey
+          ? 'USDA demo key rejected (daily quota may be exhausted). Ask the admin to set USDA_API_KEY.'
+          : 'USDA API key rejected. Ask the admin to verify USDA_API_KEY.';
+      } else if (response.status === 429) {
+        friendlyMessage = usingDemoKey
+          ? 'USDA rate limit reached with the demo key. Ask the admin to set USDA_API_KEY for higher limits.'
+          : 'USDA rate limit reached — try again in a few minutes.';
+      } else if (response.status >= 500) {
+        friendlyMessage = 'USDA service is currently unavailable. Try again shortly.';
+      } else {
+        friendlyMessage = `USDA search failed (${response.status}).`;
+      }
+
+      return c.json({ foods: [], error: friendlyMessage, source: 'usda_error' });
+    }
+
+    let data;
+    try {
+      data = await response.json();
+    } catch (parseErr) {
+      console.error('USDA JSON parse failed:', parseErr);
+      return c.json({
+        foods: [],
+        error: 'USDA returned an unexpected response format.',
+        source: 'usda_error'
+      });
+    }
+
     // Transform USDA response to our format
-    const foods = (data.foods || []).map(item => {
-      // Extract nutrients
+    const foods = (data.foods || []).map((item) => {
       const getNutrient = (id) => {
-        const nutrient = item.foodNutrients?.find(n => n.nutrientId === id);
+        const nutrient = item.foodNutrients?.find((n) => n.nutrientId === id);
         return nutrient?.value || 0;
       };
-      
+
       return {
-        id: null, // Not in our DB yet
+        id: null,
         name: item.description,
         brand: item.brandOwner || null,
         source: 'usda',
@@ -850,61 +917,83 @@ nutrition.get('/foods/search/usda', async (c) => {
         serving_size: 100,
         serving_unit: 'g',
         serving_description: '100g',
-        calories: getNutrient(1008), // Energy (kcal)
-        protein_g: getNutrient(1003), // Protein
-        carbs_g: getNutrient(1005), // Carbohydrates
-        fat_g: getNutrient(1004), // Total fat
-        fiber_g: getNutrient(1079), // Fiber
-        sugar_g: getNutrient(2000), // Sugars
-        sodium_mg: getNutrient(1093), // Sodium
+        calories: getNutrient(1008),
+        protein_g: getNutrient(1003),
+        carbs_g: getNutrient(1005),
+        fat_g: getNutrient(1004),
+        fiber_g: getNutrient(1079),
+        sugar_g: getNutrient(2000),
+        sodium_mg: getNutrient(1093),
         verified: 1
       };
     });
-    
-    // Cache results for 24 hours
-    await db.prepare(
-      `INSERT OR REPLACE INTO food_search_cache (query, results_json, source, expires_at)
-       VALUES (?, ?, 'usda', datetime('now', '+24 hours'))`
-    ).bind(query.toLowerCase(), JSON.stringify(foods)).run();
-    
+
+    // Cache results for 24 hours (best-effort)
+    try {
+      await db.prepare(
+        `INSERT OR REPLACE INTO food_search_cache (query, results_json, source, expires_at)
+         VALUES (?, ?, 'usda', datetime('now', '+24 hours'))`
+      ).bind(query.toLowerCase(), JSON.stringify(foods)).run();
+    } catch (cacheErr) {
+      console.warn('USDA cache write failed:', cacheErr.message);
+    }
+
     return c.json({ foods, source: 'usda' });
   } catch (error) {
-    console.error('USDA API error:', error);
-    return c.json({ foods: [], error: error.message, source: 'usda_error' });
+    console.error('USDA search handler crashed:', error);
+    return c.json({
+      foods: [],
+      error: `Unexpected error: ${error.message}`,
+      source: 'usda_error'
+    });
   }
 });
 
 // Lookup barcode using Open Food Facts API
 nutrition.get('/foods/barcode/:barcode', async (c) => {
-  const user = requireAuth(c);
-  const db = c.env.DB;
-  const barcode = c.req.param('barcode');
-  
-  // Check local cache first
-  const cached = await db.prepare(
-    `SELECT food_json FROM barcode_cache 
-     WHERE barcode = ? AND expires_at > datetime('now')
-     LIMIT 1`
-  ).bind(barcode).first();
-  
-  if (cached) {
-    if (cached.food_json) {
-      return c.json({ food: JSON.parse(cached.food_json), source: 'cache' });
-    } else {
-      return c.json({ food: null, message: 'Product not found (cached)', source: 'cache' });
-    }
-  }
-  
-  // Check if we already have this in our foods table
-  const existingFood = await db.prepare(
-    'SELECT * FROM foods WHERE barcode = ? LIMIT 1'
-  ).bind(barcode).first();
-  
-  if (existingFood) {
-    return c.json({ food: existingFood, source: 'local' });
-  }
-  
   try {
+    const user = requireAuth(c);
+    const db = c.env.DB;
+    const barcode = c.req.param('barcode');
+
+    // Check local cache first (best-effort)
+    try {
+      const cached = await db.prepare(
+        `SELECT food_json FROM barcode_cache 
+         WHERE barcode = ? AND expires_at > datetime('now')
+         LIMIT 1`
+      ).bind(barcode).first();
+
+      if (cached) {
+        if (cached.food_json) {
+          try {
+            return c.json({ food: JSON.parse(cached.food_json), source: 'cache' });
+          } catch {
+            // Corrupt cache — fall through
+          }
+        } else {
+          return c.json({ food: null, message: 'Product not found (cached)', source: 'cache' });
+        }
+      }
+    } catch (cacheErr) {
+      console.warn('Barcode cache read failed:', cacheErr.message);
+    }
+
+    // Check if we already have this in our foods table
+    try {
+      const existingFood = await db.prepare(
+        'SELECT * FROM foods WHERE barcode = ? LIMIT 1'
+      ).bind(barcode).first();
+
+      if (existingFood) {
+        return c.json({ food: existingFood, source: 'local' });
+      }
+    } catch (lookupErr) {
+      console.warn('Existing food lookup failed:', lookupErr.message);
+    }
+
+    // Open-Food-Facts fallback inside an inner try — kept as-is below
+    try {
     // Query Open Food Facts API
     const response = await fetch(
       `https://world.openfoodfacts.org/api/v2/product/${barcode}.json`,
@@ -979,16 +1068,28 @@ nutrition.get('/foods/barcode/:barcode', async (c) => {
       image_url: product.image_url || null
     };
     
-    // Cache result for 30 days
-    await db.prepare(
-      `INSERT OR REPLACE INTO barcode_cache (barcode, food_json, source, expires_at)
-       VALUES (?, ?, 'openfoodfacts', datetime('now', '+30 days'))`
-    ).bind(barcode, JSON.stringify(food)).run();
-    
+    // Cache result for 30 days (best-effort)
+    try {
+      await db.prepare(
+        `INSERT OR REPLACE INTO barcode_cache (barcode, food_json, source, expires_at)
+         VALUES (?, ?, 'openfoodfacts', datetime('now', '+30 days'))`
+      ).bind(barcode, JSON.stringify(food)).run();
+    } catch (cacheErr) {
+      console.warn('Barcode cache write failed:', cacheErr.message);
+    }
+
     return c.json({ food, source: 'openfoodfacts' });
-  } catch (error) {
-    console.error('Open Food Facts API error:', error);
-    return c.json({ food: null, error: error.message, source: 'error' });
+    } catch (error) {
+      console.error('Open Food Facts API error:', error);
+      return c.json({ food: null, error: error.message, source: 'error' });
+    }
+  } catch (outerError) {
+    console.error('Barcode lookup handler crashed:', outerError);
+    return c.json({
+      food: null,
+      error: `Unexpected error: ${outerError.message}`,
+      source: 'error'
+    });
   }
 });
 
@@ -1071,23 +1172,47 @@ nutrition.post('/meals', async (c) => {
       if (item.food_id) {
         food = await db.prepare('SELECT * FROM foods WHERE id = ?').bind(item.food_id).first();
       } else if (item.food) {
-        // Save new food first
+        // Preserve the original source metadata (usda, openfoodfacts, user).
+        // Using INSERT OR on the UNIQUE(source, source_id) constraint so the
+        // same USDA/OFF food gets reused across meals instead of duplicated.
+        const source = item.food.source || 'user';
+        const sourceId = item.food.source_id || `user_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         const savedFood = await db.prepare(
-          `INSERT INTO foods (name, source, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g)
-           VALUES (?, 'user', ?, ?, ?, ?, ?, ?)
+          `INSERT INTO foods (
+             name, brand, source, source_id,
+             serving_size, serving_unit, serving_description,
+             calories, protein_g, carbs_g, fat_g, fiber_g, sugar_g, sodium_mg,
+             verified
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(source, source_id) DO UPDATE SET
+             name = excluded.name,
+             brand = excluded.brand,
+             calories = excluded.calories,
+             protein_g = excluded.protein_g,
+             carbs_g = excluded.carbs_g,
+             fat_g = excluded.fat_g,
+             updated_at = CURRENT_TIMESTAMP
            RETURNING *`
         ).bind(
-          item.food.name, 
+          item.food.name,
+          item.food.brand || null,
+          source,
+          sourceId,
           item.food.serving_size || 100,
           item.food.serving_unit || 'g',
+          item.food.serving_description || null,
           item.food.calories || 0,
           item.food.protein_g || 0,
           item.food.carbs_g || 0,
-          item.food.fat_g || 0
+          item.food.fat_g || 0,
+          item.food.fiber_g || 0,
+          item.food.sugar_g || 0,
+          item.food.sodium_mg || null,
+          item.food.verified ? 1 : 0
         ).first();
         food = savedFood;
       }
-      
+
       if (!food) continue;
       
       const quantity = item.quantity || 1;
