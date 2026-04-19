@@ -1,317 +1,143 @@
 /**
- * AI Fitness Coach - Frontend Application
+ * Legacy compatibility shim (v2 refactor — final).
+ *
+ * This file used to be 12,732 lines. Everything has been migrated to
+ * frontend/src/. What remains is the thin compat layer that:
+ *
+ *   1. Provides globals that the HTML shell in src/middleware/static.js
+ *      references via inline onclick="…" attributes (toggleTheme,
+ *      openMobileMenu, closeMobileMenu, showProfile, switchTab, closeModal).
+ *   2. Bootstraps the page on DOMContentLoaded by calling into the
+ *      modular code.
+ *   3. Provides a couple of tiny legacy-call forwarders that the bridge
+ *      hasn't fully replaced yet.
+ *
+ * In Phase 11 this file is replaced entirely by the Vite entry point
+ * when the HTML shell is migrated to use data-action attributes.
  */
 
-// Global state
-const state = {
-  user: null,
-  currentWorkout: null,
-  currentProgram: null,
-  currentTab: 'dashboard',
-  activeTimer: null,
-  restTimer: null,
-  restTimerInterval: null,
-  restTimeRemaining: 0,
-  workoutTimer: null,
-  workoutNotes: '',
-  audioContext: null,
-  keyboardShortcutsEnabled: false,
-  theme: null
-};
+/* global window, document, localStorage */
 
-// Prevent concurrent set logging
-let isAddingSet = false;
-
-// Theme Management
-function initTheme() {
-  // Check for saved theme preference or default to system preference
-  const savedTheme = localStorage.getItem('theme');
-  const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  
-  if (savedTheme) {
-    state.theme = savedTheme;
-  } else {
-    state.theme = systemPrefersDark ? 'dark' : 'light';
-  }
-  
-  applyTheme(state.theme);
-  
-  // Listen for system theme changes
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-    if (!localStorage.getItem('theme')) {
-      state.theme = e.matches ? 'dark' : 'light';
-      applyTheme(state.theme);
-    }
-  });
-}
-
-function toggleTheme() {
-  state.theme = state.theme === 'light' ? 'dark' : 'light';
-  applyTheme(state.theme);
-  localStorage.setItem('theme', state.theme);
-  
-  // Show notification
-  showNotification(`Switched to ${state.theme} mode`, 'success');
-}
+// -----------------------------------------------------------------------------
+// Theme (shared with modular code via localStorage + data-theme)
+// -----------------------------------------------------------------------------
 
 function applyTheme(theme) {
-  const root = document.documentElement;
+  document.documentElement.setAttribute('data-theme', theme);
   const themeIcon = document.getElementById('themeIcon');
-  
-  if (theme === 'dark') {
-    root.setAttribute('data-theme', 'dark');
-    if (themeIcon) {
-      themeIcon.className = 'fas fa-sun';
-    }
-  } else {
-    root.setAttribute('data-theme', 'light');
-    if (themeIcon) {
-      themeIcon.className = 'fas fa-moon';
-    }
+  if (themeIcon) {
+    themeIcon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+  }
+  const menuThemeIcon = document.getElementById('menuThemeIcon');
+  if (menuThemeIcon) {
+    menuThemeIcon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
   }
 }
 
-// Measurement conversion utilities
-function kgToLbs(kg) {
-  // Round to 1 decimal place for clean display values
-  return Math.round(kg * 2.20462 * 10) / 10;
-}
+function initTheme() {
+  const saved = localStorage.getItem('theme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const theme = saved || (prefersDark ? 'dark' : 'light');
+  applyTheme(theme);
 
-function lbsToKg(lbs) {
-  // Round to 2 decimal places to eliminate floating-point drift
-  // This ensures clean round-trip conversion (lbs -> kg -> lbs)
-  return Math.round((lbs / 2.20462) * 100) / 100;
-}
-
-function cmToInches(cm) {
-  return cm / 2.54;
-}
-
-function inchesToCm(inches) {
-  return inches * 2.54;
-}
-
-function cmToFeetInches(cm) {
-  const totalInches = cmToInches(cm);
-  const feet = Math.floor(totalInches / 12);
-  const inches = Math.round(totalInches % 12);
-  return { feet, inches };
-}
-
-function feetInchesToCm(feet, inches) {
-  return inchesToCm(feet * 12 + inches);
-}
-
-// Measurement system utilities - centralized to avoid duplication
-function getMeasurementSystem() {
-  return (state.user && state.user.measurement_system) || 'metric';
-}
-
-function isImperialSystem() {
-  return getMeasurementSystem() === 'imperial';
-}
-
-function getWeightUnit() {
-  return isImperialSystem() ? 'lbs' : 'kg';
-}
-
-function getWeightStep() {
-  return isImperialSystem() ? '5' : '2.5';
-}
-
-function getDistanceUnit() {
-  return isImperialSystem() ? 'mi' : 'km';
-}
-
-function convertWeightForDisplay(kg) {
-  if (!kg) return '';
-  const value = isImperialSystem() ? kgToLbs(kg) : kg;
-  return value % 1 === 0 ? String(value) : value.toFixed(1);
-}
-
-function convertWeightForStorage(displayWeight) {
-  const weight = parseFloat(displayWeight);
-  if (isNaN(weight)) return null;
-  return isImperialSystem() ? lbsToKg(weight) : weight;
-}
-
-// Smart weight tracking for bodyweight exercises
-// Returns: { showWeight: boolean, useBodyweight: boolean, weightOptional: boolean }
-function getBodyweightExerciseConfig(exerciseName, muscleGroup) {
-  const name = (exerciseName || '').toLowerCase();
-  const group = (muscleGroup || '').toLowerCase();
-  
-  // Core exercises - typically no weight needed (reps only)
-  const noWeightExercises = [
-    'sit-up', 'situp', 'crunch', 'plank', 'dead bug', 'bird dog', 'mountain climber',
-    'leg raise', 'flutter kick', 'bicycle', 'v-up', 'hollow hold', 'superman',
-    'reverse crunch', 'toe touch', 'russian twist', 'side plank', 'windshield wiper',
-    'jumping jack', 'high knee', 'butt kick', 'burpee'
-  ];
-  
-  // Exercises where bodyweight is the primary resistance (optional to track)
-  const bodyweightOptionalExercises = [
-    'push-up', 'push up', 'pushup', 'pull-up', 'pull up', 'pullup', 
-    'chin-up', 'chin up', 'chinup', 'dip', 'inverted row', 'muscle-up',
-    'pistol squat', 'lunge', 'squat', 'glute bridge', 'hip thrust',
-    'nordic curl', 'calf raise', 'step-up', 'step up'
-  ];
-  
-  // Check if weight should be hidden completely
-  for (const pattern of noWeightExercises) {
-    if (name.includes(pattern)) {
-      return { showWeight: false, useBodyweight: false, weightOptional: true };
-    }
-  }
-  
-  // Check if it's a bodyweight exercise where weight is optional
-  for (const pattern of bodyweightOptionalExercises) {
-    if (name.includes(pattern)) {
-      return { showWeight: true, useBodyweight: true, weightOptional: true };
-    }
-  }
-  
-  // Default: show weight input normally
-  return { showWeight: true, useBodyweight: false, weightOptional: false };
-}
-
-function formatWeight(kg, system) {
-  if (!kg) return 'N/A';
-  system = system || (state.user && state.user.measurement_system) || 'metric';
-  if (system === 'imperial') {
-    const lbs = kgToLbs(kg);
-    // For large totals (>1000), round to whole number for cleaner display
-    if (lbs >= 1000) {
-      return `${Math.round(lbs).toLocaleString()} lbs`;
-    }
-    // Show decimal only if it's not a whole number
-    return lbs % 1 === 0 ? `${lbs} lbs` : `${lbs.toFixed(1)} lbs`;
-  }
-  // For large totals (>1000), round to whole number for cleaner display
-  if (kg >= 1000) {
-    return `${Math.round(kg).toLocaleString()} kg`;
-  }
-  // Show decimal only if it's not a whole number
-  return kg % 1 === 0 ? `${kg} kg` : `${parseFloat(kg).toFixed(1)} kg`;
-}
-
-function formatHeight(cm, system) {
-  if (!cm) return 'N/A';
-  system = system || (state.user && state.user.measurement_system) || 'metric';
-  if (system === 'imperial') {
-    const { feet, inches } = cmToFeetInches(cm);
-    return `${feet}'${inches}"`;
-  }
-  return `${Math.round(cm)} cm`;
-}
-
-// Initialize app
-document.addEventListener('DOMContentLoaded', async () => {
-  initTheme();
-  await loadUser();
-  loadDashboard();
-});
-
-// API helper
-async function api(endpoint, options = {}) {
-  const response = await fetch(`/api${endpoint}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+    if (!localStorage.getItem('theme')) {
+      applyTheme(e.matches ? 'dark' : 'light');
     }
   });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'API request failed');
-  }
-
-  return response.json();
 }
 
-// Load user data
-async function loadUser() {
-  try {
-    const data = await api('/auth/user');
-    state.user = data.user;
-    document.getElementById('userName').textContent = state.user.name || state.user.email;
-  } catch (error) {
-    console.error('Failed to load user:', error);
-    document.getElementById('userName').textContent = 'Error';
-    showNotification('Failed to load user. Please refresh the page.', 'error');
-  }
-}
+window.toggleTheme = function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'light';
+  const next = current === 'light' ? 'dark' : 'light';
+  applyTheme(next);
+  localStorage.setItem('theme', next);
+  window.__fitnessApp?.toast?.success(`Switched to ${next} mode`);
+};
 
-// Tab switching
-function switchTab(tabName) {
-  // Track current tab in state
-  state.currentTab = tabName;
-  
+// -----------------------------------------------------------------------------
+// Global notification shim (for any remaining legacy callers)
+// -----------------------------------------------------------------------------
+
+window.showNotification = function showNotification(message, type = 'success') {
+  const toast = window.__fitnessApp?.toast;
+  if (!toast) return;
+  if (typeof toast[type] === 'function') toast[type](message);
+  else toast.show(message, { type });
+};
+
+// -----------------------------------------------------------------------------
+// Modal close (legacy HTML has onclick="closeModal()")
+// -----------------------------------------------------------------------------
+
+window.closeModal = function closeModal() {
+  // New modals auto-close on backdrop click / ESC / close button.
+  // This is for any lingering onclick="closeModal()" callers in legacy HTML.
+  const modal = document.getElementById('modal');
+  if (modal?.classList?.contains('active')) {
+    modal.classList.remove('active');
+    modal.onclick = null;
+  }
+};
+
+// -----------------------------------------------------------------------------
+// Tab routing (driven by the modular bridge, but HTML shell calls switchTab)
+// -----------------------------------------------------------------------------
+
+const TAB_LOADERS = {
+  dashboard: 'loadDashboard',
+  program: 'loadPrograms',
+  workout: 'loadWorkout',
+  analytics: 'loadAnalytics',
+  insights: 'loadInsights',
+  achievements: 'loadAchievements',
+  nutrition: 'loadNutrition',
+  learn: 'loadLearn'
+};
+
+window.switchTab = function switchTab(tabName) {
   // Update desktop tab buttons
-  document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-  
-  // Find and activate the correct tab button by matching onclick attribute
-  const targetTab = Array.from(document.querySelectorAll('.tab')).find(tab => {
-    const onclick = tab.getAttribute('onclick');
-    return onclick && onclick.includes(`'${tabName}'`) || onclick && onclick.includes(`"${tabName}"`);
+  document.querySelectorAll('.tab').forEach((tab) => tab.classList.remove('active'));
+  const target = Array.from(document.querySelectorAll('.tab')).find((tab) => {
+    const onclick = tab.getAttribute('onclick') || '';
+    return onclick.includes(`'${tabName}'`) || onclick.includes(`"${tabName}"`);
   });
-  
-  if (targetTab) {
-    targetTab.classList.add('active');
-  }
-  
-  // Update mobile nav buttons
-  document.querySelectorAll('.mobile-nav-item').forEach(item => item.classList.remove('active'));
-  const mobileNavItem = document.querySelector(`.mobile-nav-item[data-tab="${tabName}"]`);
-  if (mobileNavItem) {
-    mobileNavItem.classList.add('active');
+  target?.classList.add('active');
+
+  // Update mobile nav
+  document.querySelectorAll('.mobile-nav-item').forEach((item) => item.classList.remove('active'));
+  const mobileItem = document.querySelector(`.mobile-nav-item[data-tab="${tabName}"]`);
+  if (mobileItem) {
+    mobileItem.classList.add('active');
   } else {
-    // If tab is not in bottom nav, highlight the Menu button
     const menuBtn = document.querySelector('.mobile-nav-item[data-tab="menu"]');
     if (menuBtn && ['program', 'insights', 'achievements', 'learn'].includes(tabName)) {
       menuBtn.classList.add('active');
     }
   }
 
-  // Update tab content
-  document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-  document.getElementById(tabName).classList.add('active');
+  // Show the correct content panel
+  document.querySelectorAll('.tab-content').forEach((content) => content.classList.remove('active'));
+  document.getElementById(tabName)?.classList.add('active');
 
-  // Load tab content
-  switch (tabName) {
-    case 'dashboard':
-      loadDashboard();
-      break;
-    case 'program':
-      loadPrograms();
-      break;
-    case 'workout':
-      loadWorkout();
-      break;
-    case 'analytics':
-      loadAnalytics();
-      break;
-    case 'insights':
-      loadInsights();
-      break;
-    case 'achievements':
-      loadAchievements();
-      break;
-    case 'nutrition':
-      loadNutrition();
-      break;
-    case 'learn':
-      loadLearn();
-      break;
-    default:
-      loadDashboard();
-      break;
+  // Dispatch to the loader (modular functions overridden by bridge)
+  const loaderName = TAB_LOADERS[tabName] || 'loadDashboard';
+  const loader = window[loaderName];
+  if (typeof loader === 'function') {
+    Promise.resolve().then(() => loader()).catch((err) => {
+      console.error(`Tab loader ${loaderName} failed:`, err);
+    });
   }
-}
 
-// Mobile Menu Configuration
-const mobileMenuItems = [
+  // Update store
+  window.__fitnessApp?.store?.set('currentTab', tabName);
+};
+
+// -----------------------------------------------------------------------------
+// Mobile menu drawer
+// -----------------------------------------------------------------------------
+
+const MOBILE_MENU_ITEMS = [
   { id: 'dashboard', icon: 'fa-home', label: 'Home', color: '#3b82f6' },
   { id: 'workout', icon: 'fa-dumbbell', label: 'Workout', color: '#10b981' },
   { id: 'nutrition', icon: 'fa-apple-alt', label: 'Nutrition', color: '#f59e0b' },
@@ -322,1839 +148,166 @@ const mobileMenuItems = [
   { id: 'learn', icon: 'fa-graduation-cap', label: 'Learn', color: '#14b8a6' }
 ];
 
-// Open mobile menu drawer
-function openMobileMenu() {
+window.openMobileMenu = function openMobileMenu() {
   const overlay = document.getElementById('mobileMenuOverlay');
   const drawer = document.getElementById('mobileMenuDrawer');
   const grid = document.getElementById('mobileMenuGrid');
-  
-  // Get current active tab
-  const activeTab = document.querySelector('.tab.active')?.textContent?.trim()?.toLowerCase() || 'dashboard';
-  
-  // Populate menu grid
-  grid.innerHTML = mobileMenuItems.map(item => `
-    <button class="mobile-menu-item ${state.currentTab === item.id ? 'active' : ''}" 
-            onclick="closeMobileMenu(); switchTab('${item.id}')">
+  if (!overlay || !drawer || !grid) return;
+
+  const currentTab = window.__fitnessApp?.store?.get('currentTab') || 'dashboard';
+
+  grid.innerHTML = MOBILE_MENU_ITEMS.map((item) => `
+    <button class="mobile-menu-item ${currentTab === item.id ? 'active' : ''}" onclick="closeMobileMenu(); switchTab('${item.id}')">
       <div class="mobile-menu-icon" style="color: ${item.color};">
         <i class="fas ${item.icon}"></i>
       </div>
       <span class="mobile-menu-label">${item.label}</span>
     </button>
   `).join('');
-  
-  // Show menu with animation
+
   overlay.classList.add('active');
   setTimeout(() => drawer.classList.add('active'), 10);
-  
-  // Prevent body scroll
   document.body.style.overflow = 'hidden';
-}
+};
 
-// Close mobile menu drawer
-function closeMobileMenu() {
+window.closeMobileMenu = function closeMobileMenu() {
   const overlay = document.getElementById('mobileMenuOverlay');
   const drawer = document.getElementById('mobileMenuDrawer');
-  
+  if (!drawer || !overlay) return;
   drawer.classList.remove('active');
   setTimeout(() => {
     overlay.classList.remove('active');
     document.body.style.overflow = '';
   }, 300);
-}
+};
 
-// Legacy function for backwards compatibility
-function showMobileMoreMenu() {
-  openMobileMenu();
-}
+// Alias for older HTML templates
+window.showMobileMoreMenu = window.openMobileMenu;
 
+// -----------------------------------------------------------------------------
+// Legacy helpers still referenced from a few places
+// -----------------------------------------------------------------------------
 
-
-
-// AI Insights & Recommendations
-
-
-// Load saved meals list for the preview section
-async function loadSavedMealsList() {
-  const container = document.getElementById('saved-meals-list');
-  if (!container) return;
-  
-  try {
-    const data = await api('/nutrition/saved-meals');
-    const meals = data.saved_meals || [];
-    
-    if (meals.length === 0) {
-      container.innerHTML = `
-        <div style="text-align: center; padding: 16px; color: var(--gray);">
-          <i class="fas fa-heart" style="font-size: 24px; margin-bottom: 8px; opacity: 0.5;"></i>
-          <p style="margin: 0;">No saved meals yet</p>
-          <p style="font-size: 12px; margin-top: 4px;">Save your favorite meals for quick logging</p>
-        </div>
-      `;
-      return;
-    }
-    
-    container.innerHTML = meals.slice(0, 5).map(meal => `
-      <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--light); border-radius: 8px;">
-        <div style="flex: 1;">
-          <div style="font-weight: 600; font-size: 14px;">${meal.name}</div>
-          <div style="font-size: 12px; color: var(--gray);">
-            ${Math.round(meal.calories || 0)} cal • ${Math.round(meal.protein_g || 0)}g P • ${Math.round(meal.carbs_g || 0)}g C • ${Math.round(meal.fat_g || 0)}g F
-          </div>
-        </div>
-        <button class="btn btn-primary" onclick="logSavedMeal(${meal.id})" style="padding: 8px 12px; font-size: 12px;">
-          <i class="fas fa-plus"></i>
-        </button>
-      </div>
-    `).join('') + (meals.length > 5 ? `
-      <button class="btn btn-outline" onclick="showSavedMeals()" style="width: 100%; margin-top: 8px;">
-        View All (${meals.length})
-      </button>
-    ` : '');
-  } catch (error) {
-    container.innerHTML = `<div style="color: var(--danger); padding: 12px;">Error loading saved meals</div>`;
-  }
-}
-
-// Quick add protein helper
-function addQuickProtein(amount) {
-  const input = document.getElementById('proteinInput');
-  const current = parseFloat(input.value) || 0;
-  input.value = current + amount;
-}
-
-// Log all quick entries at once
-async function logAllQuick() {
-  const protein = parseFloat(document.getElementById('proteinInput')?.value) || 0;
-  const water = parseFloat(document.getElementById('waterInput')?.value) || 0;
-  const creatine = parseFloat(document.getElementById('creatineInput')?.value) || 0;
-  
-  if (!protein && !water && !creatine) {
-    showNotification('Enter at least one value to log', 'warning');
-    return;
-  }
-  
-  try {
-    const promises = [];
-    if (protein > 0) {
-      promises.push(api('/nutrition/entries', {
-        method: 'POST',
-        body: JSON.stringify({ entry_type: 'protein', amount: protein, unit: 'g' })
-      }));
-    }
-    if (water > 0) {
-      promises.push(api('/nutrition/entries', {
-        method: 'POST',
-        body: JSON.stringify({ entry_type: 'water', amount: water, unit: 'ml' })
-      }));
-    }
-    if (creatine > 0) {
-      promises.push(api('/nutrition/entries', {
-        method: 'POST',
-        body: JSON.stringify({ entry_type: 'creatine', amount: creatine, unit: 'g' })
-      }));
-    }
-    
-    await Promise.all(promises);
-    
-    document.getElementById('proteinInput').value = '';
-    document.getElementById('waterInput').value = '';
-    document.getElementById('creatineInput').value = '';
-    
-    showNotification('Logged successfully!', 'success');
-    loadNutrition();
-  } catch (error) {
-    showNotification('Error logging: ' + error.message, 'error');
-  }
-}
-
-// Show saved meals modal
-async function showSavedMeals() {
-  const modalBody = document.getElementById('modalBody');
-  modalBody.innerHTML = '<div style="text-align: center; padding: 40px;"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
-  openModal('Saved Meals');
-  
-  try {
-    const data = await api('/nutrition/saved-meals');
-    const meals = data.saved_meals || [];
-    
-    modalBody.innerHTML = `
-      <div style="margin-bottom: 16px;">
-        <button class="btn btn-primary" onclick="showCreateSavedMeal()" style="width: 100%;">
-          <i class="fas fa-plus"></i> Create New Saved Meal
-        </button>
-      </div>
-      
-      ${meals.length === 0 ? `
-        <div style="text-align: center; padding: 40px; color: var(--gray);">
-          <i class="fas fa-heart" style="font-size: 48px; margin-bottom: 16px; opacity: 0.5;"></i>
-          <p>No saved meals yet</p>
-          <p style="font-size: 14px;">Create saved meals for quick logging</p>
-        </div>
-      ` : `
-        <div style="display: flex; flex-direction: column; gap: 12px;">
-          ${meals.map(meal => `
-            <div style="display: flex; align-items: center; gap: 12px; padding: 16px; background: var(--light); border-radius: 12px;">
-              <div style="flex: 1;">
-                <div style="font-weight: 600;">${meal.name}</div>
-                <div style="font-size: 13px; color: var(--gray); margin-top: 4px;">
-                  ${Math.round(meal.calories || 0)} cal • ${Math.round(meal.protein_g || 0)}g P • ${Math.round(meal.carbs_g || 0)}g C • ${Math.round(meal.fat_g || 0)}g F
-                </div>
-                ${meal.recipe_url ? `<a href="${meal.recipe_url}" target="_blank" style="font-size: 12px; color: var(--primary);"><i class="fas fa-external-link-alt"></i> Recipe</a>` : ''}
-              </div>
-              <div style="display: flex; gap: 8px;">
-                <button class="btn btn-primary" onclick="logSavedMeal(${meal.id})" style="padding: 10px 16px;">
-                  <i class="fas fa-plus"></i> Log
-                </button>
-                <button class="btn btn-outline" onclick="editSavedMeal(${meal.id})" style="padding: 10px;">
-                  <i class="fas fa-edit"></i>
-                </button>
-                <button class="btn btn-outline" onclick="deleteSavedMeal(${meal.id})" style="padding: 10px; color: var(--danger);">
-                  <i class="fas fa-trash"></i>
-                </button>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-      `}
-    `;
-  } catch (error) {
-    modalBody.innerHTML = `<div style="color: var(--danger); padding: 20px;">Error: ${error.message}</div>`;
-  }
-}
-
-// Create new saved meal modal
-function showCreateSavedMeal() {
-  const modalBody = document.getElementById('modalBody');
-  
-  modalBody.innerHTML = `
-    <div style="display: flex; flex-direction: column; gap: 16px;">
-      <div class="form-group">
-        <label>Meal Name *</label>
-        <input type="text" id="savedMealName" placeholder="e.g., Chicken and Rice" required>
-      </div>
-      
-      <div class="form-group">
-        <label>Meal Type</label>
-        <select id="savedMealType">
-          <option value="any">Any</option>
-          <option value="breakfast">Breakfast</option>
-          <option value="lunch">Lunch</option>
-          <option value="dinner">Dinner</option>
-          <option value="snack">Snack</option>
-        </select>
-      </div>
-      
-      <div class="form-group">
-        <label>Recipe URL (optional)</label>
-        <div style="display: flex; gap: 8px;">
-          <input type="url" id="savedMealRecipeUrl" placeholder="https://..." style="flex: 1;">
-          <button class="btn btn-outline" onclick="parseRecipeUrl()" style="white-space: nowrap;">
-            <i class="fas fa-magic"></i> Parse
-          </button>
-        </div>
-        <div style="font-size: 12px; color: var(--gray); margin-top: 4px;">
-          Enter a recipe URL to auto-fill nutrition info
-        </div>
-      </div>
-      
-      <div id="recipe-parse-result"></div>
-      
-      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
-        <div class="form-group">
-          <label>Calories</label>
-          <input type="number" id="savedMealCalories" placeholder="0" min="0">
-        </div>
-        <div class="form-group">
-          <label>Protein (g)</label>
-          <input type="number" id="savedMealProtein" placeholder="0" min="0" step="0.1">
-        </div>
-        <div class="form-group">
-          <label>Carbs (g)</label>
-          <input type="number" id="savedMealCarbs" placeholder="0" min="0" step="0.1">
-        </div>
-        <div class="form-group">
-          <label>Fat (g)</label>
-          <input type="number" id="savedMealFat" placeholder="0" min="0" step="0.1">
-        </div>
-      </div>
-      
-      <div class="form-group">
-        <label>Description (optional)</label>
-        <textarea id="savedMealDescription" placeholder="Notes about this meal..." rows="2"></textarea>
-      </div>
-      
-      <div style="display: flex; gap: 12px;">
-        <button class="btn btn-outline" onclick="showSavedMeals()" style="flex: 1;">
-          Cancel
-        </button>
-        <button class="btn btn-primary" onclick="createSavedMeal()" style="flex: 1;">
-          <i class="fas fa-save"></i> Save Meal
-        </button>
-      </div>
-    </div>
-  `;
-  
-  openModal('Create Saved Meal');
-}
-
-// Parse recipe URL for nutrition info
-async function parseRecipeUrl() {
-  const url = document.getElementById('savedMealRecipeUrl').value;
-  if (!url) {
-    showNotification('Please enter a recipe URL', 'warning');
-    return;
-  }
-  
-  const resultContainer = document.getElementById('recipe-parse-result');
-  resultContainer.innerHTML = '<div style="padding: 12px; text-align: center;"><i class="fas fa-spinner fa-spin"></i> Parsing recipe...</div>';
-  
-  try {
-    const data = await api('/nutrition/parse-recipe', {
-      method: 'POST',
-      body: JSON.stringify({ url })
-    });
-    
-    if (data.recipe) {
-      const r = data.recipe;
-      
-      // Auto-fill the form
-      if (r.name && !document.getElementById('savedMealName').value) {
-        document.getElementById('savedMealName').value = r.name;
-      }
-      if (r.calories) document.getElementById('savedMealCalories').value = Math.round(r.calories);
-      if (r.protein_g) document.getElementById('savedMealProtein').value = r.protein_g.toFixed(1);
-      if (r.carbs_g) document.getElementById('savedMealCarbs').value = r.carbs_g.toFixed(1);
-      if (r.fat_g) document.getElementById('savedMealFat').value = r.fat_g.toFixed(1);
-      
-      resultContainer.innerHTML = `
-        <div style="padding: 12px; background: var(--success-light, #d4edda); border-radius: 8px; color: var(--success, #155724);">
-          <i class="fas fa-check-circle"></i> ${r.parsed ? 'Recipe parsed successfully!' : 'Could not auto-parse. Please enter nutrition manually.'}
-          ${r.servings ? `<br><small>Servings: ${r.servings}</small>` : ''}
-        </div>
-      `;
-    } else {
-      resultContainer.innerHTML = `
-        <div style="padding: 12px; background: var(--warning-light, #fff3cd); border-radius: 8px; color: var(--warning, #856404);">
-          <i class="fas fa-exclamation-triangle"></i> Could not parse recipe. Please enter nutrition manually.
-        </div>
-      `;
-    }
-  } catch (error) {
-    resultContainer.innerHTML = `
-      <div style="padding: 12px; background: var(--danger-light, #f8d7da); border-radius: 8px; color: var(--danger);">
-        <i class="fas fa-times-circle"></i> Error: ${error.message}
-      </div>
-    `;
-  }
-}
-
-// Create saved meal
-async function createSavedMeal() {
-  const name = document.getElementById('savedMealName').value.trim();
-  if (!name) {
-    showNotification('Please enter a meal name', 'warning');
-    return;
-  }
-  
-  const meal = {
-    name,
-    meal_type: document.getElementById('savedMealType').value,
-    recipe_url: document.getElementById('savedMealRecipeUrl').value || null,
-    calories: parseFloat(document.getElementById('savedMealCalories').value) || 0,
-    protein_g: parseFloat(document.getElementById('savedMealProtein').value) || 0,
-    carbs_g: parseFloat(document.getElementById('savedMealCarbs').value) || 0,
-    fat_g: parseFloat(document.getElementById('savedMealFat').value) || 0,
-    description: document.getElementById('savedMealDescription').value || null
-  };
-  
-  try {
-    await api('/nutrition/saved-meals', {
-      method: 'POST',
-      body: JSON.stringify(meal)
-    });
-    
-    showNotification('Meal saved!', 'success');
-    showSavedMeals();
-    loadSavedMealsList();
-  } catch (error) {
-    showNotification('Error saving meal: ' + error.message, 'error');
-  }
-}
-
-// Log a saved meal
-async function logSavedMeal(mealId) {
-  try {
-    const result = await api(`/nutrition/saved-meals/${mealId}/log`, {
-      method: 'POST',
-      body: JSON.stringify({})
-    });
-    
-    showNotification(`Logged ${result.logged?.meal_name || 'meal'}!`, 'success');
-    closeModal();
-    loadNutrition();
-  } catch (error) {
-    showNotification('Error logging meal: ' + error.message, 'error');
-  }
-}
-
-// Delete saved meal
-async function deleteSavedMeal(mealId) {
-  if (!confirm('Delete this saved meal?')) return;
-  
-  try {
-    await api(`/nutrition/saved-meals/${mealId}`, { method: 'DELETE' });
-    showNotification('Meal deleted', 'success');
-    showSavedMeals();
-    loadSavedMealsList();
-  } catch (error) {
-    showNotification('Error deleting meal: ' + error.message, 'error');
-  }
-}
-
-// Edit saved meal
-async function editSavedMeal(mealId) {
-  try {
-    const data = await api('/nutrition/saved-meals');
-    const meal = (data.saved_meals || []).find(m => m.id === mealId);
-    
-    if (!meal) {
-      showNotification('Meal not found', 'error');
-      return;
-    }
-    
-    showCreateSavedMeal();
-    
-    // Populate form
-    setTimeout(() => {
-      document.getElementById('savedMealName').value = meal.name || '';
-      document.getElementById('savedMealType').value = meal.meal_type || 'any';
-      document.getElementById('savedMealRecipeUrl').value = meal.recipe_url || '';
-      document.getElementById('savedMealCalories').value = meal.calories || '';
-      document.getElementById('savedMealProtein').value = meal.protein_g || '';
-      document.getElementById('savedMealCarbs').value = meal.carbs_g || '';
-      document.getElementById('savedMealFat').value = meal.fat_g || '';
-      document.getElementById('savedMealDescription').value = meal.description || '';
-      
-      // Update modal title and save button
-      document.getElementById('modalTitle').textContent = 'Edit Saved Meal';
-      
-      // Replace save button with update
-      const saveBtn = document.querySelector('#modalBody button.btn-primary');
-      if (saveBtn) {
-        saveBtn.innerHTML = '<i class="fas fa-save"></i> Update Meal';
-        saveBtn.onclick = () => updateSavedMeal(mealId);
-      }
-    }, 50);
-  } catch (error) {
-    showNotification('Error loading meal: ' + error.message, 'error');
-  }
-}
-
-// Update saved meal
-async function updateSavedMeal(mealId) {
-  const meal = {
-    name: document.getElementById('savedMealName').value.trim(),
-    meal_type: document.getElementById('savedMealType').value,
-    recipe_url: document.getElementById('savedMealRecipeUrl').value || null,
-    calories: parseFloat(document.getElementById('savedMealCalories').value) || 0,
-    protein_g: parseFloat(document.getElementById('savedMealProtein').value) || 0,
-    carbs_g: parseFloat(document.getElementById('savedMealCarbs').value) || 0,
-    fat_g: parseFloat(document.getElementById('savedMealFat').value) || 0,
-    description: document.getElementById('savedMealDescription').value || null
-  };
-  
-  try {
-    await api(`/nutrition/saved-meals/${mealId}`, {
-      method: 'PUT',
-      body: JSON.stringify(meal)
-    });
-    
-    showNotification('Meal updated!', 'success');
-    showSavedMeals();
-    loadSavedMealsList();
-  } catch (error) {
-    showNotification('Error updating meal: ' + error.message, 'error');
-  }
-}
-
-// Quick macro entry modal
-function showQuickMacroEntry() {
-  const modalBody = document.getElementById('modalBody');
-  
-  modalBody.innerHTML = `
-    <div style="display: flex; flex-direction: column; gap: 16px;">
-      <p style="color: var(--gray); margin: 0;">Quickly log a meal by entering macros directly</p>
-      
-      <div class="form-group">
-        <label>Meal Name (optional)</label>
-        <input type="text" id="quickMacroName" placeholder="e.g., Lunch">
-      </div>
-      
-      <div class="form-group">
-        <label>Meal Type</label>
-        <select id="quickMacroType">
-          <option value="snack">Snack</option>
-          <option value="breakfast">Breakfast</option>
-          <option value="lunch">Lunch</option>
-          <option value="dinner">Dinner</option>
-        </select>
-      </div>
-      
-      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
-        <div class="form-group">
-          <label>Calories</label>
-          <input type="number" id="quickMacroCalories" placeholder="0" min="0">
-        </div>
-        <div class="form-group">
-          <label>Protein (g)</label>
-          <input type="number" id="quickMacroProtein" placeholder="0" min="0" step="0.1">
-        </div>
-        <div class="form-group">
-          <label>Carbs (g)</label>
-          <input type="number" id="quickMacroCarbs" placeholder="0" min="0" step="0.1">
-        </div>
-        <div class="form-group">
-          <label>Fat (g)</label>
-          <input type="number" id="quickMacroFat" placeholder="0" min="0" step="0.1">
-        </div>
-      </div>
-      
-      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-        <button class="btn btn-outline" onclick="applyMacroPreset(300, 30, 20, 10)" style="flex: 1;">
-          Light<br><small>300cal</small>
-        </button>
-        <button class="btn btn-outline" onclick="applyMacroPreset(500, 40, 40, 20)" style="flex: 1;">
-          Medium<br><small>500cal</small>
-        </button>
-        <button class="btn btn-outline" onclick="applyMacroPreset(800, 50, 70, 30)" style="flex: 1;">
-          Large<br><small>800cal</small>
-        </button>
-      </div>
-      
-      <div style="display: flex; gap: 12px; margin-top: 8px;">
-        <button class="btn btn-outline" onclick="closeModal()" style="flex: 1;">Cancel</button>
-        <button class="btn btn-primary" onclick="logQuickMacros()" style="flex: 1;">
-          <i class="fas fa-plus"></i> Log Meal
-        </button>
-      </div>
-      
-      <div style="border-top: 1px solid var(--border); padding-top: 16px; margin-top: 8px;">
-        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-          <input type="checkbox" id="quickMacroSave">
-          <span>Save as favorite meal for quick access</span>
-        </label>
-      </div>
-    </div>
-  `;
-  
-  openModal('Quick Macro Entry');
-}
-
-// Apply macro preset
-function applyMacroPreset(calories, protein, carbs, fat) {
-  document.getElementById('quickMacroCalories').value = calories;
-  document.getElementById('quickMacroProtein').value = protein;
-  document.getElementById('quickMacroCarbs').value = carbs;
-  document.getElementById('quickMacroFat').value = fat;
-}
-
-// Log quick macros
-async function logQuickMacros() {
-  const protein = parseFloat(document.getElementById('quickMacroProtein').value) || 0;
-  const calories = parseFloat(document.getElementById('quickMacroCalories').value) || 0;
-  const carbs = parseFloat(document.getElementById('quickMacroCarbs').value) || 0;
-  const fat = parseFloat(document.getElementById('quickMacroFat').value) || 0;
-  const mealType = document.getElementById('quickMacroType').value;
-  const mealName = document.getElementById('quickMacroName').value || `${mealType.charAt(0).toUpperCase() + mealType.slice(1)}`;
-  const saveAsFavorite = document.getElementById('quickMacroSave').checked;
-  
-  if (!protein && !calories && !carbs && !fat) {
-    showNotification('Please enter at least one macro', 'warning');
-    return;
-  }
-  
-  try {
-    // Log the meal
-    await api('/nutrition/meals', {
-      method: 'POST',
-      body: JSON.stringify({
-        meal_type: mealType,
-        name: mealName,
-        foods: [{
-          custom_name: mealName,
-          calories,
-          protein_g: protein,
-          carbs_g: carbs,
-          fat_g: fat
-        }]
-      })
-    });
-    
-    // Optionally save as favorite
-    if (saveAsFavorite && mealName) {
-      await api('/nutrition/saved-meals', {
-        method: 'POST',
-        body: JSON.stringify({
-          name: mealName,
-          meal_type: mealType,
-          calories,
-          protein_g: protein,
-          carbs_g: carbs,
-          fat_g: fat
-        })
-      });
-    }
-    
-    showNotification('Meal logged!', 'success');
-    closeModal();
-    loadNutrition();
-  } catch (error) {
-    showNotification('Error logging meal: ' + error.message, 'error');
-  }
-}
-
-async function logProtein(amount) {
-  const grams = amount || parseFloat(document.getElementById('proteinInput').value);
-  
-  if (!grams) {
-    showNotification('Please enter protein amount', 'warning');
-    return;
-  }
-
-  try {
-    await api('/nutrition/entries', {
-      method: 'POST',
-      body: JSON.stringify({ 
-        entry_type: 'protein', 
-        amount: grams, 
-        unit: 'g'
-      })
-    });
-
-    showNotification('Protein logged!', 'success');
-    document.getElementById('proteinInput').value = '';
-    loadNutrition();
-  } catch (error) {
-    showNotification('Error logging protein: ' + error.message, 'error');
-  }
-}
-
-async function logWater(amount) {
-  const ml = amount || parseFloat(document.getElementById('waterInput').value);
-  
-  if (!ml) {
-    showNotification('Please enter water amount', 'warning');
-    return;
-  }
-
-  try {
-    await api('/nutrition/entries', {
-      method: 'POST',
-      body: JSON.stringify({ 
-        entry_type: 'water', 
-        amount: ml, 
-        unit: 'ml'
-      })
-    });
-
-    showNotification('Water logged!', 'success');
-    if (!amount) document.getElementById('waterInput').value = '';
-    loadNutrition();
-  } catch (error) {
-    showNotification('Error logging water: ' + error.message, 'error');
-  }
-}
-
-async function logCreatine(amount) {
-  const grams = amount || parseFloat(document.getElementById('creatineInput').value);
-  
-  if (!grams) {
-    showNotification('Please enter creatine amount', 'warning');
-    return;
-  }
-
-  try {
-    await api('/nutrition/entries', {
-      method: 'POST',
-      body: JSON.stringify({ 
-        entry_type: 'creatine', 
-        amount: grams, 
-        unit: 'g'
-      })
-    });
-
-    showNotification('Creatine logged!', 'success');
-    if (!amount) document.getElementById('creatineInput').value = '';
-    loadNutrition();
-  } catch (error) {
-    showNotification('Error logging creatine: ' + error.message, 'error');
-  }
-}
-
-// Load nutrition entries for today
-async function loadNutritionEntries() {
-  const today = new Date().toISOString().split('T')[0];
-  const container = document.getElementById('nutrition-entries-table');
-  
-  try {
-    const data = await api(`/nutrition/entries?start_date=${today}&end_date=${today}`);
-    const entries = data.entries || [];
-    
-    if (entries.length === 0) {
-      container.innerHTML = `
-        <div style="text-align: center; padding: 20px; color: var(--gray);">
-          <i class="fas fa-inbox"></i>
-          <p style="margin-top: 8px;">No entries logged today. Start tracking above!</p>
-        </div>
-      `;
-      return;
-    }
-    
-    // Group entries by type
-    const grouped = {
-      protein: entries.filter(e => e.entry_type === 'protein'),
-      water: entries.filter(e => e.entry_type === 'water'),
-      creatine: entries.filter(e => e.entry_type === 'creatine')
-    };
-    
-    const formatTime = (timestamp) => {
-      const date = new Date(timestamp);
-      return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    };
-    
-    const renderEntries = (entries, icon, color) => {
-      if (entries.length === 0) return '';
-      
-      return `
-        <div style="margin-bottom: 20px;">
-          <h4 style="color: ${color}; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-            <i class="${icon}"></i> ${entries[0].entry_type.charAt(0).toUpperCase() + entries[0].entry_type.slice(1)} 
-            <span style="font-size: 14px; font-weight: normal; color: var(--gray);">(${entries.length} ${entries.length === 1 ? 'entry' : 'entries'})</span>
-          </h4>
-          <div style="overflow-x: auto;">
-            <table class="data-table" style="font-size: 14px;">
-              <thead>
-                <tr>
-                  <th>Time</th>
-                  <th>Amount</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${entries.map(entry => `
-                  <tr>
-                    <td>${formatTime(entry.logged_at)}</td>
-                    <td><strong>${entry.amount}${entry.unit}</strong></td>
-                    <td>
-                      <button class="btn btn-outline" onclick="editNutritionEntry(${entry.id}, '${entry.entry_type}', ${entry.amount})" 
-                              style="padding: 4px 8px; font-size: 12px; margin-right: 4px;">
-                        <i class="fas fa-edit"></i>
-                      </button>
-                      <button class="btn btn-outline" onclick="deleteNutritionEntry(${entry.id})" 
-                              style="padding: 4px 8px; font-size: 12px; color: var(--danger);">
-                        <i class="fas fa-trash"></i>
-                      </button>
-                    </td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      `;
-    };
-    
-    container.innerHTML = `
-      ${renderEntries(grouped.protein, 'fas fa-drumstick-bite', 'var(--secondary)')}
-      ${renderEntries(grouped.water, 'fas fa-tint', 'var(--primary)')}
-      ${renderEntries(grouped.creatine, 'fas fa-flask', '#8b5cf6')}
-    `;
-    
-  } catch (error) {
-    container.innerHTML = `
-      <div style="text-align: center; padding: 20px; color: var(--danger);">
-        <i class="fas fa-exclamation-triangle"></i>
-        <p style="margin-top: 8px;">Error loading entries: ${error.message}</p>
-      </div>
-    `;
-  }
-}
-
-// Edit nutrition entry
-function editNutritionEntry(id, type, currentAmount) {
-  const modalBody = document.getElementById('modalBody');
-  
-  modalBody.innerHTML = `
-    <div class="form-group">
-      <label>Type:</label>
-      <input type="text" value="${type.charAt(0).toUpperCase() + type.slice(1)}" disabled style="background: var(--light);">
-    </div>
-    <div class="form-group">
-      <label>Amount:</label>
-      <input type="number" id="editEntryAmount" value="${currentAmount}" step="0.5" min="0.1">
-    </div>
-    <button class="btn btn-primary" onclick="saveNutritionEntryEdit(${id})">
-      <i class="fas fa-save"></i> Save Changes
-    </button>
-  `;
-  
-  openModal('Edit Entry');
-}
-
-// Save nutrition entry edit
-async function saveNutritionEntryEdit(id) {
-  const amount = parseFloat(document.getElementById('editEntryAmount').value);
-  
-  if (!amount || amount <= 0) {
-    showNotification('Please enter a valid amount', 'warning');
-    return;
-  }
-  
-  try {
-    await api(`/nutrition/entries/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify({ amount })
-    });
-    
-    showNotification('Entry updated!', 'success');
-    closeModal();
-    loadNutritionEntries();
-    loadNutrition();
-  } catch (error) {
-    showNotification('Error updating entry: ' + error.message, 'error');
-  }
-}
-
-// Delete nutrition entry
-async function deleteNutritionEntry(id) {
-  if (!confirm('Delete this entry?')) return;
-  
-  try {
-    await api(`/nutrition/entries/${id}`, {
-      method: 'DELETE'
-    });
-    
-    showNotification('Entry deleted!', 'success');
-    loadNutritionEntries();
-    loadNutrition();
-  } catch (error) {
-    showNotification('Error deleting entry: ' + error.message, 'error');
-  }
-}
-
-// ========== MEAL TRACKING & FOOD DATABASE ==========
-
-// State for meal tracking - only initialize if not already set
-if (!state.mealTracking) {
-  state.mealTracking = {
-    searchResults: [],
-    selectedFoods: [],
-    currentMealType: 'snack',
-    scannerActive: false,
-    tempFood: null,
-    scannedFood: null,
-    scannerStream: null
-  };
-}
-
-// Show meal logging modal
-function showLogMealModal(mealType = 'snack', preserveFoods = false) {
-  state.mealTracking.currentMealType = mealType;
-  if (!preserveFoods) {
-    state.mealTracking.selectedFoods = [];
-  }
-  
-  const modalBody = document.getElementById('modalBody');
-  modalBody.innerHTML = `
-    <div style="margin-bottom: 16px;">
-      <label style="font-weight: 600; margin-bottom: 8px; display: block;">Meal Type:</label>
-      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-        ${['breakfast', 'lunch', 'dinner', 'snack'].map(type => `
-          <button class="btn ${type === mealType ? 'btn-primary' : 'btn-outline'}" 
-                  onclick="selectMealType('${type}')" id="meal-type-${type}">
-            ${type.charAt(0).toUpperCase() + type.slice(1)}
-          </button>
-        `).join('')}
-      </div>
-    </div>
-    
-    <div style="margin-bottom: 16px;">
-      <label style="font-weight: 600; margin-bottom: 8px; display: block;">Search Foods:</label>
-      <div style="display: flex; gap: 8px;">
-        <input type="text" id="foodSearchInput" placeholder="Search foods..." 
-               style="flex: 1;" oninput="debounceSearchFoods(this.value)">
-        <button class="btn btn-secondary" onclick="showBarcodeScanner()" title="Scan Barcode">
-          <i class="fas fa-barcode"></i>
-        </button>
-      </div>
-      <div style="display: flex; gap: 8px; margin-top: 8px;">
-        <button class="btn btn-outline" onclick="searchFoodsUSDA()" style="font-size: 12px;">
-          <i class="fas fa-database"></i> Search USDA
-        </button>
-        <button class="btn btn-outline" onclick="loadFavoriteFoods()" style="font-size: 12px;">
-          <i class="fas fa-star"></i> Favorites
-        </button>
-      </div>
-    </div>
-    
-    <div id="foodSearchResults" style="max-height: 200px; overflow-y: auto; margin-bottom: 16px; display: none;">
-    </div>
-    
-    <div id="selectedFoodsList" style="margin-bottom: 16px;">
-      <label style="font-weight: 600; margin-bottom: 8px; display: block;">Selected Foods:</label>
-      <div id="selectedFoodsContainer" style="color: var(--gray); font-style: italic;">
-        No foods selected yet
-      </div>
-    </div>
-    
-    <div id="mealTotals" style="background: var(--light); padding: 12px; border-radius: 8px; margin-bottom: 16px; display: none;">
-      <div style="font-weight: 600; margin-bottom: 8px;">Meal Totals:</div>
-      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; text-align: center;">
-        <div><div style="font-size: 18px; font-weight: bold;" id="totalCalories">0</div><div style="font-size: 11px; color: var(--gray);">Calories</div></div>
-        <div><div style="font-size: 18px; font-weight: bold; color: var(--secondary);" id="totalProtein">0g</div><div style="font-size: 11px; color: var(--gray);">Protein</div></div>
-        <div><div style="font-size: 18px; font-weight: bold; color: var(--primary);" id="totalCarbs">0g</div><div style="font-size: 11px; color: var(--gray);">Carbs</div></div>
-        <div><div style="font-size: 18px; font-weight: bold; color: #f59e0b;" id="totalFat">0g</div><div style="font-size: 11px; color: var(--gray);">Fat</div></div>
-      </div>
-    </div>
-    
-    <button class="btn btn-primary" onclick="saveMeal()" style="width: 100%;" id="saveMealBtn" disabled>
-      <i class="fas fa-check"></i> Log Meal
-    </button>
-  `;
-  
-  openModal('Log Meal');
-}
-
-function selectMealType(type) {
-  state.mealTracking.currentMealType = type;
-  ['breakfast', 'lunch', 'dinner', 'snack'].forEach(t => {
-    const btn = document.getElementById(`meal-type-${t}`);
-    if (btn) {
-      btn.className = t === type ? 'btn btn-primary' : 'btn btn-outline';
-    }
-  });
-}
-
-// Debounced food search
-let foodSearchTimeout;
-function debounceSearchFoods(query) {
-  clearTimeout(foodSearchTimeout);
-  if (query.length < 2) {
-    document.getElementById('foodSearchResults').style.display = 'none';
-    return;
-  }
-  foodSearchTimeout = setTimeout(() => searchFoods(query), 300);
-}
-
-// Search foods in local database
-async function searchFoods(query) {
-  const container = document.getElementById('foodSearchResults');
-  container.style.display = 'block';
-  container.innerHTML = '<div style="text-align: center; padding: 12px;"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
-  
-  try {
-    const data = await api(`/nutrition/foods/search?q=${encodeURIComponent(query)}`);
-    renderFoodSearchResults(data.foods || [], 'local');
-  } catch (error) {
-    container.innerHTML = `<div style="color: var(--danger); padding: 12px;">Error: ${error.message}</div>`;
-  }
-}
-
-// Search USDA database
-async function searchFoodsUSDA() {
-  const query = document.getElementById('foodSearchInput')?.value;
-  if (!query || query.length < 2) {
-    showNotification('Enter at least 2 characters to search', 'warning');
-    return;
-  }
-  
-  const container = document.getElementById('foodSearchResults');
-  container.style.display = 'block';
-  container.innerHTML = '<div style="text-align: center; padding: 12px;"><i class="fas fa-spinner fa-spin"></i> Searching USDA database...</div>';
-  
-  try {
-    const data = await api(`/nutrition/foods/search/usda?q=${encodeURIComponent(query)}`);
-    renderFoodSearchResults(data.foods || [], 'usda');
-  } catch (error) {
-    container.innerHTML = `<div style="color: var(--danger); padding: 12px;">Error: ${error.message}</div>`;
-  }
-}
-
-// Load favorite foods
-async function loadFavoriteFoods() {
-  const container = document.getElementById('foodSearchResults');
-  container.style.display = 'block';
-  container.innerHTML = '<div style="text-align: center; padding: 12px;"><i class="fas fa-spinner fa-spin"></i> Loading favorites...</div>';
-  
-  try {
-    const data = await api('/nutrition/foods/favorites');
-    if (data.foods.length === 0) {
-      container.innerHTML = '<div style="padding: 12px; color: var(--gray); text-align: center;">No favorites yet. Add foods to build your favorites!</div>';
-    } else {
-      renderFoodSearchResults(data.foods, 'favorites');
-    }
-  } catch (error) {
-    container.innerHTML = `<div style="color: var(--danger); padding: 12px;">Error: ${error.message}</div>`;
-  }
-}
-
-// Render food search results
-function renderFoodSearchResults(foods, source) {
-  const container = document.getElementById('foodSearchResults');
-  
-  if (foods.length === 0) {
-    container.innerHTML = `
-      <div style="padding: 12px; text-align: center; color: var(--gray);">
-        No foods found. ${source === 'local' ? '<button class="btn btn-outline" onclick="searchFoodsUSDA()" style="margin-top: 8px;">Try USDA Database</button>' : ''}
-      </div>
-    `;
-    return;
-  }
-  
-  container.innerHTML = foods.map(food => `
-    <div style="padding: 12px; border-bottom: 1px solid var(--light); cursor: pointer; display: flex; justify-content: space-between; align-items: center;"
-         onclick="selectFood(${JSON.stringify(food).replace(/"/g, '&quot;')})">
-      <div style="flex: 1;">
-        <div style="font-weight: 600;">${food.name}</div>
-        <div style="font-size: 12px; color: var(--gray);">
-          ${food.brand ? food.brand + ' • ' : ''}${food.serving_description || food.serving_size + food.serving_unit}
-        </div>
-        <div style="font-size: 12px; margin-top: 4px;">
-          <span style="color: var(--primary);">${Math.round(food.calories)} cal</span> • 
-          <span style="color: var(--secondary);">${food.protein_g?.toFixed(1) || 0}g P</span> • 
-          <span>${food.carbs_g?.toFixed(1) || 0}g C</span> • 
-          <span style="color: #f59e0b;">${food.fat_g?.toFixed(1) || 0}g F</span>
-        </div>
-      </div>
-      <i class="fas fa-plus-circle" style="color: var(--primary); font-size: 20px;"></i>
-    </div>
-  `).join('');
-}
-
-// Select a food to add to meal (from search results)
-async function selectFood(food) {
-  // If food doesn't have an ID (from external API), save it first
-  if (!food.id && food.source && food.source_id) {
-    try {
-      const result = await api('/nutrition/foods', {
-        method: 'POST',
-        body: JSON.stringify(food)
-      });
-      food = result.food;
-    } catch (error) {
-      showNotification('Error saving food: ' + error.message, 'error');
-      return;
-    }
-  }
-  
-  // Store the food in state FIRST before rendering
-  state.mealTracking.tempFood = food;
-  
-  // Show quantity selector
-  const modalBody = document.getElementById('modalBody');
-  
-  modalBody.innerHTML = `
-    <div style="margin-bottom: 16px;">
-      <button class="btn btn-outline" onclick="showBarcodeScanner()" style="margin-bottom: 16px;">
-        <i class="fas fa-arrow-left"></i> Back
-      </button>
-      
-      <h3 style="margin-bottom: 8px;">${food.name}</h3>
-      <p style="color: var(--gray); font-size: 14px; margin-bottom: 16px;">
-        ${food.brand ? food.brand + ' • ' : ''}${food.serving_description || food.serving_size + food.serving_unit}
-      </p>
-      
-      <div style="background: var(--light); padding: 12px; border-radius: 8px; margin-bottom: 16px;">
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; text-align: center;">
-          <div><div style="font-weight: bold;">${Math.round(food.calories)}</div><div style="font-size: 11px; color: var(--gray);">Calories</div></div>
-          <div><div style="font-weight: bold; color: var(--secondary);">${food.protein_g?.toFixed(1) || 0}g</div><div style="font-size: 11px; color: var(--gray);">Protein</div></div>
-          <div><div style="font-weight: bold; color: var(--primary);">${food.carbs_g?.toFixed(1) || 0}g</div><div style="font-size: 11px; color: var(--gray);">Carbs</div></div>
-          <div><div style="font-weight: bold; color: #f59e0b;">${food.fat_g?.toFixed(1) || 0}g</div><div style="font-size: 11px; color: var(--gray);">Fat</div></div>
-        </div>
-        <div style="font-size: 11px; color: var(--gray); text-align: center; margin-top: 8px;">Per serving</div>
-      </div>
-      
-      <div class="form-group">
-        <label>Quantity:</label>
-        <div style="display: flex; gap: 8px; align-items: center;">
-          <button class="btn btn-outline" onclick="adjustFoodQty(-0.5)">-</button>
-          <input type="number" id="foodQuantity" value="1" min="0.25" step="0.25" style="width: 80px; text-align: center;">
-          <button class="btn btn-outline" onclick="adjustFoodQty(0.5)">+</button>
-          <select id="foodUnit" style="flex: 1;">
-            <option value="serving">serving(s)</option>
-            <option value="g">grams</option>
-            <option value="oz">ounces</option>
-            <option value="cup">cup(s)</option>
-          </select>
-        </div>
-      </div>
-      
-      <button class="btn btn-primary" onclick="addFoodToMeal()" style="width: 100%;">
-        <i class="fas fa-plus"></i> Add to Meal
-      </button>
-    </div>
-  `;
-  
-  openModal('Add Food');
-}
-
-function adjustFoodQty(delta) {
-  const input = document.getElementById('foodQuantity');
-  const newVal = Math.max(0.25, parseFloat(input.value) + delta);
-  input.value = newVal;
-}
-
-// Add food to current meal
-function addFoodToMeal() {
-  console.log('=== addFoodToMeal START ===');
-  console.log('state.mealTracking:', JSON.stringify(state.mealTracking, null, 2));
-  
-  const quantity = parseFloat(document.getElementById('foodQuantity')?.value) || 1;
-  const unit = document.getElementById('foodUnit')?.value || 'serving';
-  const food = state.mealTracking.tempFood;
-  
-  console.log('quantity:', quantity, 'unit:', unit, 'food:', food);
-  
-  if (!food) {
-    console.error('ERROR: tempFood is null/undefined');
-    showNotification('Error: Food not found', 'error');
-    return;
-  }
-  
-  const foodEntry = {
-    food_id: food.id,
-    food: food,
-    quantity: quantity,
-    unit: unit
-  };
-  console.log('Adding food entry:', foodEntry);
-  
-  state.mealTracking.selectedFoods.push(foodEntry);
-  console.log('selectedFoods after push:', state.mealTracking.selectedFoods.length, 'items');
-  
-  showNotification(`Added ${food.name}`, 'success');
-  
-  // Clear temp food
-  state.mealTracking.tempFood = null;
-  
-  const mealType = state.mealTracking.currentMealType;
-  console.log('Calling showLogMealModal with mealType:', mealType, 'preserveFoods: true');
-  
-  // Go back to meal modal and update display (preserve existing foods)
-  showLogMealModal(mealType, true);
-  
-  console.log('After showLogMealModal, selectedFoods:', state.mealTracking.selectedFoods.length, 'items');
-  
-  updateSelectedFoodsDisplay();
-  console.log('=== addFoodToMeal END ===');
-}
-
-// Update the selected foods display
-function updateSelectedFoodsDisplay() {
-  const container = document.getElementById('selectedFoodsContainer');
-  const totalsContainer = document.getElementById('mealTotals');
-  const saveBtn = document.getElementById('saveMealBtn');
-  
-  if (state.mealTracking.selectedFoods.length === 0) {
-    container.innerHTML = '<div style="color: var(--gray); font-style: italic;">No foods selected yet</div>';
-    totalsContainer.style.display = 'none';
-    saveBtn.disabled = true;
-    return;
-  }
-  
-  let totals = { calories: 0, protein: 0, carbs: 0, fat: 0 };
-  
-  container.innerHTML = state.mealTracking.selectedFoods.map((item, idx) => {
-    const multiplier = item.unit === 'serving' ? item.quantity : (item.quantity / item.food.serving_size);
-    const cals = (item.food.calories || 0) * multiplier;
-    const protein = (item.food.protein_g || 0) * multiplier;
-    const carbs = (item.food.carbs_g || 0) * multiplier;
-    const fat = (item.food.fat_g || 0) * multiplier;
-    
-    totals.calories += cals;
-    totals.protein += protein;
-    totals.carbs += carbs;
-    totals.fat += fat;
-    
-    return `
-      <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: var(--light); border-radius: 8px; margin-bottom: 8px;">
-        <div>
-          <div style="font-weight: 600;">${item.food.name}</div>
-          <div style="font-size: 12px; color: var(--gray);">${item.quantity} ${item.unit} • ${Math.round(cals)} cal</div>
-        </div>
-        <button class="btn btn-outline" onclick="removeFoodFromMeal(${idx})" style="padding: 4px 8px; color: var(--danger);">
-          <i class="fas fa-times"></i>
-        </button>
-      </div>
-    `;
-  }).join('');
-  
-  // Update totals
-  document.getElementById('totalCalories').textContent = Math.round(totals.calories);
-  document.getElementById('totalProtein').textContent = totals.protein.toFixed(1) + 'g';
-  document.getElementById('totalCarbs').textContent = totals.carbs.toFixed(1) + 'g';
-  document.getElementById('totalFat').textContent = totals.fat.toFixed(1) + 'g';
-  
-  totalsContainer.style.display = 'block';
-  saveBtn.disabled = false;
-}
-
-// Remove food from meal
-function removeFoodFromMeal(index) {
-  state.mealTracking.selectedFoods.splice(index, 1);
-  updateSelectedFoodsDisplay();
-}
-
-// Save the meal
-async function saveMeal() {
-  if (state.mealTracking.selectedFoods.length === 0) {
-    showNotification('Please add at least one food', 'warning');
-    return;
-  }
-  
-  try {
-    const mealData = {
-      date: new Date().toISOString().split('T')[0],
-      meal_type: state.mealTracking.currentMealType,
-      foods: state.mealTracking.selectedFoods.map(item => ({
-        food_id: item.food_id,
-        quantity: item.quantity,
-        unit: item.unit
-      }))
-    };
-    
-    await api('/nutrition/meals', {
-      method: 'POST',
-      body: JSON.stringify(mealData)
-    });
-    
-    showNotification('Meal logged successfully!', 'success');
-    closeModal();
-    loadNutrition();
-  } catch (error) {
-    showNotification('Error logging meal: ' + error.message, 'error');
-  }
-}
-
-// ========== BARCODE SCANNER ==========
-
-function showBarcodeScanner() {
-  const modalBody = document.getElementById('modalBody');
-  
-  modalBody.innerHTML = `
-    <div style="text-align: center;">
-      <div id="scanner-container" style="position: relative; width: 100%; max-width: 400px; margin: 0 auto;">
-        <video id="scanner-video" style="width: 100%; border-radius: 12px; background: #000;"></video>
-        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-                    width: 200px; height: 100px; border: 3px solid var(--primary); border-radius: 8px;
-                    pointer-events: none;"></div>
-      </div>
-      
-      <p style="margin: 16px 0; color: var(--gray);">Position barcode within the frame</p>
-      
-      <div style="margin-bottom: 16px;">
-        <label style="font-weight: 600;">Or enter barcode manually:</label>
-        <div style="display: flex; gap: 8px; margin-top: 8px;">
-          <input type="text" id="manualBarcode" placeholder="Enter UPC/EAN code" style="flex: 1;">
-          <button class="btn btn-primary" onclick="lookupBarcode()">
-            <i class="fas fa-search"></i> Lookup
-          </button>
-        </div>
-      </div>
-      
-      <div id="barcode-result" style="display: none; margin-top: 16px;"></div>
-      
-      <button class="btn btn-outline" onclick="stopBarcodeScanner(); showLogMealModal('${state.mealTracking.currentMealType}', true);" style="margin-top: 16px;">
-        <i class="fas fa-arrow-left"></i> Back to Meal
-      </button>
-    </div>
-  `;
-  
-  openModal('Scan Barcode');
-  startBarcodeScanner();
-}
-
-async function startBarcodeScanner() {
-  const video = document.getElementById('scanner-video');
-  if (!video) return;
-  
-  try {
-    // Check for camera support
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      document.getElementById('scanner-container').innerHTML = `
-        <div style="padding: 40px; background: var(--light); border-radius: 12px;">
-          <i class="fas fa-camera-slash" style="font-size: 48px; color: var(--gray); margin-bottom: 16px;"></i>
-          <p>Camera not supported on this device.</p>
-          <p style="font-size: 14px; color: var(--gray);">Use manual barcode entry below.</p>
-        </div>
-      `;
-      return;
-    }
-    
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment' }
-    });
-    
-    video.srcObject = stream;
-    video.play();
-    state.mealTracking.scannerStream = stream;
-    state.mealTracking.scannerActive = true;
-    
-    // Start barcode detection
-    if ('BarcodeDetector' in window) {
-      const detector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'] });
-      detectBarcode(video, detector);
-    } else {
-      console.log('BarcodeDetector not supported, using manual entry only');
-    }
-    
-  } catch (error) {
-    console.error('Camera error:', error);
-    // Stop scanner on camera error
-    state.mealTracking.scannerActive = false;
-    const container = document.getElementById('scanner-container');
-    if (container) {
-      container.innerHTML = `
-        <div style="padding: 40px; background: var(--light); border-radius: 12px; text-align: center;">
-          <i class="fas fa-exclamation-triangle" style="font-size: 48px; color: var(--warning); margin-bottom: 16px;"></i>
-          <p>Camera access denied or unavailable.</p>
-          <p style="font-size: 14px; color: var(--gray);">Use manual barcode entry below.</p>
-        </div>
-      `;
-    }
-  }
-}
-
-async function detectBarcode(video, detector) {
-  // Check if scanner is still active and video element exists
-  if (!state.mealTracking?.scannerActive || !video || !video.srcObject) {
-    return;
-  }
-  
-  // Verify video element is still in DOM and valid
-  if (!document.body.contains(video)) {
-    state.mealTracking.scannerActive = false;
-    return;
-  }
-  
-  // Only detect when video is ready and has valid dimensions
-  if (video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) {
-    if (state.mealTracking.scannerActive) {
-      setTimeout(() => detectBarcode(video, detector), 100);
-    }
-    return;
-  }
-  
-  try {
-    const barcodes = await detector.detect(video);
-    if (barcodes.length > 0) {
-      const barcode = barcodes[0].rawValue;
-      stopBarcodeScanner();
-      const input = document.getElementById('manualBarcode');
-      if (input) input.value = barcode;
-      await lookupBarcode(barcode);
-      return;
-    }
-  } catch (error) {
-    // Stop scanning on any detection error - video likely invalid
-    state.mealTracking.scannerActive = false;
-    stopBarcodeScanner();
-    return;
-  }
-  
-  // Continue scanning only if still active and video is valid
-  if (state.mealTracking.scannerActive && video.srcObject && document.body.contains(video)) {
-    setTimeout(() => detectBarcode(video, detector), 50);
-  }
-}
-
-function stopBarcodeScanner() {
-  state.mealTracking.scannerActive = false;
-  if (state.mealTracking.scannerStream) {
-    state.mealTracking.scannerStream.getTracks().forEach(track => track.stop());
-    state.mealTracking.scannerStream = null;
-  }
-}
-
-// Add scanned food directly to meal (simplified flow - no quantity selector)
-async function addScannedFood() {
-  // Ensure state exists
-  if (!state.mealTracking) {
-    state.mealTracking = {
-      searchResults: [],
-      selectedFoods: [],
-      currentMealType: 'snack',
-      scannerActive: false,
-      tempFood: null,
-      scannedFood: null,
-      scannerStream: null
-    };
-  }
-  
-  let food = state.mealTracking.scannedFood;
-  if (!food) {
-    showNotification('Error: No food scanned', 'error');
-    return;
-  }
-  
-  // If food doesn't have an ID, save it first
-  if (!food.id && food.source && food.source_id) {
-    try {
-      const result = await api('/nutrition/foods', {
-        method: 'POST',
-        body: JSON.stringify(food)
-      });
-      food = result.food;
-    } catch (error) {
-      showNotification('Error saving food: ' + error.message, 'error');
-      return;
-    }
-  }
-  
-  // Add directly to selectedFoods with default quantity (1 serving)
-  state.mealTracking.selectedFoods.push({
-    food_id: food.id,
-    food: food,
-    quantity: 1,
-    unit: 'serving'
-  });
-  
-  // Clear scanned food and stop scanner
-  state.mealTracking.scannedFood = null;
-  stopBarcodeScanner();
-  
-  showNotification(`Added ${food.name}`, 'success');
-  
-  // Go back to meal modal with foods preserved
-  showLogMealModal(state.mealTracking.currentMealType, true);
-  updateSelectedFoodsDisplay();
-}
-
-async function lookupBarcode(barcode) {
-  barcode = barcode || document.getElementById('manualBarcode')?.value;
-  if (!barcode) {
-    showNotification('Please enter a barcode', 'warning');
-    return;
-  }
-  
-  const resultContainer = document.getElementById('barcode-result');
-  resultContainer.style.display = 'block';
-  resultContainer.innerHTML = '<div style="padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Looking up barcode...</div>';
-  
-  try {
-    const data = await api(`/nutrition/foods/barcode/${encodeURIComponent(barcode)}`);
-    
-    if (!data.food) {
-      resultContainer.innerHTML = `
-        <div style="padding: 20px; background: var(--light); border-radius: 8px;">
-          <i class="fas fa-question-circle" style="font-size: 32px; color: var(--gray); margin-bottom: 12px;"></i>
-          <p>Product not found for barcode: ${barcode}</p>
-          <p style="font-size: 14px; color: var(--gray);">Try searching by name instead.</p>
-        </div>
-      `;
-      return;
-    }
-    
-    const food = data.food;
-    
-    // Store the scanned food in state immediately
-    state.mealTracking.scannedFood = food;
-    
-    resultContainer.innerHTML = `
-      <div style="padding: 16px; background: var(--light); border-radius: 8px; text-align: left;">
-        <h3 style="margin-bottom: 8px;">${food.name}</h3>
-        <p style="color: var(--gray); font-size: 14px; margin-bottom: 12px;">
-          ${food.brand ? food.brand + ' • ' : ''}${food.serving_description || food.serving_size + food.serving_unit}
-        </p>
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; text-align: center; margin-bottom: 12px;">
-          <div><div style="font-weight: bold;">${Math.round(food.calories)}</div><div style="font-size: 11px; color: var(--gray);">Cal</div></div>
-          <div><div style="font-weight: bold; color: var(--secondary);">${food.protein_g?.toFixed(1) || 0}g</div><div style="font-size: 11px; color: var(--gray);">P</div></div>
-          <div><div style="font-weight: bold; color: var(--primary);">${food.carbs_g?.toFixed(1) || 0}g</div><div style="font-size: 11px; color: var(--gray);">C</div></div>
-          <div><div style="font-weight: bold; color: #f59e0b;">${food.fat_g?.toFixed(1) || 0}g</div><div style="font-size: 11px; color: var(--gray);">F</div></div>
-        </div>
-        <button class="btn btn-primary" onclick="addScannedFood()" style="width: 100%;">
-          <i class="fas fa-plus"></i> Add to Meal
-        </button>
-      </div>
-    `;
-    
-  } catch (error) {
-    resultContainer.innerHTML = `
-      <div style="padding: 20px; background: var(--light); border-radius: 8px; color: var(--danger);">
-        Error: ${error.message}
-      </div>
-    `;
-  }
-}
-
-// Quick add to today's meal from favorites
-async function quickAddFood(foodId, mealType = 'snack') {
-  try {
-    await api('/nutrition/quick-add', {
-      method: 'POST',
-      body: JSON.stringify({
-        food_id: foodId,
-        quantity: 1,
-        unit: 'serving',
-        meal_type: mealType
-      })
-    });
-    
-    showNotification('Food added!', 'success');
-    loadNutrition();
-  } catch (error) {
-    showNotification('Error adding food: ' + error.message, 'error');
-  }
-}
-
-
-// Utility functions
-function formatDuration(seconds) {
-  if (!seconds || seconds < 0) return '00:00';
-  
-  seconds = Math.abs(Math.floor(seconds));
-  
-  const hrs = Math.floor(seconds / 3600);
-  const mins = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
-  
-  if (hrs > 0) {
-    return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-  }
-  
-  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-}
-
-function formatDateOnly(dateStr) {
-  // Parse date without timezone conversion
-  const [year, month, day] = dateStr.split('-').map(Number);
-  const date = new Date(year, month - 1, day);
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-
-function openModal(wide = false) {
-  const modal = document.getElementById('modal');
-  const modalContent = document.querySelector('.modal-content');
-  
-  // Add or remove wide class
-  if (wide) {
-    modalContent.classList.add('wide');
-  } else {
-    modalContent.classList.remove('wide');
-  }
-  
-  modal.classList.add('active');
-  
-  // Click outside to close
-  setTimeout(() => {
-    modal.onclick = function(e) {
-      if (e.target === modal) {
-        closeModal();
-      }
-    };
-  }, 100);
-}
-
-function closeModal() {
-  const modal = document.getElementById('modal');
-  modal.classList.remove('active');
-  modal.onclick = null;
-}
-
-
-function showNotification(message, type = 'success') {
-  const notification = document.getElementById('notification');
-  const text = document.getElementById('notificationText');
-  
-  text.textContent = message;
-  notification.classList.add('active');
-  
-  setTimeout(() => {
-    notification.classList.remove('active');
-  }, 3000);
-}
-
-// Save workout notes (works with both old interface and Phase 4 modal)
-async function saveWorkoutNotes() {
-  // Try Phase 4 modal textarea first
-  const textarea = document.getElementById('workout-notes-input');
-  const notes = textarea ? textarea.value : document.getElementById('workoutNotes')?.value;
-  
-  if (!state.currentWorkout) {
-    showNotification('No active workout', 'error');
-    return;
-  }
-  
-  try {
-    await api(`/workouts/${state.currentWorkout.id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ notes })
-    });
-
-    state.workoutNotes = notes;
-    showNotification('Notes saved!', 'success');
-    
-    // Close modal if it's the Phase 4 version
-    if (textarea) {
-      const modal = textarea.closest('div[style*="fixed"]');
-      if (modal) modal.remove();
-    }
-  } catch (error) {
-    showNotification('Error saving notes: ' + error.message, 'error');
-  }
-}
-
-function exportNutritionCSV(type, days) {
-  window.location.href = `/api/nutrition/export/csv?type=${type}&days=${days}`;
-}
-
-// Export nutrition report
-function exportNutritionReport(days) {
-  window.location.href = `/api/nutrition/export/report?days=${days}`;
-}
-
-// Edit nutrition log
-function editNutritionLog(date, protein, water, creatine) {
-  const modalBody = document.getElementById('modalBody');
-  
-  modalBody.innerHTML = `
-    <div style="display: grid; gap: 16px;">
-      <div class="form-group">
-        <label>Date:</label>
-        <input type="date" id="editNutritionDate" value="${date}" readonly class="form-control" style="background: var(--light);">
-      </div>
-      
-      <div class="form-group">
-        <label>Protein (grams):</label>
-        <input type="number" id="editNutritionProtein" value="${protein}" class="form-control" step="1" min="0">
-      </div>
-      
-      <div class="form-group">
-        <label>Water (ml):</label>
-        <input type="number" id="editNutritionWater" value="${water}" class="form-control" step="100" min="0">
-      </div>
-      
-      <div class="form-group">
-        <label>Creatine (grams):</label>
-        <input type="number" id="editNutritionCreatine" value="${creatine}" class="form-control" step="0.5" min="0">
-      </div>
-      
-      <button class="btn btn-primary" onclick="saveNutritionEdit()">
-        <i class="fas fa-save"></i> Save Changes
-      </button>
-    </div>
-  `;
-  
-  openModal('Edit Nutrition Log');
-}
-
-// Save edited nutrition log
-async function saveNutritionEdit() {
-  const date = document.getElementById('editNutritionDate').value;
-  const protein = parseFloat(document.getElementById('editNutritionProtein').value) || 0;
-  const water = parseFloat(document.getElementById('editNutritionWater').value) || 0;
-  const creatine = parseFloat(document.getElementById('editNutritionCreatine').value) || 0;
-  
-  try {
-    await api('/nutrition/daily', {
-      method: 'PUT',
-      body: JSON.stringify({
-        date,
-        protein_grams: protein,
-        water_ml: water,
-        creatine_grams: creatine
-      })
-    });
-    
-    showNotification('Nutrition log updated!', 'success');
-    closeModal();
-    loadNutrition();
-  } catch (error) {
-    showNotification('Error updating nutrition log: ' + error.message, 'error');
-  }
-}
-
-// Delete nutrition log
-async function deleteNutritionLog(date) {
-  if (!confirm(`Delete nutrition log for ${new Date(date).toLocaleDateString()}?`)) return;
-  
-  try {
-    await api(`/nutrition/daily/${date}`, {
-      method: 'DELETE'
-    });
-    
-    showNotification('Nutrition log deleted!', 'success');
-    loadNutrition();
-  } catch (error) {
-    showNotification('Error deleting nutrition log: ' + error.message, 'error');
-  }
-}
-
-// Filter weekly trends table
-function filterWeeklyTrends() {
-  const filterValue = document.getElementById('weeklyTrendsFilter').value.toLowerCase();
-  const tbody = document.getElementById('weeklyTrendsBody');
-  const rows = tbody.getElementsByTagName('tr');
-  
-  for (let row of rows) {
-    const text = row.textContent.toLowerCase();
-    row.style.display = text.includes(filterValue) ? '' : 'none';
-  }
-}
-
-// Sort weekly trends by dropdown
-function sortWeeklyTrends() {
-  const sortValue = document.getElementById('weeklyTrendsSort').value;
-  const tbody = document.getElementById('weeklyTrendsBody');
-  const rows = Array.from(tbody.getElementsByTagName('tr'));
-  
-  rows.sort((a, b) => {
-    let aVal, bVal;
-    
-    switch(sortValue) {
-      case 'date-desc':
-        aVal = new Date(a.dataset.weekStart);
-        bVal = new Date(b.dataset.weekStart);
-        return bVal - aVal;
-      case 'date-asc':
-        aVal = new Date(a.dataset.weekStart);
-        bVal = new Date(b.dataset.weekStart);
-        return aVal - bVal;
-      case 'protein-desc':
-        return parseFloat(b.dataset.protein) - parseFloat(a.dataset.protein);
-      case 'protein-asc':
-        return parseFloat(a.dataset.protein) - parseFloat(b.dataset.protein);
-      case 'water-desc':
-        return parseFloat(b.dataset.water) - parseFloat(a.dataset.water);
-      case 'water-asc':
-        return parseFloat(a.dataset.water) - parseFloat(b.dataset.water);
-      case 'goals-desc':
-        return parseInt(b.dataset.goals) - parseInt(a.dataset.goals);
-      case 'goals-asc':
-        return parseInt(a.dataset.goals) - parseInt(b.dataset.goals);
-      default:
-        return 0;
-    }
-  });
-  
-  rows.forEach(row => tbody.appendChild(row));
-}
-
-// Sort weekly trends by column click
-function sortWeeklyTrendsByColumn(column) {
-  const select = document.getElementById('weeklyTrendsSort');
-  const currentValue = select.value;
-  
-  // Toggle between asc and desc
-  if (currentValue === `${column}-desc`) {
-    select.value = `${column}-asc`;
-  } else {
-    select.value = `${column}-desc`;
-  }
-  
-  // Map column names to sort values
-  const columnMap = {
-    'week': 'date',
-    'protein': 'protein',
-    'water': 'water',
-    'creatine': 'creatine',
-    'logged': 'logged',
-    'goals': 'goals'
-  };
-  
-  if (columnMap[column]) {
-    select.value = currentValue.includes(columnMap[column]) && currentValue.includes('desc') 
-      ? `${columnMap[column]}-asc` 
-      : `${columnMap[column]}-desc`;
-    sortWeeklyTrends();
-  }
-}
-
-// Edit a set
-function toggleWorkoutDetails(workoutId) {
+window.toggleWorkoutDetails = function toggleWorkoutDetails(workoutId) {
   const details = document.getElementById(`workout-details-${workoutId}`);
   const chevron = document.getElementById(`workout-chevron-${workoutId}`);
-  
-  if (details.style.display === 'none') {
+  if (!details) return;
+  const isHidden = details.hasAttribute('hidden') || details.style.display === 'none';
+  if (isHidden) {
+    details.removeAttribute('hidden');
     details.style.display = 'block';
     if (chevron) chevron.style.transform = 'rotate(180deg)';
   } else {
+    details.setAttribute('hidden', '');
     details.style.display = 'none';
     if (chevron) chevron.style.transform = 'rotate(0deg)';
   }
-}
+};
 
+window.deleteDashboardWorkout = async function deleteDashboardWorkout(workoutId) {
+  const api = window.__fitnessApp?.api;
+  const toast = window.__fitnessApp?.toast;
+  const confirmDialog = window.__fitnessApp?.confirmDialog;
+  if (!api || !confirmDialog) return;
 
-// Delete workout from dashboard
-async function deleteDashboardWorkout(workoutId) {
-  if (!confirm('Are you sure you want to delete this workout? This cannot be undone.')) return;
-  
+  const ok = await confirmDialog('Delete this workout? This cannot be undone.', {
+    title: 'Delete workout?',
+    confirmLabel: 'Delete',
+    confirmVariant: 'btn-danger'
+  });
+  if (!ok) return;
+
   try {
-    await api(`/workouts/${workoutId}`, {
-      method: 'DELETE'
-    });
-    
-    showNotification('Workout deleted successfully', 'success');
-    loadDashboard();
-  } catch (error) {
-    showNotification('Error deleting workout: ' + error.message, 'error');
+    await api.delete(`/workouts/${workoutId}`);
+    toast?.success('Workout deleted');
+    if (typeof window.loadDashboard === 'function') window.loadDashboard();
+  } catch (err) {
+    toast?.error(`Error: ${err.message}`);
   }
-}
+};
 
-// Delete workout from analytics
-async function deleteAnalyticsWorkout(workoutId) {
-  if (!confirm('Are you sure you want to delete this workout? This cannot be undone.')) return;
-  
+window.deleteAnalyticsWorkout = async function deleteAnalyticsWorkout(workoutId) {
+  const api = window.__fitnessApp?.api;
+  const toast = window.__fitnessApp?.toast;
+  const confirmDialog = window.__fitnessApp?.confirmDialog;
+  if (!api || !confirmDialog) return;
+
+  const ok = await confirmDialog('Delete this workout? This cannot be undone.', {
+    title: 'Delete workout?',
+    confirmLabel: 'Delete',
+    confirmVariant: 'btn-danger'
+  });
+  if (!ok) return;
+
   try {
-    await api(`/workouts/${workoutId}`, {
-      method: 'DELETE'
-    });
-    
-    showNotification('Workout deleted successfully', 'success');
-    loadAnalytics();
-  } catch (error) {
-    showNotification('Error deleting workout: ' + error.message, 'error');
+    await api.delete(`/workouts/${workoutId}`);
+    toast?.success('Workout deleted');
+    if (typeof window.loadAnalytics === 'function') window.loadAnalytics();
+  } catch (err) {
+    toast?.error(`Error: ${err.message}`);
   }
-}
+};
 
-// ========== PHASE 3: NEW WORKOUT FLOW ==========
+// -----------------------------------------------------------------------------
+// Loading overlay (legacy API kept simple; modular withLoading is preferred)
+// -----------------------------------------------------------------------------
 
-// Warmup Database (simplified version)
-function showLoadingOverlay(message = 'Loading...') {
+window.showLoadingOverlay = function showLoadingOverlay(message = 'Loading…') {
   let overlay = document.getElementById('loading-overlay');
   if (!overlay) {
     overlay = document.createElement('div');
     overlay.id = 'loading-overlay';
+    overlay.className = 'loading-overlay';
     document.body.appendChild(overlay);
   }
-  
-  overlay.style.cssText = `
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(255,255,255,0.95);
-    z-index: 10004;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    animation: fadeIn 0.2s ease-out;
-  `;
-  
   overlay.innerHTML = `
-    <div style="text-align: center;">
-      <div class="spinner" style="margin: 0 auto 20px;"></div>
-      <div style="font-size: 18px; color: var(--gray);">${message}</div>
-    </div>
+    <div class="spinner" aria-hidden="true"></div>
+    <div class="loading-overlay-message">${String(message).replace(/[<>]/g, '')}</div>
   `;
-}
+};
 
-function hideLoadingOverlay() {
+window.hideLoadingOverlay = function hideLoadingOverlay() {
   const overlay = document.getElementById('loading-overlay');
-  if (overlay) {
-    overlay.style.animation = 'fadeOut 0.2s ease-out';
-    setTimeout(() => overlay.remove(), 200);
+  if (overlay) overlay.remove();
+};
+
+// -----------------------------------------------------------------------------
+// Load user on boot, then render initial tab
+// -----------------------------------------------------------------------------
+
+async function bootstrap() {
+  initTheme();
+
+  // Fetch current user via modular api
+  const api = window.__fitnessApp?.api;
+  const store = window.__fitnessApp?.store;
+
+  if (api && store) {
+    try {
+      const data = await api.get('/auth/user');
+      store.set('user', data.user);
+      const nameEl = document.getElementById('userName');
+      if (nameEl) nameEl.textContent = data.user.name || data.user.email;
+    } catch (err) {
+      console.error('Failed to load user:', err);
+      const nameEl = document.getElementById('userName');
+      if (nameEl) nameEl.textContent = 'Error';
+      window.__fitnessApp?.toast?.error('Failed to load user. Please refresh.');
+    }
+  }
+
+  // Start on the dashboard tab
+  if (typeof window.loadDashboard === 'function') {
+    try {
+      await window.loadDashboard();
+    } catch (err) {
+      console.error('Initial dashboard load failed:', err);
+    }
   }
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Wait a tick so the Vite bundle's DOMContentLoaded listener (which installs
+  // the bridge and sets window.__fitnessApp) fires first.
+  setTimeout(bootstrap, 0);
+});

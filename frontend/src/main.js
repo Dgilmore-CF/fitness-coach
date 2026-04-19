@@ -72,6 +72,42 @@ import {
   sendAIChat,
   askQuickQuestion
 } from './features/ai-coach/coaching-modals.js';
+import {
+  showLogMealModal,
+  showBarcodeScanner,
+  selectMealType,
+  quickAddFood
+} from './features/nutrition/meal-logger.js';
+import {
+  loadSavedMealsList,
+  showSavedMeals,
+  showCreateSavedMeal,
+  editSavedMeal,
+  logSavedMeal,
+  deleteSavedMeal,
+  updateSavedMeal,
+  parseRecipeUrl,
+  createSavedMeal,
+  showQuickMacroEntry,
+  applyMacroPreset,
+  logProtein,
+  logWater,
+  logCreatine,
+  addQuickProtein,
+  logAllQuick,
+  loadNutritionEntries,
+  editNutritionEntry,
+  saveNutritionEntryEdit,
+  deleteNutritionEntry,
+  editNutritionLog,
+  saveNutritionEdit,
+  deleteNutritionLog,
+  exportNutritionCSV,
+  exportNutritionReport,
+  filterWeeklyTrends,
+  sortWeeklyTrends,
+  sortWeeklyTrendsByColumn
+} from './features/nutrition/saved-meals.js';
 
 // Expose for debugging and for legacy-code bridging
 window.__fitnessApp = {
@@ -175,6 +211,42 @@ registerScreen('ai-coaching', 'generateAICoaching', generateAICoaching);
 registerScreen('ai-exercise-coaching', 'getExerciseCoaching', getExerciseCoaching);
 registerScreen('ai-send-chat', 'sendAIChat', sendAIChat);
 registerScreen('ai-quick-q', 'askQuickQuestion', askQuickQuestion);
+
+// Nutrition meal logger + barcode scanner
+registerScreen('meal-logger', 'showLogMealModal', showLogMealModal);
+registerScreen('barcode-scanner', 'showBarcodeScanner', showBarcodeScanner);
+registerScreen('meal-type-select', 'selectMealType', selectMealType);
+registerScreen('quick-add-food', 'quickAddFood', quickAddFood);
+
+// Nutrition: saved meals, quick macros, entries, logs
+registerScreen('saved-meals-list', 'loadSavedMealsList', loadSavedMealsList);
+registerScreen('saved-meals-show', 'showSavedMeals', showSavedMeals);
+registerScreen('saved-meals-create', 'showCreateSavedMeal', showCreateSavedMeal);
+registerScreen('saved-meals-edit', 'editSavedMeal', editSavedMeal);
+registerScreen('saved-meals-log', 'logSavedMeal', logSavedMeal);
+registerScreen('saved-meals-delete', 'deleteSavedMeal', deleteSavedMeal);
+registerScreen('saved-meals-update', 'updateSavedMeal', updateSavedMeal);
+registerScreen('parse-recipe', 'parseRecipeUrl', parseRecipeUrl);
+registerScreen('create-saved-meal', 'createSavedMeal', createSavedMeal);
+registerScreen('quick-macro-entry', 'showQuickMacroEntry', showQuickMacroEntry);
+registerScreen('macro-preset', 'applyMacroPreset', applyMacroPreset);
+registerScreen('log-protein', 'logProtein', logProtein);
+registerScreen('log-water', 'logWater', logWater);
+registerScreen('log-creatine', 'logCreatine', logCreatine);
+registerScreen('add-quick-protein', 'addQuickProtein', addQuickProtein);
+registerScreen('log-all-quick', 'logAllQuick', logAllQuick);
+registerScreen('nutrition-entries', 'loadNutritionEntries', loadNutritionEntries);
+registerScreen('edit-nutrition-entry', 'editNutritionEntry', editNutritionEntry);
+registerScreen('save-nutrition-entry', 'saveNutritionEntryEdit', saveNutritionEntryEdit);
+registerScreen('delete-nutrition-entry', 'deleteNutritionEntry', deleteNutritionEntry);
+registerScreen('edit-nutrition-log', 'editNutritionLog', editNutritionLog);
+registerScreen('save-nutrition-edit', 'saveNutritionEdit', saveNutritionEdit);
+registerScreen('delete-nutrition-log', 'deleteNutritionLog', deleteNutritionLog);
+registerScreen('export-nutrition-csv', 'exportNutritionCSV', exportNutritionCSV);
+registerScreen('export-nutrition-report', 'exportNutritionReport', exportNutritionReport);
+registerScreen('filter-weekly-trends', 'filterWeeklyTrends', filterWeeklyTrends);
+registerScreen('sort-weekly-trends', 'sortWeeklyTrends', sortWeeklyTrends);
+registerScreen('sort-weekly-trends-col', 'sortWeeklyTrendsByColumn', sortWeeklyTrendsByColumn);
 
 // Install overrides once legacy globals are defined.
 // (In Vite dev mode there are no legacy globals, so this is a no-op.)
