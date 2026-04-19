@@ -5,12 +5,10 @@
   "main": "src/index.js",
   "type": "module",
   "scripts": {
-    "build:legacy": "node build-frontend.js",
+    "build": "vite build",
     "build:frontend": "vite build",
-    "build": "npm run build:frontend && npm run build:legacy",
     "dev:frontend": "vite",
     "dev:worker": "wrangler dev --port 8787",
-    "dev:legacy": "npm run build:legacy && wrangler dev",
     "dev": "concurrently -n vite,worker -c cyan,magenta \"npm:dev:frontend\" \"npm:dev:worker\"",
     "preview": "vite preview",
     "deploy": "npm run build && git add -A && git commit -m 'Deploy' --allow-empty && git push",
@@ -44,7 +42,7 @@
     "wrangler": "^4.77.0"
   },
   "dependencies": {
-    "hono": "^3.11.7",
+    "hono": "^4.12.14",
     "jsonwebtoken": "^9.0.2"
   }
 }

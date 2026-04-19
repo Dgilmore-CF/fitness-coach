@@ -18,7 +18,8 @@ import { api } from '@core/api';
 import { openModal } from '@ui/Modal';
 import { toast } from '@ui/Toast';
 import { progressRing } from '@ui/ProgressRing';
-import { formatWeight, toDisplayWeight, getWeightUnit } from '@utils/conversions';
+import { toDisplayWeight, getWeightUnit } from '@utils/conversions';
+import { formatWeight } from '@utils/formatters';
 
 const READINESS_MESSAGES = {
   primed: { label: 'Primed to Go', emoji: '🔥', color: 'var(--color-secondary)' },

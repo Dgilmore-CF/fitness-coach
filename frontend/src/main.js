@@ -404,10 +404,15 @@ function mountScaffoldingStatus() {
   });
 }
 
-// Only mount the scaffolding UI when running under the Vite dev server.
-// In production, the legacy `public/app.js` still owns #app.
+// The scaffolding status page is only used if the #app element exists
+// AND Vite dev mode is active. In production, the HTML shell owns the
+// full UI and the bridge takes over load* functions.
 if (import.meta.env && import.meta.env.DEV) {
-  document.addEventListener('DOMContentLoaded', mountScaffoldingStatus);
+  document.addEventListener('DOMContentLoaded', () => {
+    if (document.getElementById('app')) {
+      mountScaffoldingStatus();
+    }
+  });
 }
 
 export { store, api, toast, openModal, confirmDialog };
