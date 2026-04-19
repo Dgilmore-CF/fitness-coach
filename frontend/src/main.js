@@ -36,6 +36,8 @@ import {
 import { loadAnalytics } from './screens/analytics.js';
 import { loadNutrition } from './screens/nutrition.js';
 import { loadInsights } from './screens/insights.js';
+import { showWorkoutPreview } from './features/ai-coach/WorkoutPreview.js';
+import { liveCoach } from './features/ai-coach/LiveCoachOverlay.js';
 
 // Expose for debugging and for legacy-code bridging
 window.__fitnessApp = {
@@ -44,6 +46,21 @@ window.__fitnessApp = {
   toast,
   openModal,
   confirmDialog
+};
+
+// -----------------------------------------------------------------------------
+// Phase 4: Real-time AI coaching — expose to legacy workout code via globals.
+// The legacy active-workout modal calls these at key moments:
+//   - BEFORE starting a workout: await window.aiCoach.showPreview(programDayId)
+//   - WHEN workout opens:        window.aiCoach.initLive()
+//   - AFTER a set is logged:     window.aiCoach.analyzeSet({currentSets, targetReps, targetSets})
+//   - WHEN workout ends:         window.aiCoach.destroyLive()
+// -----------------------------------------------------------------------------
+window.aiCoach = {
+  showPreview: showWorkoutPreview,
+  initLive: liveCoach.init,
+  destroyLive: liveCoach.destroy,
+  analyzeSet: liveCoach.analyzeSet
 };
 
 // -----------------------------------------------------------------------------

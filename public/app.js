@@ -632,7 +632,23 @@ async function startWorkoutDay(programId, programDayId) {
       showCardioWorkoutInterface(programDay, programId);
       return;
     }
-    
+
+    hideLoadingOverlay();
+    closeModal();
+
+    // Phase 4: Show the AI pre-workout briefing BEFORE creating the workout
+    // so the user can preview readiness and suggested weights. If they
+    // dismiss the briefing, we still proceed (the briefing is informational).
+    if (window.aiCoach && typeof window.aiCoach.showPreview === 'function') {
+      try {
+        await window.aiCoach.showPreview(programDayId);
+      } catch (err) {
+        console.warn('AI briefing failed, continuing:', err);
+      }
+    }
+
+    showLoadingOverlay('Starting your workout...');
+
     // Create the workout for strength training days
     const data = await api('/workouts', {
       method: 'POST',
@@ -647,7 +663,6 @@ async function startWorkoutDay(programId, programDayId) {
     
     state.currentWorkout = fullWorkout.workout;
     hideLoadingOverlay();
-    closeModal();
     
     // Phase 3: Show warmup screen first, then exercise tabs
     showWorkoutWarmupScreen(fullWorkout.workout);
@@ -6764,7 +6779,12 @@ function cancelWorkoutStart() {
   const modal = document.getElementById('workout-modal');
   if (modal) modal.remove();
   restoreBodyScroll();
-  
+
+  // Phase 4: tear down the live AI coach overlay if it was initialized
+  if (window.aiCoach && typeof window.aiCoach.destroyLive === 'function') {
+    window.aiCoach.destroyLive();
+  }
+
   // Delete the workout that was created
   if (state.currentWorkout) {
     api(`/workouts/${state.currentWorkout.id}`, { method: 'DELETE' });
@@ -6873,7 +6893,21 @@ async function startWorkoutExercises() {
     
     // Render tabbed exercise interface
     renderWorkoutExerciseTabs();
-    
+
+    // Phase 4: mount the live AI coach overlay for the duration of the workout
+    if (window.aiCoach && typeof window.aiCoach.initLive === 'function') {
+      window.aiCoach.initLive({
+        onAction: (action) => {
+          // Apply suggested action (e.g. +30s rest, drop weight 5%)
+          if (typeof action.value === 'number' && action.value >= 30) {
+            // Extend rest timer if active
+            if (typeof window.adjustRestTimer === 'function') {
+              window.adjustRestTimer(action.value);
+            }
+          }
+        }
+      });
+    }
   } catch (error) {
     showNotification('Error loading workout: ' + error.message, 'error');
   }
@@ -7405,7 +7439,18 @@ async function addExerciseSet(exerciseId) {
     
     // Start rest timer after logging set
     startRestTimer(90);
-    
+
+    // Phase 4: Ask the live AI coach to analyze this set
+    if (window.aiCoach && typeof window.aiCoach.analyzeSet === 'function') {
+      const analysisExercise = state.currentWorkout.exercises.find(ex => ex.id === exerciseId);
+      const parsedTargetReps = parseInt(String(analysisExercise?.target_reps || '10').split(/[-–]/)[0], 10) || 10;
+      window.aiCoach.analyzeSet({
+        currentSets: analysisExercise?.sets || [],
+        targetReps: parsedTargetReps,
+        targetSets: analysisExercise?.target_sets || 3
+      });
+    }
+
     // Reset flag BEFORE re-rendering to prevent issues
     isAddingSet = false;
     
@@ -8176,7 +8221,12 @@ async function finishWorkoutSummary() {
     clearInterval(state.restTimerInterval);
     state.restTimerInterval = null;
   }
-  
+
+  // Phase 4: remove the live AI coach overlay
+  if (window.aiCoach && typeof window.aiCoach.destroyLive === 'function') {
+    window.aiCoach.destroyLive();
+  }
+
   // Return to dashboard
   switchTab('dashboard');
   showNotification('Great workout! 💪', 'success');
