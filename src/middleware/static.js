@@ -1,24 +1,28 @@
 /**
  * Serve static HTML frontend and JavaScript
+ *
+ * During the v2 refactor this file embeds both the legacy inline styles
+ * and the new modular CSS bundle produced by Vite. Once all screens migrate
+ * to the modular system the legacy inline styles will be deleted.
  */
 
-import frontendJS from '../frontend.js';
+import frontendJS, { frontendCSS } from '../frontend.js';
 
 export async function serveStatic(c) {
   const path = new URL(c.req.url).pathname;
-  
+
   // Serve index.html for root and all non-API routes
   if (path === '/' || !path.startsWith('/api')) {
     const html = getIndexHTML();
-    
+
     // Add cache control headers to prevent stale content
     c.header('Cache-Control', 'no-cache, no-store, must-revalidate');
     c.header('Pragma', 'no-cache');
     c.header('Expires', '0');
-    
+
     return c.html(html);
   }
-  
+
   return c.notFound();
 }
 
@@ -1302,6 +1306,8 @@ function getIndexHTML() {
             }
         }
     </style>
+    <!-- Modular CSS (v2 refactor) - layered after legacy styles so new components win conflicts -->
+    <style data-source="v2-modular">${frontendCSS}</style>
 </head>
 <body>
     <div class="container">

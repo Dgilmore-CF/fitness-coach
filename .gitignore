@@ -6,3 +6,16 @@ node_modules/
 dist/
 .dev.vars
 wrangler.toml.local
+
+# Vite build output
+frontend-dist/
+
+# Test artifacts
+coverage/
+playwright-report/
+test-results/
+.vitest-cache/
+
+# IDE
+.vscode/
+.idea/
