@@ -1309,3 +1309,174 @@
   background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
   color: var(--color-text-inverse);
 }
+
+/* ---------- Progress ring label & unit (used by Nutrition) ---------- */
+.progress-ring-value {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-bold);
+  color: var(--color-text);
+  line-height: 1;
+}
+
+.progress-ring-unit {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin-left: 2px;
+}
+
+.progress-ring-label {
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  font-weight: var(--font-semibold);
+}
+
+/* ---------- Nutrition: macro rings ---------- */
+.macro-rings {
+  display: flex;
+  justify-content: space-around;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.macro-ring-wrapper {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 140px;
+}
+
+.macro-ring-meta {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+/* ---------- Nutrition: meal type grid ---------- */
+.meal-type-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-2);
+}
+
+@media (min-width: 480px) {
+  .meal-type-grid { grid-template-columns: repeat(4, 1fr); }
+}
+
+.meal-type-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-2);
+  background: var(--color-primary-subtle);
+  border: 1.5px solid var(--color-primary-light);
+  border-radius: var(--radius-md);
+  color: var(--color-primary);
+  font-weight: var(--font-semibold);
+  font-size: var(--text-xs);
+  transition: all var(--transition-fast);
+  min-height: 64px;
+}
+
+.meal-type-btn i { font-size: 20px; }
+
+.meal-type-btn:hover {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  transform: translateY(-1px);
+}
+
+/* ---------- Nutrition: quick action grid ---------- */
+.quick-action-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+}
+
+/* ---------- Nutrition: quick add form ---------- */
+.quick-add-row {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.quick-add-input-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.quick-add-input-group .input { flex: 1; }
+
+.quick-add-unit {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  min-width: 32px;
+}
+
+/* ---------- Nutrition: 14-day bar chart ---------- */
+.nutrition-bar-chart {
+  display: flex;
+  gap: var(--space-1);
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
+}
+
+.nutrition-bar-day {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 48px;
+}
+
+.nutrition-bar-day.is-today .nutrition-bar-label {
+  color: var(--color-primary);
+  font-weight: var(--font-bold);
+}
+
+.nutrition-bar-label {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.nutrition-bars {
+  display: flex;
+  gap: 2px;
+  height: 80px;
+  align-items: flex-end;
+}
+
+.nutrition-bar-track {
+  width: 10px;
+  height: 100%;
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-xs);
+  position: relative;
+  overflow: hidden;
+}
+
+.nutrition-bar-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  border-radius: var(--radius-xs);
+  transition: height var(--transition-base);
+  opacity: 0.6;
+}
+
+.nutrition-bar-fill.hit { opacity: 1; }
+
+.nutrition-bar-status {
+  font-size: var(--text-sm);
+  color: var(--color-secondary);
+  height: 18px;
+}

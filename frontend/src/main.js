@@ -34,6 +34,7 @@ import {
   showRenameProgramModal
 } from './screens/programs.js';
 import { loadAnalytics } from './screens/analytics.js';
+import { loadNutrition } from './screens/nutrition.js';
 
 // Expose for debugging and for legacy-code bridging
 window.__fitnessApp = {
@@ -68,6 +69,10 @@ registerScreen('programs:rename', 'showRenameProgramModal', showRenameProgramMod
 
 // Analytics main view (export/PDF/calendar remain in legacy for now)
 registerScreen('analytics', 'loadAnalytics', loadAnalytics);
+
+// Nutrition main view (meal logger modal, barcode scanner, saved meals
+// editor all remain in legacy for now and are called via window globals)
+registerScreen('nutrition', 'loadNutrition', loadNutrition);
 
 // Install overrides once legacy globals are defined.
 // (In Vite dev mode there are no legacy globals, so this is a no-op.)
