@@ -8,6 +8,7 @@
 
 import { html, raw } from '@core/html';
 import { api } from '@core/api';
+import { delegate } from '@core/delegate';
 import { formatWeight, formatDuration, formatDate, getExertionEmoji } from '@utils/formatters';
 
 function renderStatsOverview(overview) {
@@ -189,7 +190,7 @@ function renderErrorState(message) {
  * Attach delegated event handling for the dashboard.
  */
 function attachDashboardHandlers(container) {
-  container.addEventListener('click', (event) => {
+  delegate(container, 'click', (event) => {
     // Quick action buttons that call legacy globals directly
     const legacyBtn = event.target.closest('[data-legacy-call]');
     if (legacyBtn) {

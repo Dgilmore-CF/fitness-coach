@@ -5,6 +5,7 @@
 
 import { html, raw } from '@core/html';
 import { api } from '@core/api';
+import { delegate } from '@core/delegate';
 import { openModal, confirmDialog, closeTopModal } from '@ui/Modal';
 import { toast } from '@ui/Toast';
 
@@ -50,7 +51,7 @@ export async function loadSavedMealsList() {
       </div>
     `);
 
-    container.addEventListener('click', async (event) => {
+    delegate(container, 'click', async (event) => {
       const btn = event.target.closest('[data-log-meal]');
       if (btn) {
         await logSavedMeal(parseInt(btn.getAttribute('data-log-meal'), 10));

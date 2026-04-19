@@ -10,6 +10,7 @@
 import { html, raw } from '@core/html';
 import { api } from '@core/api';
 import { store } from '@core/state';
+import { delegate } from '@core/delegate';
 import { toast } from '@ui/Toast';
 import { confirmDialog } from '@ui/Modal';
 import { formatDate, formatDuration } from '@utils/formatters';
@@ -304,7 +305,7 @@ function renderNoProgram() {
 }
 
 function attachHandlers(container, program) {
-  container.addEventListener('click', async (event) => {
+  delegate(container, 'click', async (event) => {
     const target = event.target.closest('[data-action]');
     if (!target) return;
     const action = target.getAttribute('data-action');

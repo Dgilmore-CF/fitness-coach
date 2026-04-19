@@ -10,6 +10,7 @@
 import { html, raw } from '@core/html';
 import { api } from '@core/api';
 import { store } from '@core/state';
+import { delegate } from '@core/delegate';
 import { toast } from '@ui/Toast';
 
 const QUICK_QUESTIONS = [
@@ -121,7 +122,7 @@ function attachInsightsHandlers(container) {
   // Form submission
   const form = container.querySelector('#ai-chat-form');
   if (form) {
-    form.addEventListener('submit', (event) => {
+    delegate(form, 'submit', (event) => {
       event.preventDefault();
       const input = form.querySelector('#ai-chat-input');
       const msg = input.value.trim();
@@ -131,7 +132,7 @@ function attachInsightsHandlers(container) {
     });
   }
 
-  container.addEventListener('click', (event) => {
+  delegate(container, 'click', (event) => {
     const target = event.target.closest('[data-action]');
     if (!target) return;
     const action = target.getAttribute('data-action');

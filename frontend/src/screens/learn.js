@@ -10,6 +10,7 @@
  * — a simple render function is sufficient.
  */
 
+import { delegate } from '@core/delegate';
 import learnHtmlRaw from '../../content/learn.html?raw';
 
 const QUICK_NAV_SELECTORS = {
@@ -32,7 +33,7 @@ export function renderLearn(container) {
   // calls. These still work in the DOM since the HTML is unchanged, but we
   // also set up event delegation for data-action buttons to smooth out
   // future cleanup.
-  container.addEventListener('click', (event) => {
+  delegate(container, 'click', (event) => {
     const target = event.target.closest('[data-learn-scroll]');
     if (!target) return;
     event.preventDefault();
