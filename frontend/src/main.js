@@ -55,6 +55,7 @@ import {
   startWorkoutFromProgram,
   startWorkoutDay
 } from './features/start-workout.js';
+import { openUnifiedExporter } from './features/analytics/export-center.js';
 
 // Expose for debugging and for legacy-code bridging
 window.__fitnessApp = {
@@ -138,6 +139,10 @@ registerScreen('view-workout', 'viewWorkout', viewWorkout);
 registerScreen('start-workout', 'startWorkout', startWorkout);
 registerScreen('start-workout-program', 'startWorkoutFromProgram', startWorkoutFromProgram);
 registerScreen('start-workout-day', 'startWorkoutDay', startWorkoutDay);
+
+// Export Center (called from Analytics screen)
+registerScreen('export-center', 'openUnifiedExporter', openUnifiedExporter);
+registerScreen('export-center-alias', 'openReportBuilder', openUnifiedExporter);
 
 // Install overrides once legacy globals are defined.
 // (In Vite dev mode there are no legacy globals, so this is a no-op.)

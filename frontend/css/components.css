@@ -2478,3 +2478,87 @@
   background: linear-gradient(135deg, #dc2626 0%, #ea580c 100%);
   color: var(--color-text-inverse);
 }
+
+/* ---------- Export Center ---------- */
+.export-tabs {
+  display: flex;
+  gap: var(--space-2);
+  border-bottom: 2px solid var(--color-border);
+}
+
+.export-tab {
+  padding: var(--space-3) var(--space-5);
+  background: none;
+  font-weight: var(--font-semibold);
+  color: var(--color-text-muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+}
+
+.export-tab.is-active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+.export-date-range {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-md);
+}
+
+.export-type-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-2);
+}
+
+.export-type-checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-surface-sunken);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.export-type-checkbox input {
+  width: 18px;
+  height: 18px;
+}
+
+.export-type-checkbox:hover {
+  border-color: var(--color-primary);
+}
+
+.export-format-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  background: var(--color-surface-sunken);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.export-format-option input { display: none; }
+
+.export-format-option.is-selected {
+  background: var(--color-primary-subtle);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.export-format-option i {
+  color: var(--color-text-muted);
+}
+
+.export-format-option.is-selected i {
+  color: var(--color-primary);
+}
