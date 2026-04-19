@@ -152,7 +152,11 @@ export function openModal(opts) {
       { once: true }
     );
 
-    if (MODAL_STACK.length === 0) {
+    // Only clear overflow if we set it ourselves AND no other locker claims it.
+    // The active-workout modal manages its own body scroll lock independently
+    // of MODAL_STACK, so we must not stomp on it when closing a nested
+    // confirm dialog.
+    if (MODAL_STACK.length === 0 && !document.body.dataset.externalScrollLock) {
       document.body.style.overflow = '';
     }
 
