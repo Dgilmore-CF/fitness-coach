@@ -33,6 +33,7 @@ import {
   showCreateManualProgram,
   showRenameProgramModal
 } from './screens/programs.js';
+import { loadAnalytics } from './screens/analytics.js';
 
 // Expose for debugging and for legacy-code bridging
 window.__fitnessApp = {
@@ -64,6 +65,9 @@ registerScreen('programs:delete', 'deleteProgram', deleteProgram);
 registerScreen('programs:generate', 'showGenerateProgram', showGenerateProgram);
 registerScreen('programs:manual', 'showCreateManualProgram', showCreateManualProgram);
 registerScreen('programs:rename', 'showRenameProgramModal', showRenameProgramModal);
+
+// Analytics main view (export/PDF/calendar remain in legacy for now)
+registerScreen('analytics', 'loadAnalytics', loadAnalytics);
 
 // Install overrides once legacy globals are defined.
 // (In Vite dev mode there are no legacy globals, so this is a no-op.)

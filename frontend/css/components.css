@@ -1173,3 +1173,139 @@
   font-size: var(--text-sm);
   min-height: 32px;
 }
+
+/* ---------- Analytics: comparison blocks ---------- */
+.comparison-title {
+  font-size: var(--text-base);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-1);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.comparison-date-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.progress-comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-3);
+}
+
+.progress-comparison-card {
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  text-align: center;
+}
+
+.progress-comparison-label {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  margin-bottom: var(--space-2);
+}
+
+.progress-comparison-values {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-bottom: var(--space-2);
+}
+
+.progress-comparison-current {
+  font-size: var(--text-xl);
+  font-weight: var(--font-bold);
+  color: var(--color-text);
+}
+
+.progress-comparison-previous {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* ---------- Analytics: volume by muscle ---------- */
+.volume-by-muscle {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.muscle-volume-row {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-sm);
+}
+
+/* ---------- Analytics: body map ---------- */
+.body-map-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-3);
+}
+
+.body-map-tile {
+  padding: var(--space-4);
+  color: var(--color-text-inverse);
+  background: linear-gradient(
+    135deg,
+    rgba(79, 70, 229, var(--intensity)) 0%,
+    rgba(118, 75, 162, var(--intensity)) 100%
+  );
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+.body-map-muscle { font-weight: var(--font-bold); }
+.body-map-meta { font-size: var(--text-xs); margin-top: var(--space-1); opacity: 0.9; }
+
+/* ---------- Analytics: top exercises ---------- */
+.top-exercise-row {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+/* ---------- Analytics: PR grid ---------- */
+.pr-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-md);
+  border-left: 4px solid var(--color-warning);
+}
+
+.pr-value {
+  font-size: var(--text-xl);
+  font-weight: var(--font-bold);
+  color: var(--color-primary);
+}
+
+/* ---------- Analytics: export button ---------- */
+.export-button {
+  background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%);
+  color: var(--color-text-inverse);
+  font-size: var(--text-base);
+  padding: var(--space-4);
+}
+
+.export-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+  color: var(--color-text-inverse);
+}
