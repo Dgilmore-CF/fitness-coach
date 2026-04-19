@@ -30,39 +30,39 @@
     <div class="header">
       <h1><i class="fas fa-dumbbell"></i> AI Fitness Coach</h1>
       <div class="user-info">
-        <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark/Light Mode">
+        <button class="theme-toggle" data-action="toggle-theme" title="Toggle Dark/Light Mode">
           <i class="fas fa-moon" id="themeIcon"></i>
         </button>
         <span id="userName">Loading...</span>
-        <button class="btn btn-outline" onclick="showProfile()">
+        <button class="btn btn-outline" data-action="show-profile">
           <i class="fas fa-user"></i> Profile
         </button>
       </div>
     </div>
 
     <div class="tabs">
-      <button class="tab active" onclick="switchTab('dashboard')">
+      <button class="tab active" data-action="switch-tab" data-tab="dashboard">
         <i class="fas fa-home"></i> Dashboard
       </button>
-      <button class="tab" onclick="switchTab('program')">
+      <button class="tab" data-action="switch-tab" data-tab="program">
         <i class="fas fa-list"></i> Program
       </button>
-      <button class="tab" onclick="switchTab('workout')">
+      <button class="tab" data-action="switch-tab" data-tab="workout">
         <i class="fas fa-dumbbell"></i> Workout
       </button>
-      <button class="tab" onclick="switchTab('analytics')">
+      <button class="tab" data-action="switch-tab" data-tab="analytics">
         <i class="fas fa-chart-line"></i> Analytics
       </button>
-      <button class="tab" onclick="switchTab('insights')">
+      <button class="tab" data-action="switch-tab" data-tab="insights">
         <i class="fas fa-robot"></i> AI Coach
       </button>
-      <button class="tab" onclick="switchTab('achievements')">
+      <button class="tab" data-action="switch-tab" data-tab="achievements">
         <i class="fas fa-trophy"></i> Achievements
       </button>
-      <button class="tab" onclick="switchTab('nutrition')">
+      <button class="tab" data-action="switch-tab" data-tab="nutrition">
         <i class="fas fa-apple-alt"></i> Nutrition
       </button>
-      <button class="tab" onclick="switchTab('learn')">
+      <button class="tab" data-action="switch-tab" data-tab="learn">
         <i class="fas fa-graduation-cap"></i> Learn
       </button>
     </div>
@@ -80,23 +80,23 @@
   <!-- Mobile Bottom Navigation -->
   <nav class="mobile-nav" id="mobileNav">
     <div class="mobile-nav-inner">
-      <button class="mobile-nav-item active" onclick="switchTab('dashboard')" data-tab="dashboard">
+      <button class="mobile-nav-item active" data-action="switch-tab" data-tab="dashboard">
         <i class="fas fa-home"></i>
         <span>Home</span>
       </button>
-      <button class="mobile-nav-item" onclick="switchTab('workout')" data-tab="workout">
+      <button class="mobile-nav-item" data-action="switch-tab" data-tab="workout">
         <i class="fas fa-dumbbell"></i>
         <span>Workout</span>
       </button>
-      <button class="mobile-nav-item" onclick="switchTab('nutrition')" data-tab="nutrition">
+      <button class="mobile-nav-item" data-action="switch-tab" data-tab="nutrition">
         <i class="fas fa-apple-alt"></i>
         <span>Nutrition</span>
       </button>
-      <button class="mobile-nav-item" onclick="switchTab('analytics')" data-tab="analytics">
+      <button class="mobile-nav-item" data-action="switch-tab" data-tab="analytics">
         <i class="fas fa-chart-line"></i>
         <span>Stats</span>
       </button>
-      <button class="mobile-nav-item" onclick="openMobileMenu()" data-tab="menu">
+      <button class="mobile-nav-item" data-action="open-mobile-menu" data-tab="menu">
         <i class="fas fa-th-large"></i>
         <span>Menu</span>
       </button>
@@ -104,12 +104,12 @@
   </nav>
 
   <!-- Mobile Menu Drawer -->
-  <div class="mobile-menu-overlay" id="mobileMenuOverlay" onclick="closeMobileMenu()"></div>
+  <div class="mobile-menu-overlay" id="mobileMenuOverlay" data-action="close-mobile-menu"></div>
   <div class="mobile-menu-drawer" id="mobileMenuDrawer">
     <div class="mobile-menu-handle"></div>
     <div class="mobile-menu-header">
       <h3>Menu</h3>
-      <button class="mobile-menu-close" onclick="closeMobileMenu()">
+      <button class="mobile-menu-close" data-action="close-mobile-menu">
         <i class="fas fa-times"></i>
       </button>
     </div>
@@ -117,10 +117,10 @@
     <div class="mobile-menu-section">
       <div class="mobile-menu-section-title">Quick Actions</div>
       <div class="cluster" style="gap: var(--space-2);">
-        <button class="btn btn-outline" onclick="closeMobileMenu(); showProfile();" style="flex: 1;">
+        <button class="btn btn-outline" data-action="show-profile-from-menu" style="flex: 1;">
           <i class="fas fa-user"></i> Profile
         </button>
-        <button class="btn btn-outline" onclick="closeMobileMenu(); toggleTheme();" style="flex: 1;">
+        <button class="btn btn-outline" data-action="toggle-theme-from-menu" style="flex: 1;">
           <i class="fas fa-moon" id="menuThemeIcon"></i> Theme
         </button>
       </div>
@@ -132,7 +132,7 @@
     <div class="modal-content">
       <div class="modal-header">
         <h2 id="modalTitle"></h2>
-        <span class="modal-close" onclick="closeModal()">&times;</span>
+        <span class="modal-close" data-action="close-modal">&times;</span>
       </div>
       <div id="modalBody"></div>
     </div>
@@ -144,7 +144,7 @@
   <!-- Toast container -->
   <div id="toast-container" aria-live="polite" aria-atomic="true"></div>
 
-  <!-- Legacy compat shim (theme, switchTab, mobile menu, etc.) -->
+  <!-- Shell event delegation (theme, switchTab, mobile menu, etc.) -->
   <script src="/app.js"></script>
 
   <!-- Modular app entry (Vite bundles and replaces legacy globals via the bridge) -->

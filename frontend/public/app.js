@@ -2,18 +2,14 @@
  * Legacy compatibility shim (v2 refactor — final).
  *
  * This file used to be 12,732 lines. Everything has been migrated to
- * frontend/src/. What remains is the thin compat layer that:
+ * frontend/src/. What remains is a thin compat layer that:
  *
- *   1. Provides globals that the HTML shell in src/middleware/static.js
- *      references via inline onclick="…" attributes (toggleTheme,
- *      openMobileMenu, closeMobileMenu, showProfile, switchTab, closeModal).
+ *   1. Handles the HTML shell's data-action buttons (theme, tabs,
+ *      mobile menu, profile, modal close).
  *   2. Bootstraps the page on DOMContentLoaded by calling into the
  *      modular code.
- *   3. Provides a couple of tiny legacy-call forwarders that the bridge
- *      hasn't fully replaced yet.
- *
- * In Phase 11 this file is replaced entirely by the Vite entry point
- * when the HTML shell is migrated to use data-action attributes.
+ *   3. Exposes a handful of legacy-call forwarders that unmigrated
+ *      legacy HTML strings (inside screens) may still reference.
  */
 
 /* global window, document, localStorage */
@@ -25,38 +21,32 @@
 function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
   const themeIcon = document.getElementById('themeIcon');
-  if (themeIcon) {
-    themeIcon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
-  }
+  if (themeIcon) themeIcon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
   const menuThemeIcon = document.getElementById('menuThemeIcon');
-  if (menuThemeIcon) {
-    menuThemeIcon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
-  }
+  if (menuThemeIcon) menuThemeIcon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
 }
 
 function initTheme() {
   const saved = localStorage.getItem('theme');
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const theme = saved || (prefersDark ? 'dark' : 'light');
-  applyTheme(theme);
+  applyTheme(saved || (prefersDark ? 'dark' : 'light'));
 
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-    if (!localStorage.getItem('theme')) {
-      applyTheme(e.matches ? 'dark' : 'light');
-    }
+    if (!localStorage.getItem('theme')) applyTheme(e.matches ? 'dark' : 'light');
   });
 }
 
-window.toggleTheme = function toggleTheme() {
+function toggleTheme() {
   const current = document.documentElement.getAttribute('data-theme') || 'light';
   const next = current === 'light' ? 'dark' : 'light';
   applyTheme(next);
   localStorage.setItem('theme', next);
   window.__fitnessApp?.toast?.success(`Switched to ${next} mode`);
-};
+}
+window.toggleTheme = toggleTheme;
 
 // -----------------------------------------------------------------------------
-// Global notification shim (for any remaining legacy callers)
+// Global notification shim (any remaining legacy callers)
 // -----------------------------------------------------------------------------
 
 window.showNotification = function showNotification(message, type = 'success') {
@@ -67,21 +57,20 @@ window.showNotification = function showNotification(message, type = 'success') {
 };
 
 // -----------------------------------------------------------------------------
-// Modal close (legacy HTML has onclick="closeModal()")
+// Legacy modal close (unmigrated screens still use the shared #modal element)
 // -----------------------------------------------------------------------------
 
-window.closeModal = function closeModal() {
-  // New modals auto-close on backdrop click / ESC / close button.
-  // This is for any lingering onclick="closeModal()" callers in legacy HTML.
+function closeLegacyModal() {
   const modal = document.getElementById('modal');
   if (modal?.classList?.contains('active')) {
     modal.classList.remove('active');
     modal.onclick = null;
   }
-};
+}
+window.closeModal = closeLegacyModal;
 
 // -----------------------------------------------------------------------------
-// Tab routing (driven by the modular bridge, but HTML shell calls switchTab)
+// Tab routing
 // -----------------------------------------------------------------------------
 
 const TAB_LOADERS = {
@@ -95,14 +84,10 @@ const TAB_LOADERS = {
   learn: 'loadLearn'
 };
 
-window.switchTab = function switchTab(tabName) {
+function switchTab(tabName) {
   // Update desktop tab buttons
   document.querySelectorAll('.tab').forEach((tab) => tab.classList.remove('active'));
-  const target = Array.from(document.querySelectorAll('.tab')).find((tab) => {
-    const onclick = tab.getAttribute('onclick') || '';
-    return onclick.includes(`'${tabName}'`) || onclick.includes(`"${tabName}"`);
-  });
-  target?.classList.add('active');
+  document.querySelector(`.tab[data-tab="${tabName}"]`)?.classList.add('active');
 
   // Update mobile nav
   document.querySelectorAll('.mobile-nav-item').forEach((item) => item.classList.remove('active'));
@@ -117,21 +102,20 @@ window.switchTab = function switchTab(tabName) {
   }
 
   // Show the correct content panel
-  document.querySelectorAll('.tab-content').forEach((content) => content.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach((c) => c.classList.remove('active'));
   document.getElementById(tabName)?.classList.add('active');
 
   // Dispatch to the loader (modular functions overridden by bridge)
-  const loaderName = TAB_LOADERS[tabName] || 'loadDashboard';
-  const loader = window[loaderName];
+  const loader = window[TAB_LOADERS[tabName] || 'loadDashboard'];
   if (typeof loader === 'function') {
     Promise.resolve().then(() => loader()).catch((err) => {
-      console.error(`Tab loader ${loaderName} failed:`, err);
+      console.error(`Tab loader failed:`, err);
     });
   }
 
-  // Update store
   window.__fitnessApp?.store?.set('currentTab', tabName);
-};
+}
+window.switchTab = switchTab;
 
 // -----------------------------------------------------------------------------
 // Mobile menu drawer
@@ -148,7 +132,7 @@ const MOBILE_MENU_ITEMS = [
   { id: 'learn', icon: 'fa-graduation-cap', label: 'Learn', color: '#14b8a6' }
 ];
 
-window.openMobileMenu = function openMobileMenu() {
+function openMobileMenu() {
   const overlay = document.getElementById('mobileMenuOverlay');
   const drawer = document.getElementById('mobileMenuDrawer');
   const grid = document.getElementById('mobileMenuGrid');
@@ -157,7 +141,7 @@ window.openMobileMenu = function openMobileMenu() {
   const currentTab = window.__fitnessApp?.store?.get('currentTab') || 'dashboard';
 
   grid.innerHTML = MOBILE_MENU_ITEMS.map((item) => `
-    <button class="mobile-menu-item ${currentTab === item.id ? 'active' : ''}" onclick="closeMobileMenu(); switchTab('${item.id}')">
+    <button class="mobile-menu-item ${currentTab === item.id ? 'active' : ''}" data-action="menu-switch-tab" data-tab="${item.id}">
       <div class="mobile-menu-icon" style="color: ${item.color};">
         <i class="fas ${item.icon}"></i>
       </div>
@@ -168,9 +152,10 @@ window.openMobileMenu = function openMobileMenu() {
   overlay.classList.add('active');
   setTimeout(() => drawer.classList.add('active'), 10);
   document.body.style.overflow = 'hidden';
-};
+}
+window.openMobileMenu = openMobileMenu;
 
-window.closeMobileMenu = function closeMobileMenu() {
+function closeMobileMenu() {
   const overlay = document.getElementById('mobileMenuOverlay');
   const drawer = document.getElementById('mobileMenuDrawer');
   if (!drawer || !overlay) return;
@@ -179,10 +164,64 @@ window.closeMobileMenu = function closeMobileMenu() {
     overlay.classList.remove('active');
     document.body.style.overflow = '';
   }, 300);
-};
+}
+window.closeMobileMenu = closeMobileMenu;
+window.showMobileMoreMenu = openMobileMenu;
 
-// Alias for older HTML templates
-window.showMobileMoreMenu = window.openMobileMenu;
+// Note: Do NOT define a local showProfile placeholder. The modular bridge
+// sets window.showProfile when screens register, and we call it via
+// window.showProfile() below. If the bridge hasn't fired yet, we wait.
+function dispatchShowProfile() {
+  if (typeof window.showProfile === 'function' && !window.showProfile.__isLegacyStub) {
+    window.showProfile();
+  } else {
+    // Retry on next tick — bridge may not have installed the override yet
+    setTimeout(dispatchShowProfile, 50);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Event delegation for the HTML shell
+// -----------------------------------------------------------------------------
+
+function handleShellAction(event) {
+  const target = event.target.closest('[data-action]');
+  if (!target) return;
+  const action = target.getAttribute('data-action');
+
+  switch (action) {
+    case 'toggle-theme':
+      toggleTheme();
+      break;
+    case 'switch-tab':
+      switchTab(target.getAttribute('data-tab'));
+      break;
+    case 'show-profile':
+      dispatchShowProfile();
+      break;
+    case 'open-mobile-menu':
+      openMobileMenu();
+      break;
+    case 'close-mobile-menu':
+      closeMobileMenu();
+      break;
+    case 'menu-switch-tab':
+      closeMobileMenu();
+      switchTab(target.getAttribute('data-tab'));
+      break;
+    case 'show-profile-from-menu':
+      closeMobileMenu();
+      dispatchShowProfile();
+      break;
+    case 'toggle-theme-from-menu':
+      closeMobileMenu();
+      toggleTheme();
+      break;
+    case 'close-modal':
+      closeLegacyModal();
+      break;
+  }
+}
 
 // -----------------------------------------------------------------------------
 // Legacy helpers still referenced from a few places
@@ -205,18 +244,14 @@ window.toggleWorkoutDetails = function toggleWorkoutDetails(workoutId) {
 };
 
 window.deleteDashboardWorkout = async function deleteDashboardWorkout(workoutId) {
-  const api = window.__fitnessApp?.api;
-  const toast = window.__fitnessApp?.toast;
-  const confirmDialog = window.__fitnessApp?.confirmDialog;
+  const { api, toast, confirmDialog } = window.__fitnessApp || {};
   if (!api || !confirmDialog) return;
-
   const ok = await confirmDialog('Delete this workout? This cannot be undone.', {
     title: 'Delete workout?',
     confirmLabel: 'Delete',
     confirmVariant: 'btn-danger'
   });
   if (!ok) return;
-
   try {
     await api.delete(`/workouts/${workoutId}`);
     toast?.success('Workout deleted');
@@ -227,18 +262,14 @@ window.deleteDashboardWorkout = async function deleteDashboardWorkout(workoutId)
 };
 
 window.deleteAnalyticsWorkout = async function deleteAnalyticsWorkout(workoutId) {
-  const api = window.__fitnessApp?.api;
-  const toast = window.__fitnessApp?.toast;
-  const confirmDialog = window.__fitnessApp?.confirmDialog;
+  const { api, toast, confirmDialog } = window.__fitnessApp || {};
   if (!api || !confirmDialog) return;
-
   const ok = await confirmDialog('Delete this workout? This cannot be undone.', {
     title: 'Delete workout?',
     confirmLabel: 'Delete',
     confirmVariant: 'btn-danger'
   });
   if (!ok) return;
-
   try {
     await api.delete(`/workouts/${workoutId}`);
     toast?.success('Workout deleted');
@@ -249,7 +280,7 @@ window.deleteAnalyticsWorkout = async function deleteAnalyticsWorkout(workoutId)
 };
 
 // -----------------------------------------------------------------------------
-// Loading overlay (legacy API kept simple; modular withLoading is preferred)
+// Loading overlay (legacy API)
 // -----------------------------------------------------------------------------
 
 window.showLoadingOverlay = function showLoadingOverlay(message = 'Loading…') {
@@ -260,9 +291,10 @@ window.showLoadingOverlay = function showLoadingOverlay(message = 'Loading…') 
     overlay.className = 'loading-overlay';
     document.body.appendChild(overlay);
   }
+  const safeMessage = String(message).replace(/[<>]/g, '');
   overlay.innerHTML = `
     <div class="spinner" aria-hidden="true"></div>
-    <div class="loading-overlay-message">${String(message).replace(/[<>]/g, '')}</div>
+    <div class="loading-overlay-message">${safeMessage}</div>
   `;
 };
 
@@ -272,13 +304,12 @@ window.hideLoadingOverlay = function hideLoadingOverlay() {
 };
 
 // -----------------------------------------------------------------------------
-// Load user on boot, then render initial tab
+// Boot
 // -----------------------------------------------------------------------------
 
 async function bootstrap() {
   initTheme();
 
-  // Fetch current user via modular api
   const api = window.__fitnessApp?.api;
   const store = window.__fitnessApp?.store;
 
@@ -296,7 +327,6 @@ async function bootstrap() {
     }
   }
 
-  // Start on the dashboard tab
   if (typeof window.loadDashboard === 'function') {
     try {
       await window.loadDashboard();
@@ -307,7 +337,8 @@ async function bootstrap() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Wait a tick so the Vite bundle's DOMContentLoaded listener (which installs
-  // the bridge and sets window.__fitnessApp) fires first.
+  // Attach shell-level delegation
+  document.body.addEventListener('click', handleShellAction);
+  // Wait a tick so the Vite bundle's initBridge has installed its overrides
   setTimeout(bootstrap, 0);
 });
