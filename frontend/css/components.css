@@ -2052,3 +2052,82 @@
   border-radius: var(--radius-sm);
   gap: var(--space-3);
 }
+
+/* ---------- Past Workout (log past session) ---------- */
+.past-workout-exercise {
+  padding: var(--space-3);
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.past-workout-exercise-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-3);
+  gap: var(--space-3);
+}
+
+.past-workout-set-header {
+  display: grid;
+  grid-template-columns: 50px 1fr 1fr 40px;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  padding: 0 var(--space-2) var(--space-1);
+}
+
+.past-workout-set-row {
+  display: grid;
+  grid-template-columns: 50px 1fr 1fr 40px;
+  gap: var(--space-2);
+  align-items: center;
+  margin-bottom: var(--space-2);
+}
+
+.past-workout-set-num {
+  text-align: center;
+  font-weight: var(--font-semibold);
+  color: var(--color-text-muted);
+}
+
+.past-add-exercise-list {
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: var(--space-2);
+}
+
+.past-add-group {
+  margin-bottom: var(--space-4);
+}
+
+.past-add-group-title {
+  color: var(--color-primary);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  margin-bottom: var(--space-2);
+  font-weight: var(--font-bold);
+}
+
+.past-add-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: var(--space-3);
+  margin-bottom: var(--space-2);
+  background: var(--color-surface-sunken);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  text-align: left;
+  transition: all var(--transition-fast);
+}
+
+.past-add-item:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
