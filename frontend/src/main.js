@@ -47,6 +47,9 @@ import { showWorkoutPreview } from './features/ai-coach/WorkoutPreview.js';
 import { liveCoach } from './features/ai-coach/LiveCoachOverlay.js';
 import activeWorkout from './features/active-workout/controller.js';
 import { showLogPastWorkout } from './features/past-workout/controller.js';
+import { showExerciseHistory } from './features/exercise-history.js';
+import { loadWorkoutCalendar, loadWorkoutHistory } from './features/workout-calendar.js';
+import { viewWorkout } from './features/view-workout.js';
 
 // Expose for debugging and for legacy-code bridging
 window.__fitnessApp = {
@@ -116,6 +119,15 @@ registerScreen('workout', 'loadWorkout', loadWorkout);
 
 // Log past workout modal (modal opener, not a tab)
 registerScreen('past-workout', 'showLogPastWorkout', showLogPastWorkout);
+
+// Exercise history modal (called from workouts, active workout, analytics)
+registerScreen('exercise-history', 'showExerciseHistory', showExerciseHistory);
+
+// Workout calendar (injected into #workoutCalendarContainer by Analytics)
+registerScreen('workout-calendar', 'loadWorkoutHistory', loadWorkoutHistory);
+
+// View completed workout modal
+registerScreen('view-workout', 'viewWorkout', viewWorkout);
 
 // Install overrides once legacy globals are defined.
 // (In Vite dev mode there are no legacy globals, so this is a no-op.)
