@@ -21,6 +21,8 @@ import { progressRing } from '@ui/ProgressRing';
 
 import { initBridge, registerScreen } from './bridge.js';
 import { loadLearn } from './screens/learn.js';
+import { loadAchievements } from './screens/achievements.js';
+import { loadDashboard } from './screens/dashboard.js';
 
 // Expose for debugging and for legacy-code bridging
 window.__fitnessApp = {
@@ -37,6 +39,8 @@ window.__fitnessApp = {
 // to the legacy implementation.
 // -----------------------------------------------------------------------------
 registerScreen('learn', 'loadLearn', loadLearn);
+registerScreen('achievements', 'loadAchievements', loadAchievements);
+registerScreen('dashboard', 'loadDashboard', loadDashboard);
 
 // Install overrides once legacy globals are defined.
 // (In Vite dev mode there are no legacy globals, so this is a no-op.)

@@ -605,3 +605,281 @@
   background: var(--color-border);
   margin: var(--space-4) 0;
 }
+
+/* ---------- Section title (for within a card) ---------- */
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  letter-spacing: var(--tracking-tight);
+  margin-bottom: var(--space-4);
+}
+
+.section-title i {
+  color: var(--color-primary);
+}
+
+/* ---------- Stat card gradient variants ---------- */
+.stat-card-gradient-1 {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: var(--color-text-inverse);
+  border: none;
+}
+.stat-card-gradient-2 {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: var(--color-text-inverse);
+  border: none;
+}
+.stat-card-gradient-3 {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  color: var(--color-text-inverse);
+  border: none;
+}
+.stat-card-gradient-4 {
+  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+  color: var(--color-text-inverse);
+  border: none;
+}
+
+.stat-card-gradient-1 .stat-label,
+.stat-card-gradient-1 .stat-meta,
+.stat-card-gradient-2 .stat-label,
+.stat-card-gradient-2 .stat-meta,
+.stat-card-gradient-3 .stat-label,
+.stat-card-gradient-3 .stat-meta,
+.stat-card-gradient-4 .stat-label,
+.stat-card-gradient-4 .stat-meta {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.stat-icon {
+  font-size: 32px;
+  line-height: 1;
+  margin-bottom: var(--space-2);
+}
+
+/* ---------- Achievement badge ---------- */
+.achievement-card {
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-inverse);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--transition-base), box-shadow var(--transition-base);
+}
+
+.achievement-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.achievement-icon {
+  font-size: 40px;
+  line-height: 1;
+  margin-bottom: var(--space-2);
+}
+
+.achievement-name {
+  font-weight: var(--font-bold);
+  font-size: var(--text-base);
+}
+
+.achievement-description {
+  font-size: var(--text-sm);
+  opacity: 0.9;
+}
+
+.achievement-date {
+  font-size: var(--text-xs);
+  opacity: 0.8;
+  margin-top: auto;
+}
+
+.tier-bronze { background: linear-gradient(135deg, #cd7f32 0%, #8b4513 100%); }
+.tier-silver { background: linear-gradient(135deg, #c0c0c0 0%, #808080 100%); }
+.tier-gold   { background: linear-gradient(135deg, #ffd700 0%, #ffa500 100%); }
+.tier-platinum { background: linear-gradient(135deg, #e5e4e2 0%, #71797e 100%); }
+
+.achievements-category-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-primary);
+  font-weight: var(--font-semibold);
+  margin-bottom: var(--space-3);
+  text-transform: capitalize;
+}
+
+/* ---------- Streak card ---------- */
+.streak-card {
+  background: var(--color-surface-sunken);
+  border-left: 4px solid var(--color-secondary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+}
+
+.streak-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+.streak-metric { min-width: 120px; }
+
+.streak-value {
+  font-size: var(--text-3xl);
+  font-weight: var(--font-bold);
+  line-height: 1;
+  margin-top: var(--space-1);
+}
+
+.streak-value-small {
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  margin-top: var(--space-1);
+}
+
+/* ---------- Data table (legacy-compatible) ---------- */
+.table-container {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.data-table thead {
+  background: var(--color-surface-sunken);
+}
+
+.data-table th {
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  font-weight: var(--font-semibold);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--color-text-secondary);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.data-table td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border-subtle);
+  color: var(--color-text);
+}
+
+.data-table tbody tr:last-child td { border-bottom: none; }
+.data-table tbody tr:hover { background: var(--color-surface-sunken); }
+
+/* ---------- Workout card (dashboard) ---------- */
+.workout-card {
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: border-color var(--transition-base), box-shadow var(--transition-base);
+}
+
+.workout-card:hover {
+  border-color: var(--color-border-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.workout-card-header {
+  padding: var(--space-4);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.workout-card-header-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.workout-card-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.workout-card-status-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-inverse);
+  flex-shrink: 0;
+}
+
+.workout-card-status-icon.complete { background: var(--color-secondary); }
+.workout-card-status-icon.in-progress { background: var(--color-warning); }
+
+.workout-card-metrics {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  font-size: var(--text-sm);
+  margin-left: 48px;
+}
+
+.workout-card-chevron {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+.workout-card-chevron i {
+  transition: transform var(--transition-base);
+  color: var(--color-text-muted);
+}
+
+.workout-card-details {
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface-sunken);
+  padding: var(--space-5);
+}
+
+.workout-notes {
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.workout-notes p {
+  margin-top: var(--space-1);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  white-space: pre-wrap;
+}
+
+.mini-stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.mini-stat-value {
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  color: var(--color-text);
+}
