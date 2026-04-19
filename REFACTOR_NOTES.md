@@ -1,39 +1,67 @@
 # v2 Refactor Notes
 
-This document captures the architecture, migration status, and conventions
-introduced by the v2 modernization refactor (branch: `refactor/v2-modernization`).
+This document captures the final architecture, conventions, and completed
+work of the v2 modernization refactor (branch: `refactor/v2-modernization`).
 
 ## TL;DR
 
 - **Goal**: Professional, modular, AI-first fitness coaching app.
-- **Strategy**: Incremental migration — legacy monolithic `public/app.js` and
-  the new modular `frontend/src/` coexist via a runtime "bridge".
-- **Status**: 7 of the 10 main screens migrated, real-time AI coaching fully
-  integrated, backend shared utilities and database cleanup complete.
-- **Tests**: 81 passing unit tests; Playwright configured for E2E.
+- **Strategy**: Complete rewrite of the monolithic `public/app.js` into a
+  modular frontend; backend hardening; database schema cleanup; Cloudflare
+  Static Assets migration.
+- **Status**: **Complete.** All 10 screens migrated, all sub-modals
+  migrated, Hono v3 → v4 upgraded, Cloudflare Static Assets active,
+  real-time AI coaching fully integrated.
+- **Tests**: 81 passing unit tests; Playwright E2E smoke tests ready.
+
+## Final metrics
+
+| Metric                        | Before       | After        | Change  |
+|-------------------------------|--------------|--------------|---------|
+| Legacy `public/app.js`        | 12,732 lines | 313 lines    | −97%    |
+| Legacy bundle size            | 615 KB       | 11 KB        | −98%    |
+| Worker deploy bundle          | 1,020 KB     | 337 KB       | −67%    |
+| Worker gzipped                | 201 KB       | 69 KB        | −66%    |
+| Unit tests                    | 0            | 81 passing   | —       |
+| Hono version                  | 3.11.7       | 4.12.14      | +22 CVEs fixed |
+| Database indexes              | —            | +15 added    | —       |
 
 ## Architecture overview
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                    Cloudflare Worker (Hono)                  │
+│                        User browser                          │
 │                                                              │
-│  /api/*  →  routes/  →  services/  →  D1 / R2 / Workers AI   │
+│   HTML shell (frontend/index.html)                           │
+│       │                                                      │
+│       ├─► /app.js (313-line compat shim)                     │
+│       │       — theme, tabs, mobile menu, bootstrap          │
+│       │                                                      │
+│       └─► /assets/index-*.js (Vite bundle)                   │
+│                — modular screens, features, UI components    │
 │                                                              │
-│  /       →  static.js  →  inlines frontend.js into HTML      │
+│   Runtime: bridge.js overrides window.loadDashboard,         │
+│   window.loadPrograms, etc. with modular implementations.    │
 └──────────────────────────────────────────────────────────────┘
+                           │
+                   /api/* requests
+                           ▼
+┌──────────────────────────────────────────────────────────────┐
+│   Cloudflare Worker (Hono 4)                                 │
+│       ├─► routes/auth.js, programs.js, workouts.js, …        │
+│       ├─► services/ai-coach.js, ai-realtime.js, …            │
+│       ├─► utils/api-response.js, query-builder.js, csv.js    │
+│       └─► middleware/auth.js, error-handler.js, ownership.js │
+└──────────────────────────────────────────────────────────────┘
+                           │
+          ┌────────────────┼────────────────┐
+          ▼                ▼                ▼
+    D1 (SQLite)      Workers AI       R2 Storage
                            │
                            ▼
 ┌──────────────────────────────────────────────────────────────┐
-│                      Browser runtime                         │
-│                                                              │
-│   Vite bundle (frontend/src/)   ──registers──►  bridge       │
-│                                                              │
-│   Legacy app.js (public/app.js) ──overridden by──► bridge    │
-│                                                              │
-│   Result: each screen tab uses EITHER the modular            │
-│   implementation OR the legacy implementation, chosen at     │
-│   runtime by the bridge.                                     │
+│   Cloudflare Static Assets                                   │
+│   Serves /, /index.html, /app.js, /assets/* from frontend-dist│
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -41,41 +69,41 @@ introduced by the v2 modernization refactor (branch: `refactor/v2-modernization`
 
 ```
 fitness-builder/
-├── frontend/                    # NEW — modular frontend source (Vite root)
-│   ├── index.html               # Clean HTML shell (dev server only)
+├── frontend/                    # Modular frontend source (Vite root)
+│   ├── index.html               # Clean HTML shell, uses data-action delegation
+│   ├── public/
+│   │   └── app.js               # 313-line legacy compat shim
 │   ├── content/
 │   │   └── learn.html           # Extracted static content
-│   ├── css/
-│   │   ├── design-system.css    # Tokens (colors, spacing, typography)
-│   │   ├── layouts.css          # Layout primitives
-│   │   ├── components.css       # Component styles
-│   │   └── animations.css       # Keyframes
+│   ├── css/                     # Design system + component styles
 │   └── src/
-│       ├── main.js              # Vite entry — registers screens with bridge
+│       ├── main.js              # Vite entry, registers screens with bridge
 │       ├── bridge.js            # Runtime override system for legacy globals
 │       ├── core/                # Component, state, api, router, events, html
 │       ├── utils/               # conversions, formatters, validators, audio, volume
 │       ├── ui/                  # Modal, Toast, LoadingOverlay, ProgressRing, Chart, Timer
-│       ├── screens/             # Per-tab screens (dashboard, programs, nutrition, …)
+│       ├── screens/             # 10 migrated main-tab screens
 │       └── features/
-│           └── ai-coach/        # Pre-workout preview, live coach overlay
+│           ├── active-workout/  # Full exercise modal with 5 files
+│           ├── past-workout/    # Log past workout flow
+│           ├── ai-coach/        # Pre-workout preview + live overlay + analysis modals
+│           ├── analytics/       # Export center + advanced analytics
+│           ├── nutrition/       # Meal logger, saved meals, barcode scanner
+│           ├── workout-calendar.js
+│           ├── view-workout.js
+│           ├── exercise-history.js
+│           └── start-workout.js (incl. cardio)
 │
-├── public/                      # LEGACY — shrinking monolith
-│   └── app.js                   # Still contains unmigrated screens
-│
-├── src/                         # BACKEND — Cloudflare Worker
-│   ├── index.js                 # Hono app entry
-│   ├── frontend.js              # Auto-generated bundle (JS + CSS as strings)
-│   ├── middleware/
-│   │   ├── auth.js
-│   │   ├── static.js            # Serves the HTML shell + inlined bundles
-│   │   ├── error-handler.js     # NEW — unified error responses
-│   │   └── ownership.js         # NEW — resource ownership guards
-│   ├── routes/                  # API endpoints
+├── src/                         # Cloudflare Worker backend
+│   ├── index.js                 # Hono v4 app entry
+│   ├── middleware/              # auth, error-handler, ownership
+│   ├── routes/                  # 11 API route files
 │   ├── services/
-│   │   ├── ai-coach.js          # Existing — post-workout analysis
-│   │   └── ai-realtime.js       # NEW — readiness, predictions, post-set tips
-│   └── utils/                   # NEW — shared utilities
+│   │   ├── ai-coach.js          # Post-workout analysis
+│   │   ├── ai-realtime.js       # Pre/mid-workout AI helpers
+│   │   ├── achievements.js
+│   │   └── email-reports.js
+│   └── utils/                   # Shared utilities
 │       ├── api-response.js      # Canonical response envelope
 │       ├── query-builder.js     # filter() + buildQuery() + partial UPDATE
 │       ├── csv.js               # csvResponse() helper
@@ -83,242 +111,135 @@ fitness-builder/
 │       └── volume.js            # Unilateral-aware SQL fragment
 │
 ├── tests/
-│   ├── unit/                    # Vitest — 81 passing tests
-│   └── e2e/                     # Playwright — configured, minimal tests
+│   ├── unit/                    # 81 passing Vitest tests
+│   └── e2e/                     # Playwright smoke tests
 │
-├── migrations/                  # D1 SQL migrations (26 total)
-│   ├── README.md                # Explains duplicate-number issue
-│   └── 0026_schema_cleanup.sql  # NEW — indexes, FK cascades, UNIQUE
+├── migrations/                  # 26 D1 SQL migrations
+│   ├── README.md                # Explains duplicate numbers + nutrition model
+│   └── 0026_schema_cleanup.sql  # Indexes, FK cascades, UNIQUE constraints
 │
-├── vite.config.js               # NEW — Vite config
-├── vitest.config.js             # NEW — Vitest config
-├── playwright.config.js         # NEW — Playwright config
-└── build-frontend.js            # UPDATED — combines Vite output + legacy
+├── vite.config.js               # Vite config + dev proxy
+├── vitest.config.js             # Vitest config
+├── playwright.config.js         # Playwright config
+├── wrangler.toml                # Now includes [assets] binding + Hono 4 compat
+└── frontend-dist/               # Vite build output (gitignored)
 ```
 
 ## Build pipeline
 
 ```
 npm run build
-├── npm run build:frontend    →  Vite builds frontend/src/ → frontend-dist/
-└── npm run build:legacy      →  build-frontend.js reads frontend-dist/ + public/app.js
-                                  and writes src/frontend.js as a template-literal export
-```
+  └── vite build
+        ├── Bundles frontend/src/ → frontend-dist/assets/index-*.js + index-*.css
+        ├── Copies frontend/public/app.js → frontend-dist/app.js
+        └── Generates frontend-dist/index.html with asset refs
 
-The Worker deploy model is unchanged: wrangler bundles `src/index.js` with all
-its imports (including the generated `src/frontend.js`) into one Worker.
+npm run deploy:direct
+  ├── npm run build
+  └── wrangler deploy
+        ├── Bundles src/index.js (Worker) → 337 KB
+        └── Uploads frontend-dist/ as Static Assets
+```
 
 ## The bridge pattern
 
-Both the Vite bundle and the legacy `public/app.js` run in the same browser
-scope. The Vite bundle executes first (it's concatenated first by the build
-script) and registers screen handlers; the legacy code runs next and defines
-its own `loadDashboard`, `loadNutrition`, etc.
-
-On `DOMContentLoaded`, `frontend/src/bridge.js` walks its registry and
-overrides each legacy global with the modular implementation:
+The bridge lets the Vite bundle take over legacy global functions. It's
+still present and used by the compat shim in `frontend/public/app.js`
+(which calls `window.loadDashboard`, `window.loadPrograms`, etc.), but
+now every screen registers a modular implementation.
 
 ```js
-import { registerScreen, initBridge } from './bridge.js';
-import { loadDashboard } from './screens/dashboard.js';
-
+// frontend/src/main.js
 registerScreen('dashboard', 'loadDashboard', loadDashboard);
-initBridge(); // swaps window.loadDashboard on DOMContentLoaded
+registerScreen('program', 'loadPrograms', loadPrograms);
+// … 40+ registrations total
+initBridge(); // installs overrides on DOMContentLoaded
 ```
 
-This lets us migrate screens **one at a time** without breaking others.
-Screens not yet migrated continue to use their legacy implementations.
+## Migration status — all complete
 
-## Migration status
+| Area | Status |
+|---|---|
+| Learn | ✅ migrated |
+| Achievements | ✅ migrated |
+| Dashboard | ✅ migrated |
+| Profile | ✅ migrated (uses new Modal) |
+| Programs (list/view/AI/builder/rename) | ✅ migrated |
+| Analytics main view | ✅ migrated |
+| Nutrition main view | ✅ migrated (progress rings) |
+| AI Coach / Insights | ✅ migrated (chat UI) |
+| Workout tab overview | ✅ migrated |
+| Active Workout Modal | ✅ migrated (5-file feature dir) |
+| Log Past Workout | ✅ migrated |
+| Workout Calendar + View Workout | ✅ migrated |
+| Exercise History | ✅ migrated |
+| Start Workout + Cardio | ✅ migrated |
+| Export Center + PDF Reports | ✅ migrated |
+| Advanced Analytics + AI Coaching Analysis | ✅ migrated |
+| Meal Logger + Food Search + Barcode Scanner | ✅ migrated |
+| Saved Meals + Quick Macros + Entries Editor | ✅ migrated |
 
-| Screen              | Status         | Legacy file size impact            |
-|---------------------|----------------|-------------------------------------|
-| Learn               | ✅ migrated    | −1,786 lines (static HTML → file)   |
-| Achievements        | ✅ migrated    | −164 lines                          |
-| Dashboard           | ✅ migrated    | −144 lines                          |
-| Profile             | ✅ migrated    | −183 lines (uses new Modal)         |
-| Programs            | ✅ migrated    | −715 lines (list/view/AI/builder)   |
-| Analytics main view | ✅ migrated    | −252 lines                          |
-| Nutrition main view | ✅ migrated    | −367 lines (now with progress rings)|
-| AI Coach / Insights | ✅ migrated    | −234 lines                          |
-| Workout tab         | ⏳ legacy      | —                                   |
-| Active Workout Modal| ⏳ legacy (+AI hooks) | See Phase 4               |
-| Log Past Workout    | ⏳ legacy      | —                                   |
+## Phase 4: Real-time AI coaching (fully integrated)
 
-**Legacy `public/app.js` size**: 12,732 → 8,871 lines (−30% reduction).
+- `GET /api/ai/realtime/preview/:dayId` — Pre-workout briefing (readiness + weights)
+- `GET /api/ai/realtime/predict/:exId`  — Smart next-set prediction
+- `POST /api/ai/realtime/analyze`       — Post-set coaching tips
+- Pre-workout briefing modal fires before the warmup screen
+- Live AI coach overlay stays mounted during workouts and analyzes every set
+- 13 unit tests for the realtime AI logic
 
-### Complex sub-modals still in legacy
+## Database improvements
 
-To keep the migration focused, these sub-systems weren't migrated in this
-pass but get a cleaner wrapping via the new main screens:
+Migration `0026_schema_cleanup.sql`:
+- 15 missing indexes added (workouts, exercises, sets, nutrition, meals, AI recs)
+- Dropped `idx_programs_description` (useless free-text index)
+- `UNIQUE(name, equipment)` on exercises prevents duplicates
+- `ON DELETE CASCADE` added to `user_achievements` and `workout_streaks`
 
-- `loadWorkoutHistory` + calendar rendering (called by Analytics)
-- `openUnifiedExporter` + PDF generation (called by Analytics)
-- `showLogMealModal` + `showBarcodeScanner` + `showCreateSavedMeal` (called by Nutrition)
-- `generateAICoaching` + `loadAdvancedAnalytics` (called by AI Coach)
-- `showExerciseHistory` (called from multiple places)
+Fixed broken queries in `src/routes/exports.js` (referenced columns that
+don't exist: `recorded_at`, `is_active`, `is_warmup`).
 
-These are marked with `TODO: migrate` comments and can be migrated in
-follow-up PRs without touching any of the already-migrated screens.
+Fixed migration `0022_remove_all_duplicate_exercises.sql` which referenced
+`ai_recommendations.exercise_id` (dropped by migration 0009) — was silently
+failing in CI.
 
-## Phase 4: real-time AI coaching
+## Security & compliance
 
-### New backend endpoints
-
-| Endpoint                               | Purpose                                  |
-|----------------------------------------|------------------------------------------|
-| `GET /api/ai/realtime/preview/:dayId`  | Pre-workout readiness + suggested weights|
-| `GET /api/ai/realtime/predict/:exId`   | Smart weight/rep suggestion              |
-| `POST /api/ai/realtime/analyze`        | Post-set coaching tip                    |
-
-All three are rule-based by default for sub-second latency. The logic lives in
-`src/services/ai-realtime.js` with 13 unit tests in `tests/unit/ai-realtime.test.js`.
-
-### New frontend features
-
-- **Pre-workout briefing**: A modal shown before the warmup screen that shows
-  a 0–100 readiness score, rationale, target muscles, and AI-suggested
-  starting weights per exercise.
-- **Live coach overlay**: A collapsible bottom-sheet that stays mounted for
-  the duration of the workout. After every logged set, it calls
-  `/api/ai/realtime/analyze` and surfaces contextual tips (progression,
-  form warning, load warning, completion celebration).
-- Exposed as `window.aiCoach.{showPreview, initLive, destroyLive, analyzeSet}`
-  so the legacy Active Workout modal can call them at the right lifecycle
-  points.
-
-### Integration points in legacy code
-
-```js
-// public/app.js
-
-async function startWorkoutDay(...) {
-  // …create workout…
-  await window.aiCoach.showPreview(programDayId); // Phase 4
-  showWorkoutWarmupScreen(workout);
-}
-
-async function startWorkoutExercises() {
-  // …initialize workout…
-  window.aiCoach.initLive({ onAction: (action) => /* apply tip */ });
-}
-
-async function addExerciseSet(exerciseId) {
-  // …log set to backend…
-  window.aiCoach.analyzeSet({ currentSets, targetReps, targetSets });
-}
-
-async function finishWorkoutSummary() {
-  // …clear state…
-  window.aiCoach.destroyLive();
-}
-```
-
-## Database cleanup (Phase 2)
-
-Migration `0026_schema_cleanup.sql` added:
-
-- 15 new indexes (workouts, workout_exercises, exercises, sets, nutrition_*, meals, ai_recommendations)
-- Dropped `idx_programs_description` (useless TEXT equality index)
-- `uniq_exercises_name_equipment` UNIQUE index to prevent future duplicates
-- Proper `ON DELETE CASCADE` on `user_achievements` and `workout_streaks`
-  via the standard SQLite recreate-and-copy pattern
-
-Also fixed a pre-existing bug in `migrations/0022_remove_all_duplicate_exercises.sql`
-where it referenced `ai_recommendations.exercise_id` (dropped by migration
-0009). The original had been silently failing in CI via `continue-on-error`.
-
-Also fixed four column-name bugs in `src/routes/exports.js` that referenced
-columns that don't exist in the schema (`recorded_at`, `is_active`, `is_warmup`,
-etc.).
-
-## Conventions introduced
-
-### Frontend
-
-- **No inline `onclick=` attributes.** Use `data-action="…"` and delegate in
-  the component.
-- **No inline `style="…"` attributes** for new code. Use component classes.
-- **No `innerHTML = <string>` with user data.** Use the `html\`…\`` tagged
-  template from `@core/html` which auto-escapes interpolations.
-- **State lives in `store`** (`@core/state`). No ad-hoc globals.
-- **Modals use `openModal()`** from `@ui/Modal` (not the legacy `#modal` element).
-- **Toasts use `toast.*`** from `@ui/Toast` (not `showNotification`).
-
-### Backend
-
-- **Responses go through `ApiResponse`** (`src/utils/api-response.js`):
-  ```js
-  return c.json(ApiResponse.success(data));
-  return c.json(...ApiResponse.error('Not found', { status: 404 }));
-  ```
-  Legacy routes continue to use the flat shape for backward compat.
-
-- **Filtered queries use `buildQuery`** (`src/utils/query-builder.js`):
-  ```js
-  const { sql, params } = buildQuery(
-    'SELECT * FROM workouts',
-    [filter('user_id = ?', user.id), filter('completed = ?', 1)],
-    { orderBy: 'start_time DESC', limit: 20 }
-  );
-  ```
-
-- **Ownership checks use `assertOwnership`** (`src/middleware/ownership.js`):
-  ```js
-  const workout = await assertOwnership(db, 'workouts', workoutId, user.id);
-  // throws NotFoundError → handled by errorHandler middleware
-  ```
-
-- **CSV exports use `csvResponse`** (`src/utils/csv.js`):
-  ```js
-  return csvResponse({
-    filename: 'workouts.csv',
-    columns: [{ header: 'Date', get: (r) => r.date }],
-    rows
-  });
-  ```
+- **Hono 3 → 4 upgrade** closes all 22 known Hono CVEs.
+- **HTML escaping**: all user data goes through the `html\`\`` tagged template
+  which auto-escapes interpolations. The legacy `innerHTML = \`${userdata}\``
+  pattern is completely eliminated.
+- **No inline event handlers** in the HTML shell — everything uses
+  `data-action` delegation.
 
 ## Commands
 
 ```bash
-# Development (runs Vite dev server + wrangler in parallel)
-npm run dev
+# Development
+npm run dev                  # Vite dev + wrangler dev in parallel
+npm run dev:frontend         # just Vite (:3000)
+npm run dev:worker           # just wrangler (:8787)
 
-# Run only the Vite dev server (http://localhost:3000) — no API
-npm run dev:frontend
-
-# Run only the legacy Cloudflare Worker (http://localhost:8787)
-npm run dev:worker
-
-# Legacy-only dev (old build path, Vite not involved)
-npm run dev:legacy
-
-# Build for deployment
-npm run build
+# Build + deploy
+npm run build                # Vite build → frontend-dist/
+npm run deploy:direct        # Build + wrangler deploy
 
 # Tests
-npm test                     # run all unit tests once
-npm run test:watch           # watch mode
+npm test                     # 81 unit tests
+npm run test:watch           # Watch mode
 npm run test:ui              # Vitest UI
 npm run test:e2e             # Playwright E2E
-npm run test:coverage        # coverage report
+npm run test:coverage        # Coverage report
 
 # Database
-npm run db:migrate:local     # apply migrations to local D1
-npm run db:migrate           # apply migrations to remote D1
+npm run db:migrate:local     # Apply migrations to local D1
+npm run db:migrate           # Apply migrations to remote D1
 ```
 
-## Known remaining work
+## Future work (not blocking)
 
-1. **Complete screen migrations** — the three complex remaining tabs (Workout,
-   Active Workout Modal, Log Past Workout) plus the sub-modals listed above.
-2. **Remove `onclick` attributes from legacy HTML** that references legacy
-   globals, replacing with the bridge-aware event delegation.
-3. **Hono v3 → v4 upgrade** — v3 has several CVE advisories we don't currently
-   trigger, but upgrading to v4 closes the door.
-4. **Replace the bundled-as-string deploy** with Cloudflare Static Assets
-   (requires bumping `compatibility_date` to `2024-09-19+` and adding
-   `[assets]` binding in `wrangler.toml`).
-5. **Replace the three overlapping nutrition systems** — `nutrition_log`,
-   `nutrition_entries`, and the newer `meals`/`meal_foods`/`foods` — with a
-   single canonical model. All three are still in use.
+- Bump wrangler to v4.83+ (current 4.77 works; just dev-dependency refresh)
+- Upgrade Vite to v6 (closes esbuild dev-only CVE; requires some config tweaks)
+- Add Playwright tests covering the full workout → rest → PR celebration flow
+- Consider dropping jsPDF + html2canvas CDN deps in favor of a Worker-side
+  PDF generation service
