@@ -1,13 +1,15 @@
 /**
  * Entry point for the refactored frontend.
  *
- * NOTE: During the refactor this module is NOT yet the primary app UI.
- * The legacy `public/app.js` is still the primary entry served by the
- * Worker. This Vite-built module is progressively absorbing screens from
- * the legacy code until the migration is complete.
+ * Two modes:
+ *   1. Vite dev server (`npm run dev:frontend`) — shows a scaffolding status
+ *      page so we can verify tooling. The legacy `public/app.js` is NOT
+ *      served here because the Vite dev server serves `frontend/index.html`.
  *
- * The dev-server mode of this entry shows a scaffolding status page so we
- * can verify the tooling works end-to-end.
+ *   2. Production (served from the Worker) — runs alongside the legacy
+ *      `public/app.js`. The bridge installs modular screen handlers on top
+ *      of legacy globals so individual tabs can be migrated one at a time
+ *      without breaking the others.
  */
 
 import { html } from '@core/html';
@@ -17,7 +19,10 @@ import { toast } from '@ui/Toast';
 import { openModal, confirmDialog } from '@ui/Modal';
 import { progressRing } from '@ui/ProgressRing';
 
-// Expose for debugging & for the eventual legacy-code bridge
+import { initBridge, registerScreen } from './bridge.js';
+import { loadLearn } from './screens/learn.js';
+
+// Expose for debugging and for legacy-code bridging
 window.__fitnessApp = {
   store,
   api,
@@ -26,6 +31,20 @@ window.__fitnessApp = {
   confirmDialog
 };
 
+// -----------------------------------------------------------------------------
+// Register modular screens that replace legacy `load*` functions.
+// Each registered screen takes over its tab; unregistered tabs fall back
+// to the legacy implementation.
+// -----------------------------------------------------------------------------
+registerScreen('learn', 'loadLearn', loadLearn);
+
+// Install overrides once legacy globals are defined.
+// (In Vite dev mode there are no legacy globals, so this is a no-op.)
+initBridge();
+
+// -----------------------------------------------------------------------------
+// Dev-only scaffolding status page (runs under `vite dev` on :3000 only)
+// -----------------------------------------------------------------------------
 function mountScaffoldingStatus() {
   const appEl = document.getElementById('app');
   if (!appEl) return;
@@ -54,18 +73,9 @@ function mountScaffoldingStatus() {
               <h2 class="card-title"><i class="fas fa-check-circle"></i> Foundation Ready</h2>
             </div>
             <p class="text-secondary">
-              The v2 foundation is installed. Core, UI, and utilities are in place.
-              Refactor screens will be added progressively in Phase 3.
+              The v2 foundation is installed. Migrated screens:
+              <strong>${['Learn'].join(', ')}</strong>.
             </p>
-          </div>
-
-          <div class="grid grid-cols-auto">
-            ${['core', 'utils', 'ui', 'screens', 'features', 'services'].map((dir) => html`
-              <div class="card card-compact">
-                <div class="stat-label">frontend/src/${dir}</div>
-                <div class="stat-value" style="font-size: var(--text-xl);">Ready</div>
-              </div>
-            `)}
           </div>
 
           <div class="card">
@@ -85,15 +95,27 @@ function mountScaffoldingStatus() {
               <button class="btn btn-outline" data-action="test-ring">
                 <i class="fas fa-circle-notch"></i> Test Progress Ring
               </button>
+              <button class="btn btn-outline" data-action="test-learn">
+                <i class="fas fa-graduation-cap"></i> Test Learn Screen
+              </button>
             </div>
+          </div>
+
+          <div id="learn-preview" class="card" style="display: none;">
+            <div class="card-header">
+              <h2 class="card-title">Learn screen preview</h2>
+              <button class="btn btn-ghost btn-sm" data-action="hide-learn">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+            <div id="learn"></div>
           </div>
         </div>
       </main>
     </div>
   `;
 
-  // Wire up test actions
-  appEl.addEventListener('click', (e) => {
+  appEl.addEventListener('click', async (e) => {
     const action = e.target.closest('[data-action]')?.getAttribute('data-action');
     if (!action) return;
 
@@ -129,17 +151,17 @@ function mountScaffoldingStatus() {
           ]
         });
         break;
-      case 'test-confirm':
-        confirmDialog('Delete this workout? This cannot be undone.', {
+      case 'test-confirm': {
+        const confirmed = await confirmDialog('Delete this workout? This cannot be undone.', {
           title: 'Delete workout?',
           confirmLabel: 'Delete',
           confirmVariant: 'btn-danger'
-        }).then((confirmed) => {
-          toast.show(confirmed ? 'Confirmed!' : 'Cancelled', {
-            type: confirmed ? 'success' : 'info'
-          });
+        });
+        toast.show(confirmed ? 'Confirmed!' : 'Cancelled', {
+          type: confirmed ? 'success' : 'info'
         });
         break;
+      }
       case 'test-ring':
         openModal({
           title: 'Progress Rings',
@@ -161,12 +183,19 @@ function mountScaffoldingStatus() {
           `
         });
         break;
+      case 'test-learn':
+        document.getElementById('learn-preview').style.display = '';
+        loadLearn();
+        break;
+      case 'hide-learn':
+        document.getElementById('learn-preview').style.display = 'none';
+        break;
     }
   });
 }
 
 // Only mount the scaffolding UI when running under the Vite dev server.
-// In production, the legacy `public/app.js` still owns the DOM at #app.
+// In production, the legacy `public/app.js` still owns #app.
 if (import.meta.env && import.meta.env.DEV) {
   document.addEventListener('DOMContentLoaded', mountScaffoldingStatus);
 }
