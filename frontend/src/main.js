@@ -42,6 +42,7 @@ import {
 import { loadAnalytics } from './screens/analytics.js';
 import { loadNutrition } from './screens/nutrition.js';
 import { loadInsights } from './screens/insights.js';
+import { loadWorkout } from './screens/workout.js';
 import { showWorkoutPreview } from './features/ai-coach/WorkoutPreview.js';
 import { liveCoach } from './features/ai-coach/LiveCoachOverlay.js';
 import activeWorkout from './features/active-workout/controller.js';
@@ -108,6 +109,9 @@ registerScreen('nutrition', 'loadNutrition', loadNutrition);
 // AI Coach main view with chat (full analysis and advanced analytics modals
 // remain in legacy for now)
 registerScreen('insights', 'loadInsights', loadInsights);
+
+// Workout tab overview (active workout takeover handled by activeWorkout.resume)
+registerScreen('workout', 'loadWorkout', loadWorkout);
 
 // Install overrides once legacy globals are defined.
 // (In Vite dev mode there are no legacy globals, so this is a no-op.)
