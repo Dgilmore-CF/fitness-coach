@@ -340,12 +340,14 @@ function buildFallbackSuggestion(remaining, mealType) {
 /**
  * Parse natural-language meal descriptions into structured food entries.
  *
+ * Uses the larger Llama 3.3 70B model for better accuracy on nutrition
+ * data (the 8B model hallucinates macros). Prompt is few-shot with known
+ * USDA values, and returned macros are validated against Atwater
+ * coefficients (4·protein + 4·carbs + 9·fat ≈ calories) — entries that
+ * fail the sanity check are recomputed from the macros and flagged as
+ * lower confidence.
+ *
  * Example input:  "2 eggs, a slice of whole-wheat toast, and a banana"
- * Example output: [
- *   { name: "Eggs", quantity: 2, unit: "large", calories: 143, protein_g: 12, carbs_g: 1, fat_g: 10 },
- *   { name: "Whole-wheat toast", quantity: 1, unit: "slice", calories: 70, protein_g: 3, carbs_g: 12, fat_g: 1 },
- *   { name: "Banana", quantity: 1, unit: "medium", calories: 105, protein_g: 1, carbs_g: 27, fat_g: 0 }
- * ]
  */
 export async function parseMealFromText({ ai, text }) {
   if (!text || text.trim().length < 2) {
@@ -359,38 +361,98 @@ export async function parseMealFromText({ ai, text }) {
     };
   }
 
-  const result = await callAI(ai, {
-    systemPrompt:
-      'You are a nutrition data extractor. Given a natural-language meal description, return ONLY valid JSON with this exact shape:\n' +
-      '{"foods":[{"name":"<food name>","quantity":<number>,"unit":"<unit>","calories":<number>,"protein_g":<number>,"carbs_g":<number>,"fat_g":<number>,"fiber_g":<number>,"confidence":"<high|medium|low>"}]}\n' +
-      'Use USDA-typical values for an average serving. If quantity is unclear, assume 1 standard serving. ' +
-      'Use common units: "serving", "cup", "tbsp", "tsp", "oz", "g", "ml", "slice", "medium", "large". ' +
-      'No prose, no markdown, just JSON. If the input is nonsense, return {"foods":[]}.',
-    userPrompt: `Parse this meal description into foods with macros:\n\n"${text}"`,
-    maxTokens: 1000,
-    parseJson: true,
-    fallbackJson: { foods: [] }
-  });
+  // Few-shot prompt with USDA reference values the model can anchor on
+  const systemPrompt = `You are a nutrition data extractor trained on USDA FoodData Central.
+
+Parse natural-language meal descriptions into structured food items with PER-ITEM macros (not per meal totals).
+
+REQUIREMENTS:
+- Return ONLY valid JSON. No prose, no markdown, no code fences.
+- Macros must be REALISTIC. Use USDA values for common foods.
+- The field "calories" MUST roughly equal 4·protein_g + 4·carbs_g + 9·fat_g (±15%).
+- "quantity" × per-unit macros = what the user ate. Per-unit macros go in the object.
+- Units: serving | cup | tbsp | tsp | oz | g | ml | slice | medium | large | small | whole
+- "confidence": high = common exact food, medium = reasonable estimate, low = guessing.
+- If input is nonsense, return {"foods":[]}.
+
+EXACT SHAPE:
+{"foods":[{"name":"<food>","quantity":<num>,"unit":"<unit>","calories":<per unit>,"protein_g":<per unit>,"carbs_g":<per unit>,"fat_g":<per unit>,"fiber_g":<per unit>,"confidence":"<high|medium|low>"}]}
+
+EXAMPLES:
+
+Input: "2 eggs and a slice of whole-wheat toast"
+Output: {"foods":[{"name":"Egg, whole, large","quantity":2,"unit":"large","calories":72,"protein_g":6,"carbs_g":0.4,"fat_g":5,"fiber_g":0,"confidence":"high"},{"name":"Whole-wheat toast","quantity":1,"unit":"slice","calories":80,"protein_g":4,"carbs_g":14,"fat_g":1.1,"fiber_g":2,"confidence":"high"}]}
+
+Input: "a medium banana and 1 cup greek yogurt"
+Output: {"foods":[{"name":"Banana","quantity":1,"unit":"medium","calories":105,"protein_g":1.3,"carbs_g":27,"fat_g":0.4,"fiber_g":3.1,"confidence":"high"},{"name":"Greek yogurt, plain, nonfat","quantity":1,"unit":"cup","calories":133,"protein_g":23,"carbs_g":8.7,"fat_g":0.7,"fiber_g":0,"confidence":"high"}]}
+
+Input: "6oz grilled chicken breast and 1 cup white rice"
+Output: {"foods":[{"name":"Chicken breast, grilled","quantity":6,"unit":"oz","calories":47,"protein_g":8.8,"carbs_g":0,"fat_g":1,"fiber_g":0,"confidence":"high"},{"name":"White rice, cooked","quantity":1,"unit":"cup","calories":205,"protein_g":4.3,"carbs_g":45,"fat_g":0.4,"fiber_g":0.6,"confidence":"high"}]}`;
+
+  // Prefer the larger 70B model for accuracy; fall back to 8B if unavailable
+  const models = [
+    '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+    '@cf/meta/llama-3.1-8b-instruct'
+  ];
+
+  let result = { success: false, parsed: { foods: [] } };
+  for (const model of models) {
+    result = await callAI(ai, {
+      systemPrompt,
+      userPrompt: `Input: "${text.trim()}"\nOutput:`,
+      model,
+      maxTokens: 1200,
+      parseJson: true,
+      fallbackJson: { foods: [] }
+    });
+    if (result.success && Array.isArray(result.parsed?.foods) && result.parsed.foods.length > 0) {
+      break;
+    }
+  }
 
   const parsed = result.parsed || {};
-  const foods = Array.isArray(parsed.foods) ? parsed.foods : [];
+  const rawFoods = Array.isArray(parsed.foods) ? parsed.foods : [];
 
-  // Basic sanity: drop entries missing a name
-  const clean = foods
+  // Sanitize + validate each entry
+  const clean = rawFoods
     .filter((f) => f && typeof f.name === 'string' && f.name.trim().length > 0)
-    .map((f) => ({
-      name: String(f.name).trim(),
-      quantity: Number(f.quantity) || 1,
-      unit: String(f.unit || 'serving').toLowerCase(),
-      calories: Math.max(0, Number(f.calories) || 0),
-      protein_g: Math.max(0, Number(f.protein_g) || 0),
-      carbs_g: Math.max(0, Number(f.carbs_g) || 0),
-      fat_g: Math.max(0, Number(f.fat_g) || 0),
-      fiber_g: Math.max(0, Number(f.fiber_g) || 0),
-      confidence: ['high', 'medium', 'low'].includes(String(f.confidence).toLowerCase())
+    .map((f) => {
+      const protein = Math.max(0, Number(f.protein_g) || 0);
+      const carbs = Math.max(0, Number(f.carbs_g) || 0);
+      const fat = Math.max(0, Number(f.fat_g) || 0);
+      const fiber = Math.max(0, Number(f.fiber_g) || 0);
+      let calories = Math.max(0, Number(f.calories) || 0);
+      let confidence = ['high', 'medium', 'low'].includes(String(f.confidence).toLowerCase())
         ? String(f.confidence).toLowerCase()
-        : 'medium'
-    }));
+        : 'medium';
+
+      // Atwater sanity check: 4P + 4C + 9F should roughly equal calories.
+      // If the model's calories disagree with the macros by >25%, recompute
+      // from the macros (they're usually more reliable) and downgrade confidence.
+      const computed = Math.round(protein * 4 + carbs * 4 + fat * 9);
+      if (calories > 0 && computed > 0) {
+        const ratio = calories / computed;
+        if (ratio < 0.75 || ratio > 1.25) {
+          calories = computed;
+          confidence = confidence === 'high' ? 'medium' : 'low';
+        }
+      } else if (calories === 0 && computed > 0) {
+        calories = computed;
+        confidence = confidence === 'high' ? 'medium' : confidence;
+      }
+
+      return {
+        name: String(f.name).trim(),
+        quantity: Number(f.quantity) || 1,
+        unit: String(f.unit || 'serving').toLowerCase(),
+        calories: Math.round(calories),
+        protein_g: Math.round(protein * 10) / 10,
+        carbs_g: Math.round(carbs * 10) / 10,
+        fat_g: Math.round(fat * 10) / 10,
+        fiber_g: Math.round(fiber * 10) / 10,
+        confidence
+      };
+    });
 
   // Compute totals for convenience
   const totals = clean.reduce(

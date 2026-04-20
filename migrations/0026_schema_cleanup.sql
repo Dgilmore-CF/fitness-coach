@@ -96,7 +96,53 @@ DROP INDEX IF EXISTS idx_programs_description;
 -- This prevents future duplicate exercises (migrations 0021 and 0022 had to
 -- clean up duplicates that accumulated because there was no constraint).
 -- Uses a unique INDEX (same effect, can be added without table recreation).
+--
+-- IMPORTANT: migrations 0021/0022 were supposed to clean up dupes but 0022
+-- silently failed in CI (bad column ref). Remote DB still has ~114 duplicate
+-- rows. Dedupe first, then add the unique index.
 
+-- Step A: remap any references on duplicate rows to point at the canonical
+-- (lowest-id) row for each (name, equipment) pair
+UPDATE workout_exercises
+SET exercise_id = (
+  SELECT MIN(e2.id) FROM exercises e2
+  WHERE e2.name = (SELECT name FROM exercises WHERE id = workout_exercises.exercise_id)
+    AND IFNULL(e2.equipment,'') = IFNULL((SELECT equipment FROM exercises WHERE id = workout_exercises.exercise_id),'')
+)
+WHERE exercise_id IN (
+  SELECT e.id FROM exercises e
+  WHERE e.id != (SELECT MIN(id) FROM exercises WHERE name = e.name AND IFNULL(equipment,'') = IFNULL(e.equipment,''))
+);
+
+UPDATE program_exercises
+SET exercise_id = (
+  SELECT MIN(e2.id) FROM exercises e2
+  WHERE e2.name = (SELECT name FROM exercises WHERE id = program_exercises.exercise_id)
+    AND IFNULL(e2.equipment,'') = IFNULL((SELECT equipment FROM exercises WHERE id = program_exercises.exercise_id),'')
+)
+WHERE exercise_id IN (
+  SELECT e.id FROM exercises e
+  WHERE e.id != (SELECT MIN(id) FROM exercises WHERE name = e.name AND IFNULL(equipment,'') = IFNULL(e.equipment,''))
+);
+
+UPDATE personal_records
+SET exercise_id = (
+  SELECT MIN(e2.id) FROM exercises e2
+  WHERE e2.name = (SELECT name FROM exercises WHERE id = personal_records.exercise_id)
+    AND IFNULL(e2.equipment,'') = IFNULL((SELECT equipment FROM exercises WHERE id = personal_records.exercise_id),'')
+)
+WHERE exercise_id IN (
+  SELECT e.id FROM exercises e
+  WHERE e.id != (SELECT MIN(id) FROM exercises WHERE name = e.name AND IFNULL(equipment,'') = IFNULL(e.equipment,''))
+);
+
+-- Step B: delete duplicates (keeping the lowest id for each (name, equipment))
+DELETE FROM exercises
+WHERE id NOT IN (
+  SELECT MIN(id) FROM exercises GROUP BY name, IFNULL(equipment,'')
+);
+
+-- Step C: add the unique index
 CREATE UNIQUE INDEX IF NOT EXISTS uniq_exercises_name_equipment
   ON exercises(name, equipment);
 
@@ -112,9 +158,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS uniq_exercises_name_equipment
 -- SQLite doesn't support ALTER TABLE ... DROP CONSTRAINT, so we use the
 -- standard recreate-and-copy pattern.
 
--- --- user_achievements ---
+-- --- user_achievements --- (safe: drops any leftover _new from prior attempts)
 
-CREATE TABLE IF NOT EXISTS user_achievements_new (
+DROP TABLE IF EXISTS user_achievements_new;
+
+CREATE TABLE user_achievements_new (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL,
   achievement_key TEXT NOT NULL,
@@ -138,7 +186,9 @@ CREATE INDEX IF NOT EXISTS idx_user_achievements_user ON user_achievements(user_
 
 -- --- workout_streaks ---
 
-CREATE TABLE IF NOT EXISTS workout_streaks_new (
+DROP TABLE IF EXISTS workout_streaks_new;
+
+CREATE TABLE workout_streaks_new (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL,
   current_streak INTEGER DEFAULT 0,
