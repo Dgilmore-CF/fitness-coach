@@ -49,6 +49,11 @@ import { loadInsights } from './screens/insights.js';
 import { loadWorkout } from './screens/workout.js';
 import { showWorkoutPreview } from './features/ai-coach/WorkoutPreview.js';
 import { liveCoach } from './features/ai-coach/LiveCoachOverlay.js';
+import {
+  showNutritionAnalysis,
+  showMealSuggestion,
+  showParseMeal
+} from './features/ai-coach/nutrition-coach.js';
 import activeWorkout from './features/active-workout/controller.js';
 import { showLogPastWorkout } from './features/past-workout/controller.js';
 import { showExerciseHistory } from './features/exercise-history.js';
@@ -215,6 +220,11 @@ registerScreen('ai-coaching', 'generateAICoaching', generateAICoaching);
 registerScreen('ai-exercise-coaching', 'getExerciseCoaching', getExerciseCoaching);
 registerScreen('ai-send-chat', 'sendAIChat', sendAIChat);
 registerScreen('ai-quick-q', 'askQuickQuestion', askQuickQuestion);
+
+// AI Nutrition Coach (Phase 5)
+registerScreen('ai-nutrition-analyze', 'showNutritionAnalysis', showNutritionAnalysis);
+registerScreen('ai-nutrition-suggest', 'showMealSuggestion', showMealSuggestion);
+registerScreen('ai-nutrition-parse', 'showParseMeal', showParseMeal);
 
 // Nutrition meal logger + barcode scanner
 registerScreen('meal-logger', 'showLogMealModal', showLogMealModal);
