@@ -797,6 +797,204 @@ function calculateMacros(food, quantity, unit) {
   };
 }
 
+// ============================================================================
+// Open Food Facts nutrient normalization
+//
+// OFF data is notoriously inconsistent:
+//   - Some products report calories only in kJ (energy-kj_*) and need
+//     conversion (1 kcal = 4.184 kJ).
+//   - European products often report `salt` instead of `sodium`
+//     (1 g salt = 400 mg sodium).
+//   - `nutrition_data_per` tells us whether unsuffixed fields (e.g.
+//     `proteins`) are per 100 g or per serving.
+//   - Values can come in as strings.
+//   - Serving info may be absent or wildly wrong (e.g. serving_quantity = 0).
+//
+// This normalizer does its best to extract accurate per-serving macros
+// and then cross-checks calories with the Atwater formula
+// (4·P + 4·C + 9·F ≈ calories). If the declared calories disagree by
+// more than ~25%, we recompute from the macros — usually more reliable
+// than the declared energy value for low-quality OFF entries.
+// ============================================================================
+
+function toNumber(value) {
+  if (value == null || value === '') return null;
+  const n = typeof value === 'number' ? value : parseFloat(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Pick the first defined numeric value from a list of candidate field names.
+ * Returns null if none are present or all are zero/invalid — callers
+ * decide how to fall back.
+ */
+function pickNutrient(nutrients, ...fields) {
+  for (const field of fields) {
+    const val = toNumber(nutrients[field]);
+    if (val != null && val > 0) return val;
+  }
+  // If no positive value, try again but allow 0
+  for (const field of fields) {
+    const val = toNumber(nutrients[field]);
+    if (val != null) return val;
+  }
+  return null;
+}
+
+/**
+ * Resolve a per-serving value for a macronutrient using every OFF field name
+ * combination we know about. Tries, in order:
+ *   1. Direct per-serving (<name>_serving)
+ *   2. Per-100g converted by (serving_size / 100)
+ *   3. Unsuffixed field — interpreted per nutrition_data_per metadata
+ */
+function resolveMacro(nutrients, baseName, servingSize, dataBasis) {
+  const perServing = pickNutrient(nutrients, `${baseName}_serving`);
+  if (perServing != null) return perServing;
+
+  const per100 = pickNutrient(nutrients, `${baseName}_100g`);
+  if (per100 != null) {
+    return per100 * (servingSize / 100);
+  }
+
+  const unsuffixed = pickNutrient(nutrients, baseName);
+  if (unsuffixed != null) {
+    if (dataBasis === 'serving') return unsuffixed;
+    return unsuffixed * (servingSize / 100);
+  }
+  return 0;
+}
+
+/**
+ * Calories — try kcal first, then convert kJ if only kJ is available.
+ */
+function resolveCalories(nutrients, servingSize, dataBasis) {
+  const KJ_PER_KCAL = 4.184;
+
+  const kcalServing = pickNutrient(nutrients, 'energy-kcal_serving');
+  if (kcalServing != null) return kcalServing;
+
+  const kcal100 = pickNutrient(nutrients, 'energy-kcal_100g');
+  if (kcal100 != null) return kcal100 * (servingSize / 100);
+
+  const kcalBase = pickNutrient(nutrients, 'energy-kcal');
+  if (kcalBase != null) {
+    return dataBasis === 'serving' ? kcalBase : kcalBase * (servingSize / 100);
+  }
+
+  // Fall back to kJ energy fields
+  const kjServing = pickNutrient(nutrients, 'energy-kj_serving', 'energy_serving');
+  if (kjServing != null) return kjServing / KJ_PER_KCAL;
+
+  const kj100 = pickNutrient(nutrients, 'energy-kj_100g', 'energy_100g');
+  if (kj100 != null) return (kj100 / KJ_PER_KCAL) * (servingSize / 100);
+
+  const kjBase = pickNutrient(nutrients, 'energy-kj', 'energy');
+  if (kjBase != null) {
+    const kcal = kjBase / KJ_PER_KCAL;
+    return dataBasis === 'serving' ? kcal : kcal * (servingSize / 100);
+  }
+
+  return 0;
+}
+
+/**
+ * Sodium — handle both direct sodium (reported in grams) AND salt
+ * (1 g salt = 400 mg sodium) for European products.
+ */
+function resolveSodiumMg(nutrients, servingSize, dataBasis) {
+  // sodium fields are in GRAMS (per OFF conventions); convert to mg
+  const sodiumG = resolveMacro(nutrients, 'sodium', servingSize, dataBasis);
+  if (sodiumG > 0) return sodiumG * 1000;
+
+  // Fall back to salt (also in grams) — sodium = salt * 0.4
+  const saltG = resolveMacro(nutrients, 'salt', servingSize, dataBasis);
+  if (saltG > 0) return saltG * 400;
+
+  return 0;
+}
+
+function normalizeOpenFoodFactsProduct(product, barcode) {
+  const nutrients = product.nutriments || {};
+
+  // Determine whether unsuffixed fields are per-serving or per-100g.
+  // OFF uses "serving" or "100g" (default).
+  const dataBasis = product.nutrition_data_per === 'serving' ? 'serving' : '100g';
+
+  // Serving size in grams — sanity-capped to avoid absurd values.
+  let servingSize = toNumber(product.serving_quantity);
+  if (servingSize == null || servingSize <= 0 || servingSize > 5000) {
+    servingSize = 100;
+  }
+
+  const servingUnit = (product.serving_quantity_unit || 'g').toLowerCase();
+
+  // Extract macros per SERVING (our canonical unit)
+  let calories = resolveCalories(nutrients, servingSize, dataBasis);
+  const protein = Math.max(0, resolveMacro(nutrients, 'proteins', servingSize, dataBasis));
+  const carbs = Math.max(0, resolveMacro(nutrients, 'carbohydrates', servingSize, dataBasis));
+  const fat = Math.max(0, resolveMacro(nutrients, 'fat', servingSize, dataBasis));
+  const fiber = Math.max(0, resolveMacro(nutrients, 'fiber', servingSize, dataBasis));
+  const sugar = Math.max(0, resolveMacro(nutrients, 'sugars', servingSize, dataBasis));
+  const satFat = Math.max(0, resolveMacro(nutrients, 'saturated-fat', servingSize, dataBasis));
+  const sodiumMg = resolveSodiumMg(nutrients, servingSize, dataBasis);
+
+  calories = Math.max(0, calories);
+
+  // Atwater sanity check: 4·P + 4·C + 9·F should roughly equal calories.
+  // If calories is zero but macros exist, compute. If declared calories
+  // disagrees by >25% with the Atwater computation AND the product has
+  // meaningful macros, prefer the computed value (OFF's calorie field is
+  // often the worst offender on low-quality entries).
+  const atwater = protein * 4 + carbs * 4 + fat * 9;
+  if (atwater > 5) {
+    if (calories === 0) {
+      calories = atwater;
+    } else {
+      const ratio = calories / atwater;
+      if (ratio < 0.75 || ratio > 1.25) {
+        calories = atwater;
+      }
+    }
+  }
+
+  // Name / brand polishing
+  const name =
+    product.product_name ||
+    product.product_name_en ||
+    product.generic_name ||
+    product.generic_name_en ||
+    'Unknown Product';
+  const brand = product.brands ? String(product.brands).split(',')[0].trim() : null;
+
+  // Description for display
+  const servingDescription =
+    product.serving_size ||
+    (servingSize ? `${Math.round(servingSize)}${servingUnit}` : '1 serving');
+
+  return {
+    id: null,
+    name,
+    brand,
+    barcode,
+    source: 'openfoodfacts',
+    source_id: barcode,
+    serving_size: Math.round(servingSize * 10) / 10,
+    serving_unit: servingUnit === 'ml' ? 'ml' : 'g',
+    serving_description: servingDescription,
+    calories: Math.round(calories),
+    protein_g: Math.round(protein * 10) / 10,
+    carbs_g: Math.round(carbs * 10) / 10,
+    fat_g: Math.round(fat * 10) / 10,
+    fiber_g: Math.round(fiber * 10) / 10,
+    sugar_g: Math.round(sugar * 10) / 10,
+    sodium_mg: Math.round(sodiumMg),
+    saturated_fat_g: Math.round(satFat * 10) / 10,
+    verified: 1,
+    image_url: product.image_url || null
+  };
+}
+
 // Search foods in local database
 nutrition.get('/foods/search', async (c) => {
   try {
@@ -1033,10 +1231,13 @@ nutrition.get('/foods/barcode/:barcode', async (c) => {
       console.warn('Barcode cache read failed:', cacheErr.message);
     }
 
-    // Check if we already have this in our foods table
+    // Check if we have a USER-created food with this barcode (custom entries).
+    // We intentionally DO NOT return here for source='openfoodfacts' rows,
+    // because those may have been saved by the old buggy parser with wrong
+    // macros — fetching fresh from OFF and UPSERTing is safer.
     try {
       const existingFood = await db.prepare(
-        'SELECT * FROM foods WHERE barcode = ? LIMIT 1'
+        "SELECT * FROM foods WHERE barcode = ? AND source != 'openfoodfacts' LIMIT 1"
       ).bind(barcode).first();
 
       if (existingFood) {
@@ -1075,64 +1276,59 @@ nutrition.get('/foods/barcode/:barcode', async (c) => {
     }
     
     const product = data.product;
-    const nutrients = product.nutriments || {};
+    const food = normalizeOpenFoodFactsProduct(product, barcode);
     
-    // Get serving size - prefer per-serving values if available
-    const servingSize = parseFloat(product.serving_quantity) || 100;
-    const hasPerServing = nutrients['energy-kcal_serving'] !== undefined;
-    
-    // Use per-serving values if available, otherwise calculate from per-100g
-    const multiplier = hasPerServing ? 1 : (servingSize / 100);
-    
-    const food = {
-      id: null,
-      name: product.product_name || product.generic_name || 'Unknown Product',
-      brand: product.brands || null,
-      barcode: barcode,
-      source: 'openfoodfacts',
-      source_id: barcode,
-      serving_size: servingSize,
-      serving_unit: 'g',
-      serving_description: product.serving_size || `${servingSize}g`,
-      calories: hasPerServing 
-        ? (nutrients['energy-kcal_serving'] || 0)
-        : ((nutrients['energy-kcal_100g'] || nutrients['energy-kcal'] || 0) * multiplier),
-      protein_g: hasPerServing
-        ? (nutrients.proteins_serving || 0)
-        : ((nutrients.proteins_100g || nutrients.proteins || 0) * multiplier),
-      carbs_g: hasPerServing
-        ? (nutrients.carbohydrates_serving || 0)
-        : ((nutrients.carbohydrates_100g || nutrients.carbohydrates || 0) * multiplier),
-      fat_g: hasPerServing
-        ? (nutrients.fat_serving || 0)
-        : ((nutrients.fat_100g || nutrients.fat || 0) * multiplier),
-      fiber_g: hasPerServing
-        ? (nutrients.fiber_serving || 0)
-        : ((nutrients.fiber_100g || nutrients.fiber || 0) * multiplier),
-      sugar_g: hasPerServing
-        ? (nutrients.sugars_serving || 0)
-        : ((nutrients.sugars_100g || nutrients.sugars || 0) * multiplier),
-      sodium_mg: hasPerServing
-        ? ((nutrients.sodium_serving || 0) * 1000)
-        : ((nutrients.sodium_100g || 0) * 1000 * multiplier),
-      saturated_fat_g: hasPerServing
-        ? (nutrients['saturated-fat_serving'] || 0)
-        : ((nutrients['saturated-fat_100g'] || 0) * multiplier),
-      verified: 1,
-      image_url: product.image_url || null
-    };
-    
+    // UPSERT the food into our foods table so next lookup returns the
+    // freshly-normalized values (and so meal logging can reference it
+    // by id without duplicating). Uses ON CONFLICT(source, source_id).
+    let savedFood = food;
+    try {
+      const row = await db.prepare(
+        `INSERT INTO foods (
+           name, brand, barcode, source, source_id,
+           serving_size, serving_unit, serving_description,
+           calories, protein_g, carbs_g, fat_g, fiber_g, sugar_g,
+           sodium_mg, saturated_fat_g, verified
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+         ON CONFLICT(source, source_id) DO UPDATE SET
+           name = excluded.name,
+           brand = excluded.brand,
+           barcode = excluded.barcode,
+           serving_size = excluded.serving_size,
+           serving_unit = excluded.serving_unit,
+           serving_description = excluded.serving_description,
+           calories = excluded.calories,
+           protein_g = excluded.protein_g,
+           carbs_g = excluded.carbs_g,
+           fat_g = excluded.fat_g,
+           fiber_g = excluded.fiber_g,
+           sugar_g = excluded.sugar_g,
+           sodium_mg = excluded.sodium_mg,
+           saturated_fat_g = excluded.saturated_fat_g,
+           updated_at = CURRENT_TIMESTAMP
+         RETURNING *`
+      ).bind(
+        food.name, food.brand, food.barcode, food.source, food.source_id,
+        food.serving_size, food.serving_unit, food.serving_description,
+        food.calories, food.protein_g, food.carbs_g, food.fat_g,
+        food.fiber_g, food.sugar_g, food.sodium_mg, food.saturated_fat_g
+      ).first();
+      if (row) savedFood = { ...row, image_url: food.image_url };
+    } catch (upsertErr) {
+      console.warn('Food UPSERT from barcode failed:', upsertErr.message);
+    }
+
     // Cache result for 30 days (best-effort)
     try {
       await db.prepare(
         `INSERT OR REPLACE INTO barcode_cache (barcode, food_json, source, expires_at)
          VALUES (?, ?, 'openfoodfacts', datetime('now', '+30 days'))`
-      ).bind(barcode, JSON.stringify(food)).run();
+      ).bind(barcode, JSON.stringify(savedFood)).run();
     } catch (cacheErr) {
       console.warn('Barcode cache write failed:', cacheErr.message);
     }
 
-    return c.json({ food, source: 'openfoodfacts' });
+    return c.json({ food: savedFood, source: 'openfoodfacts' });
     } catch (error) {
       console.error('Open Food Facts API error:', error);
       return c.json({ food: null, error: error.message, source: 'error' });
