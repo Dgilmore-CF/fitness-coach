@@ -82,27 +82,62 @@ nutrition.get('/daily', async (c) => {
     'SELECT * FROM nutrition_log WHERE user_id = ? AND date = ?'
   ).bind(user.id, date).first();
 
-  // Calculate recommended protein based on weight (2g per kg for hypertrophy)
-  const recommendedProtein = user.weight_kg ? user.weight_kg * 2 : 150;
-  
-  // Recommended water (35ml per kg body weight)
-  const recommendedWater = user.weight_kg ? user.weight_kg * 35 : 2500;
+  // Pull the user's latest macro targets if they've set custom ones; otherwise
+  // fall back to weight-based recommendations.
+  const target = await db.prepare(
+    `SELECT * FROM macro_targets
+     WHERE user_id = ? AND effective_date <= ?
+     ORDER BY effective_date DESC LIMIT 1`
+  ).bind(user.id, date).first().catch(() => null);
 
-  // Recommended creatine (5g per day standard, 0.03g per kg for loading phase)
-  // Standard maintenance dose is 5g regardless of weight
+  // Defaults: 2g protein/kg, 35ml water/kg, 5g creatine flat.
+  // Calories: 30 kcal/kg maintenance is a reasonable default.
+  // Macro split defaults: 40% carbs / 30% protein / 30% fat by calories.
+  const weight = user.weight_kg || 75;
+  const recommendedProtein = target?.protein_g || Math.round(weight * 2);
+  const recommendedWater = target?.water_ml || Math.round(weight * 35);
   const recommendedCreatine = 5;
+  const recommendedCalories = target?.calories || Math.round(weight * 30);
+  const recommendedCarbs = target?.carbs_g || Math.round((recommendedCalories * 0.40) / 4);
+  const recommendedFat = target?.fat_g || Math.round((recommendedCalories * 0.30) / 9);
+  const recommendedFiber = target?.fiber_g || 30;
+
+  const calories = log?.calories || 0;
+  const protein = log?.protein_grams || 0;
+  const water = log?.water_ml || 0;
+  const creatine = log?.creatine_grams || 0;
+  const carbs = log?.carbs_grams || 0;
+  const fat = log?.fat_grams || 0;
+  const fiber = log?.fiber_grams || 0;
+
+  const pct = (value, goal) => (goal > 0 ? (value / goal) * 100 : 0);
 
   return c.json({
     date,
-    protein_grams: log?.protein_grams || 0,
-    water_ml: log?.water_ml || 0,
-    creatine_grams: log?.creatine_grams || 0,
+    // Actual intake
+    calories,
+    protein_grams: protein,
+    water_ml: water,
+    creatine_grams: creatine,
+    carbs_grams: carbs,
+    fat_grams: fat,
+    fiber_grams: fiber,
+    // Goals
+    calorie_goal: recommendedCalories,
     protein_goal: recommendedProtein,
     water_goal: recommendedWater,
     creatine_goal: recommendedCreatine,
-    protein_percentage: log?.protein_grams ? (log.protein_grams / recommendedProtein) * 100 : 0,
-    water_percentage: log?.water_ml ? (log.water_ml / recommendedWater) * 100 : 0,
-    creatine_percentage: log?.creatine_grams ? (log.creatine_grams / recommendedCreatine) * 100 : 0
+    carbs_goal: recommendedCarbs,
+    fat_goal: recommendedFat,
+    fiber_goal: recommendedFiber,
+    // Percentages (capped at 100 in UI, but raw here)
+    calorie_percentage: pct(calories, recommendedCalories),
+    protein_percentage: pct(protein, recommendedProtein),
+    water_percentage: pct(water, recommendedWater),
+    creatine_percentage: pct(creatine, recommendedCreatine),
+    carbs_percentage: pct(carbs, recommendedCarbs),
+    fat_percentage: pct(fat, recommendedFat),
+    fiber_percentage: pct(fiber, recommendedFiber)
   });
 });
 
@@ -150,22 +185,31 @@ nutrition.get('/analytics', async (c) => {
   ).bind(user.id, days).all();
 
   const logs = history.results || [];
-  
-  // Calculate goals
-  const proteinGoal = user.weight_kg ? user.weight_kg * 2 : 150;
-  const waterGoal = user.weight_kg ? user.weight_kg * 35 : 2500;
+
+  // Pull latest macro targets if set, else fall back to weight-based defaults
+  const target = await db.prepare(
+    `SELECT * FROM macro_targets WHERE user_id = ?
+     ORDER BY effective_date DESC LIMIT 1`
+  ).bind(user.id).first().catch(() => null);
+
+  const weight = user.weight_kg || 75;
+  const proteinGoal = target?.protein_g || Math.round(weight * 2);
+  const waterGoal = target?.water_ml || Math.round(weight * 35);
   const creatineGoal = 5;
+  const calorieGoal = target?.calories || Math.round(weight * 30);
+  const carbsGoal = target?.carbs_g || Math.round((calorieGoal * 0.40) / 4);
+  const fatGoal = target?.fat_g || Math.round((calorieGoal * 0.30) / 9);
 
   // Calculate averages
-  const avgProtein = logs.length > 0 
-    ? logs.reduce((sum, log) => sum + (log.protein_grams || 0), 0) / logs.length 
-    : 0;
-  const avgWater = logs.length > 0 
-    ? logs.reduce((sum, log) => sum + (log.water_ml || 0), 0) / logs.length 
-    : 0;
-  const avgCreatine = logs.length > 0 
-    ? logs.reduce((sum, log) => sum + (log.creatine_grams || 0), 0) / logs.length 
-    : 0;
+  const avg = (key) => (logs.length > 0
+    ? logs.reduce((sum, log) => sum + (log[key] || 0), 0) / logs.length
+    : 0);
+  const avgProtein = avg('protein_grams');
+  const avgWater = avg('water_ml');
+  const avgCreatine = avg('creatine_grams');
+  const avgCalories = avg('calories');
+  const avgCarbs = avg('carbs_grams');
+  const avgFat = avg('fat_grams');
 
   // Count days hitting goals
   const proteinGoalDays = logs.filter(log => log.protein_grams >= proteinGoal).length;
@@ -241,26 +285,36 @@ nutrition.get('/analytics', async (c) => {
   return c.json({
     summary: {
       total_days_logged: logs.length,
+      avg_calories_daily: Math.round(avgCalories),
       avg_protein_daily: Math.round(avgProtein),
       avg_water_daily: Math.round(avgWater),
       avg_creatine_daily: avgCreatine.toFixed(1),
+      avg_carbs_daily: Math.round(avgCarbs),
+      avg_fat_daily: Math.round(avgFat),
       protein_goal_days: proteinGoalDays,
       water_goal_days: waterGoalDays,
       creatine_goal_days: creatineGoalDays,
       all_goals_days: allGoalsDays,
       current_streak: currentStreak,
       longest_streak: longestStreak,
+      calorie_goal: calorieGoal,
       protein_goal: proteinGoal,
       water_goal: waterGoal,
       creatine_goal: creatineGoal,
+      carbs_goal: carbsGoal,
+      fat_goal: fatGoal,
       adherence_rate: logs.length > 0 ? Math.round((allGoalsDays / logs.length) * 100) : 0
     },
     weekly_trends: weeklyData.reverse(),
     daily_data: logs.map(log => ({
       date: log.date,
+      calories: log.calories || 0,
       protein: log.protein_grams || 0,
       water: log.water_ml || 0,
       creatine: log.creatine_grams || 0,
+      carbs: log.carbs_grams || 0,
+      fat: log.fat_grams || 0,
+      calorie_goal: calorieGoal,
       protein_goal: proteinGoal,
       water_goal: waterGoal,
       creatine_goal: creatineGoal,
@@ -1163,7 +1217,7 @@ nutrition.post('/meals', async (c) => {
   ).bind(user.id, mealDate, mealType, name || null, notes || null).first();
   
   // Add foods to meal
-  let totalCalories = 0, totalProtein = 0, totalCarbs = 0, totalFat = 0;
+  let totalCalories = 0, totalProtein = 0, totalCarbs = 0, totalFat = 0, totalFiber = 0;
   
   if (foods && foods.length > 0) {
     for (const item of foods) {
@@ -1234,7 +1288,8 @@ nutrition.post('/meals', async (c) => {
       totalProtein += macros.protein_g;
       totalCarbs += macros.carbs_g;
       totalFat += macros.fat_g;
-      
+      totalFiber += macros.fiber_g || 0;
+
       // Update user favorites/frequent foods
       await db.prepare(
         `INSERT INTO user_favorite_foods (user_id, food_id, use_count, last_used)
@@ -1246,14 +1301,28 @@ nutrition.post('/meals', async (c) => {
     }
   }
   
-  // Also update daily nutrition log for backward compatibility
+  // Also update daily nutrition log with the full macro breakdown so the
+  // Today's Nutrition rings + AI coach have a clean daily total to read.
   await db.prepare(
-    `INSERT INTO nutrition_log (user_id, date, protein_grams, updated_at)
-     VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+    `INSERT INTO nutrition_log
+       (user_id, date, calories, protein_grams, carbs_grams, fat_grams, fiber_grams, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
      ON CONFLICT(user_id, date) DO UPDATE SET
-       protein_grams = protein_grams + excluded.protein_grams,
+       calories = COALESCE(calories, 0) + excluded.calories,
+       protein_grams = COALESCE(protein_grams, 0) + excluded.protein_grams,
+       carbs_grams = COALESCE(carbs_grams, 0) + excluded.carbs_grams,
+       fat_grams = COALESCE(fat_grams, 0) + excluded.fat_grams,
+       fiber_grams = COALESCE(fiber_grams, 0) + excluded.fiber_grams,
        updated_at = CURRENT_TIMESTAMP`
-  ).bind(user.id, mealDate, Math.round(totalProtein)).run();
+  ).bind(
+    user.id,
+    mealDate,
+    Math.round(totalCalories),
+    Math.round(totalProtein * 10) / 10,
+    Math.round(totalCarbs * 10) / 10,
+    Math.round(totalFat * 10) / 10,
+    Math.round(totalFiber * 10) / 10
+  ).run();
   
   return c.json({
     meal: {

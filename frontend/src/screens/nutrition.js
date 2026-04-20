@@ -24,6 +24,20 @@ function renderMacroRings(daily) {
     <div class="macro-rings">
       <div class="macro-ring-wrapper">
         ${raw(progressRing({
+          value: Math.round(daily.calories || 0),
+          max: Math.round(daily.calorie_goal || 2200),
+          size: 120,
+          unit: 'kcal',
+          label: 'Calories',
+          color: 'var(--color-warning)'
+        }))}
+        <div class="macro-ring-meta">
+          Goal: ${Math.round(daily.calorie_goal || 2200)} kcal
+          <span class="text-muted">(${Math.round(daily.calorie_percentage || 0)}%)</span>
+        </div>
+      </div>
+      <div class="macro-ring-wrapper">
+        ${raw(progressRing({
           value: Math.round(daily.protein_grams || 0),
           max: Math.round(daily.protein_goal || 150),
           size: 120,
@@ -65,6 +79,23 @@ function renderMacroRings(daily) {
         </div>
       </div>
     </div>
+    <div class="macro-secondary-stats">
+      <div class="macro-stat">
+        <span class="text-muted">Carbs</span>
+        <strong>${Math.round(daily.carbs_grams || 0)}g</strong>
+        <span class="text-muted" style="font-size: var(--text-xs);">/ ${Math.round(daily.carbs_goal || 0)}g</span>
+      </div>
+      <div class="macro-stat">
+        <span class="text-muted">Fat</span>
+        <strong>${Math.round(daily.fat_grams || 0)}g</strong>
+        <span class="text-muted" style="font-size: var(--text-xs);">/ ${Math.round(daily.fat_goal || 0)}g</span>
+      </div>
+      <div class="macro-stat">
+        <span class="text-muted">Fiber</span>
+        <strong>${Math.round(daily.fiber_grams || 0)}g</strong>
+        <span class="text-muted" style="font-size: var(--text-xs);">/ ${Math.round(daily.fiber_goal || 30)}g</span>
+      </div>
+    </div>
   `;
 }
 
@@ -91,8 +122,40 @@ function renderQuickLog() {
         <button class="btn btn-outline" data-action="quick-macros">
           <i class="fas fa-calculator"></i> Quick Macros
         </button>
+        <button class="btn btn-outline" data-action="parse-meal">
+          <i class="fas fa-magic"></i> Parse Text
+        </button>
         <button class="btn btn-outline" data-action="saved-meals">
           <i class="fas fa-bookmark"></i> Saved
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function renderAICoachCard() {
+  return html`
+    <div class="card ai-nutrition-coach-card">
+      <div class="ai-nutrition-coach-header">
+        <div class="ai-nutrition-coach-icon">
+          <i class="fas fa-robot"></i>
+        </div>
+        <div>
+          <h3 style="margin: 0; color: inherit;">AI Nutrition Coach</h3>
+          <p style="margin: 4px 0 0; opacity: 0.9; font-size: var(--text-sm);">
+            Personalized insights based on your intake and goals
+          </p>
+        </div>
+      </div>
+      <div class="cluster" style="gap: var(--space-2);">
+        <button class="btn ai-nutrition-btn" data-action="ai-analyze">
+          <i class="fas fa-chart-line"></i> Analyze My Day
+        </button>
+        <button class="btn ai-nutrition-btn" data-action="ai-suggest-meal">
+          <i class="fas fa-utensils"></i> What Should I Eat?
+        </button>
+        <button class="btn ai-nutrition-btn" data-action="parse-meal">
+          <i class="fas fa-magic"></i> Parse Meal
         </button>
       </div>
     </div>
@@ -306,6 +369,15 @@ function attachNutritionHandlers(container) {
       case 'create-saved':
         delegateToLegacy('showCreateSavedMeal');
         break;
+      case 'ai-analyze':
+        delegateToLegacy('showNutritionAnalysis');
+        break;
+      case 'ai-suggest-meal':
+        delegateToLegacy('showMealSuggestion');
+        break;
+      case 'parse-meal':
+        delegateToLegacy('showParseMeal');
+        break;
     }
   });
 }
@@ -359,6 +431,8 @@ export async function loadNutrition() {
           </div>
           ${renderMacroRings(daily)}
         </div>
+
+        ${renderAICoachCard()}
 
         <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
           <div class="card">

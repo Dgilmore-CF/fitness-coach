@@ -11,6 +11,11 @@ import {
   predictNextSet,
   analyzePostSet
 } from '../services/ai-realtime.js';
+import {
+  analyzeNutrition,
+  suggestNextMeal,
+  parseMealFromText
+} from '../services/ai-nutrition.js';
 
 const ai = new Hono();
 
@@ -546,6 +551,90 @@ ai.post('/realtime/analyze', async (c) => {
   } catch (error) {
     console.error('Post-set analysis error:', error);
     return c.json({ error: error.message }, 500);
+  }
+});
+
+// ============================================================================
+// AI nutrition coaching (Phase 5)
+// ============================================================================
+
+/**
+ * Analyze today's nutrition intake and surface actionable insights.
+ * Rule-based by default with optional AI narrative summary.
+ *
+ * GET /api/ai/nutrition/analyze?date=YYYY-MM-DD
+ */
+ai.get('/nutrition/analyze', async (c) => {
+  const user = requireAuth(c);
+  const db = c.env.DB;
+  const date = c.req.query('date');
+
+  try {
+    const result = await analyzeNutrition({ ai: c.env.AI, db, user, date });
+    return c.json({ success: true, ...result });
+  } catch (error) {
+    console.error('AI nutrition analyze error:', error);
+    return c.json({ success: false, error: error.message, insights: [] }, 200);
+  }
+});
+
+/**
+ * Suggest a meal (or 3 options) that would help hit the user's remaining
+ * macros for the day. AI-generated with rule-based fallback.
+ *
+ * POST /api/ai/nutrition/suggest-meal
+ * Body: { meal_type?: 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'next' }
+ */
+ai.post('/nutrition/suggest-meal', async (c) => {
+  const user = requireAuth(c);
+  const db = c.env.DB;
+
+  let body = {};
+  try {
+    body = await c.req.json();
+  } catch {
+    // No body is OK — we default to 'next'
+  }
+
+  try {
+    const result = await suggestNextMeal({
+      ai: c.env.AI,
+      db,
+      user,
+      mealType: body?.meal_type || 'next'
+    });
+    return c.json({ success: true, ...result });
+  } catch (error) {
+    console.error('AI suggest-meal error:', error);
+    return c.json({ success: false, error: error.message, suggestions: [] }, 200);
+  }
+});
+
+/**
+ * Parse a natural-language meal description into structured foods.
+ *
+ * POST /api/ai/nutrition/parse-meal
+ * Body: { text: "2 eggs and a banana" }
+ */
+ai.post('/nutrition/parse-meal', async (c) => {
+  requireAuth(c);
+
+  let body = {};
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ success: false, error: 'Invalid request body', foods: [] }, 200);
+  }
+
+  try {
+    const result = await parseMealFromText({
+      ai: c.env.AI,
+      text: body?.text || ''
+    });
+    return c.json({ success: true, ...result });
+  } catch (error) {
+    console.error('AI parse-meal error:', error);
+    return c.json({ success: false, error: error.message, foods: [] }, 200);
   }
 });
 

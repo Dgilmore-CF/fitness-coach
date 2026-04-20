@@ -1355,6 +1355,191 @@
   color: var(--color-text-secondary);
 }
 
+/* Secondary macro breakdown below the rings (carbs, fat, fiber) */
+.macro-secondary-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.macro-stat {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.macro-stat strong {
+  font-size: var(--text-xl);
+  color: var(--color-text);
+}
+
+/* ---------- AI Nutrition Coach card (on the nutrition screen) ---------- */
+.ai-nutrition-coach-card {
+  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+  color: var(--color-text-inverse);
+  border: none;
+}
+
+.ai-nutrition-coach-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.ai-nutrition-coach-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.ai-nutrition-coach-card h3 {
+  color: inherit;
+}
+
+.ai-nutrition-btn {
+  background: rgba(255, 255, 255, 0.2);
+  color: var(--color-text-inverse);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  flex: 1;
+  min-width: 140px;
+}
+
+.ai-nutrition-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  color: var(--color-text-inverse);
+  transform: translateY(-1px);
+}
+
+/* ---------- AI Nutrition modals ---------- */
+.ai-nutrition-hero {
+  background: linear-gradient(135deg, var(--color-primary-subtle) 0%, var(--color-secondary-subtle) 100%);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.ai-nutrition-hero-macros {
+  display: flex;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.ai-nutrition-narrative {
+  padding: var(--space-4);
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-md);
+  border-left: 4px solid #8b5cf6;
+}
+
+.ai-nutrition-narrative-label {
+  color: #8b5cf6;
+  font-weight: var(--font-semibold);
+  margin-bottom: var(--space-2);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.ai-nutrition-narrative p {
+  margin: 0;
+  font-size: var(--text-base);
+  line-height: var(--leading-relaxed);
+}
+
+.remaining-macros-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: var(--space-3);
+}
+
+.remaining-macro {
+  padding: var(--space-3);
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-sm);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.remaining-macro strong {
+  font-size: var(--text-lg);
+}
+
+/* Meal suggestions */
+.meal-suggestion {
+  padding: var(--space-4);
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.meal-suggestion-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.meal-suggestion-macros {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.meal-suggestion-ingredients {
+  margin: var(--space-3) 0;
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+}
+
+.meal-suggestion-ingredients ul {
+  margin-left: var(--space-5);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+}
+
+/* Parsed meal results */
+.parsed-meal {
+  margin-top: var(--space-4);
+}
+
+.parsed-food {
+  padding: var(--space-3);
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-sm);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.parsed-totals {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-primary-subtle);
+  border-radius: var(--radius-sm);
+  text-align: center;
+  color: var(--color-primary);
+}
+
 /* ---------- Nutrition: meal type grid ---------- */
 .meal-type-grid {
   display: grid;
