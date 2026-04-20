@@ -93,9 +93,39 @@ export function getRestEndTime() {
 // Workout stopwatch
 // ============================================================================
 
+/**
+ * SQLite's CURRENT_TIMESTAMP stores UTC time as "YYYY-MM-DD HH:MM:SS" with
+ * no timezone suffix. Safari and some mobile browsers interpret that as
+ * LOCAL time, producing a wildly incorrect elapsed-time calculation
+ * (e.g. "5 hours ago" when you just started the workout).
+ * Normalize to an ISO UTC string before handing to Date.
+ */
+function parseDbTimestamp(input) {
+  if (!input) return Date.now();
+  if (input instanceof Date) return input.getTime();
+  if (typeof input === 'number') return input;
+
+  let str = String(input).trim();
+  // Already ISO with timezone? Use as-is.
+  if (/[Zz]|[+-]\d{2}:?\d{2}$/.test(str)) {
+    const t = new Date(str).getTime();
+    return Number.isFinite(t) ? t : Date.now();
+  }
+  // "YYYY-MM-DD HH:MM:SS" → "YYYY-MM-DDTHH:MM:SSZ"
+  str = str.replace(' ', 'T');
+  if (!/Z$/.test(str)) str = str + 'Z';
+  const t = new Date(str).getTime();
+  // Safety: if parsing fails, or the value is in the future / absurdly far
+  // in the past (>24h), fall back to "now".
+  if (!Number.isFinite(t)) return Date.now();
+  const now = Date.now();
+  if (t > now + 60_000 || now - t > 86_400_000) return now;
+  return t;
+}
+
 export function startWorkoutTimer(startTime, onTick) {
   if (workoutInterval) clearInterval(workoutInterval);
-  workoutStartTime = startTime ? new Date(startTime).getTime() : Date.now();
+  workoutStartTime = parseDbTimestamp(startTime);
   onWorkoutTickCallback = onTick;
   tickWorkout();
   workoutInterval = setInterval(tickWorkout, 1000);

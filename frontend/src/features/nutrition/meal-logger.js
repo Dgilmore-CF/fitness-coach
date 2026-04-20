@@ -371,34 +371,72 @@ async function saveMeal() {
 // ============================================================================
 
 export function showBarcodeScanner() {
+  // Feature detection upfront so we can show an honest message. The native
+  // BarcodeDetector API is only available in Chrome/Edge (desktop + Android);
+  // iOS Safari and Firefox don't support it. Without it, auto-detect can't
+  // work, so we fall back to manual entry immediately.
+  const hasCamera = !!navigator.mediaDevices?.getUserMedia;
+  const hasDetector = typeof window !== 'undefined' && 'BarcodeDetector' in window;
+  const canAutoScan = hasCamera && hasDetector;
+
   openModal({
     title: 'Scan Barcode',
     size: 'default',
     content: String(html`
-      <div style="text-align: center;">
-        <div id="barcode-scanner-container" style="position: relative; width: 100%; max-width: 400px; margin: 0 auto;">
-          <video id="barcode-video" style="width: 100%; border-radius: var(--radius-md); background: #000;"></video>
-          <div class="barcode-frame"></div>
-        </div>
+      <div class="barcode-scanner-layout">
+        ${canAutoScan
+          ? html`
+              <div id="barcode-scanner-container" class="barcode-scanner-container">
+                <video id="barcode-video" playsinline muted autoplay></video>
+                <div class="barcode-frame"></div>
+                <div id="barcode-scanner-status" class="barcode-scanner-status">
+                  <i class="fas fa-circle-notch fa-spin"></i> Starting camera…
+                </div>
+              </div>
+              <p class="text-muted" style="font-size: var(--text-sm); text-align: center; margin: 0;">
+                Point your camera at a UPC / EAN barcode.
+              </p>
+            `
+          : html`
+              <div class="card card-sunken" style="text-align: center; padding: var(--space-5);">
+                <div style="font-size: 40px; margin-bottom: var(--space-2);">📷</div>
+                <strong>Auto-scan unavailable</strong>
+                <p class="text-muted" style="font-size: var(--text-sm); margin-top: var(--space-2);">
+                  ${!hasCamera
+                    ? 'Camera access is not available in this browser.'
+                    : 'This browser does not support barcode auto-detection. Use manual entry below, or try Chrome or Edge.'}
+                </p>
+              </div>
+            `}
 
-        <p class="text-muted" style="margin: var(--space-4) 0;">Position the barcode within the frame.</p>
-
-        <div class="form-group">
-          <label class="form-label">Or enter barcode manually:</label>
-          <div class="cluster">
-            <input type="text" id="manual-barcode" class="input" placeholder="UPC/EAN code" style="flex: 1;" />
+        <div class="form-group" style="margin: 0;">
+          <label class="form-label">Enter barcode manually</label>
+          <div class="cluster" style="gap: var(--space-2);">
+            <input type="text" id="manual-barcode" class="input"
+                   placeholder="UPC / EAN code (e.g. 012345678905)"
+                   inputmode="numeric" autocomplete="off" style="flex: 1;" />
             <button class="btn btn-primary" data-action="lookup-barcode">
-              <i class="fas fa-search"></i> Lookup
+              <i class="fas fa-search"></i> Look up
             </button>
           </div>
         </div>
 
-        <div id="barcode-result" style="margin-top: var(--space-4);"></div>
+        <div id="barcode-result"></div>
       </div>
     `),
     actions: [{ label: 'Close', variant: 'btn-outline' }],
     onOpen: ({ element }) => {
-      startBarcodeScanner();
+      if (canAutoScan) startBarcodeScanner();
+
+      const input = element.querySelector('#manual-barcode');
+      input?.focus();
+      input?.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          lookupBarcode();
+        }
+      });
+
       element.addEventListener('click', (event) => {
         const target = event.target.closest('[data-action="lookup-barcode"]');
         if (target) lookupBarcode();
@@ -410,30 +448,54 @@ export function showBarcodeScanner() {
   });
 }
 
+function setScannerStatus(text, spinner = false) {
+  const statusEl = document.getElementById('barcode-scanner-status');
+  if (!statusEl) return;
+  statusEl.innerHTML = `${spinner ? '<i class="fas fa-circle-notch fa-spin"></i> ' : ''}${text}`;
+}
+
 async function startBarcodeScanner() {
   const video = document.getElementById('barcode-video');
+  const container = document.getElementById('barcode-scanner-container');
   if (!video || !navigator.mediaDevices?.getUserMedia) return;
+
+  setScannerStatus('Requesting camera…', true);
 
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment' }
+      video: { facingMode: { ideal: 'environment' } }
     });
     video.srcObject = stream;
-    await video.play();
+    // iOS + some other browsers require play() to be awaited
+    try {
+      await video.play();
+    } catch {
+      // Autoplay may be blocked — user can tap the video to start
+    }
     state.scannerStream = stream;
     state.scannerActive = true;
 
     if ('BarcodeDetector' in window) {
-      const detector = new window.BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'] });
+      setScannerStatus('Looking for a barcode…', true);
+      const detector = new window.BarcodeDetector({
+        formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39']
+      });
       detectLoop(video, detector);
+    } else {
+      setScannerStatus('Scanner unavailable — use manual entry below', false);
     }
   } catch (err) {
-    const container = document.getElementById('barcode-scanner-container');
+    console.warn('Camera access failed:', err);
     if (container) {
       container.innerHTML = String(html`
-        <div class="empty-state">
-          <div class="empty-state-icon">📷</div>
-          <div class="empty-state-description">Camera unavailable — use manual entry below.</div>
+        <div style="text-align: center; padding: var(--space-5);">
+          <div style="font-size: 40px;">📷</div>
+          <strong>Camera blocked</strong>
+          <p class="text-muted" style="font-size: var(--text-sm); margin-top: var(--space-2);">
+            ${err.name === 'NotAllowedError'
+              ? 'Please grant camera access or use manual entry below.'
+              : 'Camera unavailable — use manual entry below.'}
+          </p>
         </div>
       `);
     }
@@ -475,14 +537,33 @@ async function lookupBarcode() {
     toast.warning('Enter a barcode');
     return;
   }
+  // Basic barcode validation: UPC-A (12), EAN-13 (13), EAN-8 (8), UPC-E (8)
+  if (!/^\d{8,14}$/.test(barcode)) {
+    toast.warning('Barcode should be 8–14 digits');
+    return;
+  }
+
   const resultEl = document.getElementById('barcode-result');
-  if (resultEl) resultEl.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Looking up…</div>';
+  if (resultEl) {
+    resultEl.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Looking up…</div>';
+  }
 
   try {
     const data = await api.get(`/nutrition/foods/barcode/${encodeURIComponent(barcode)}`);
     const food = data.food;
+
     if (!food) {
-      if (resultEl) resultEl.innerHTML = String(html`<div class="empty-state"><div class="empty-state-description">Product not found.</div></div>`);
+      if (resultEl) {
+        resultEl.innerHTML = String(html`
+          <div class="empty-state">
+            <div class="empty-state-icon">🔍</div>
+            <div class="empty-state-title">Not found</div>
+            <div class="empty-state-description">
+              ${data.error || `No product matches barcode ${barcode} in Open Food Facts. Try searching the name instead.`}
+            </div>
+          </div>
+        `);
+      }
       return;
     }
 

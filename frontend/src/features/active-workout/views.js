@@ -480,7 +480,23 @@ function getFunWeightComparison(totalKg) {
 }
 
 export function renderWorkoutSummary(workout, stats, hasModifications) {
-  const totalVolume = stats.total_volume_kg || 0;
+  // Compute totals from exercises if the aggregate stats aren't populated
+  // (e.g. legacy code paths that render summary before complete fires).
+  const exercisesDone = (workout.exercises || []).filter((e) => (e.sets || []).length > 0);
+  const computedVolume = exercisesDone.reduce((total, ex) => {
+    const multiplier = ex.is_unilateral ? 2 : 1;
+    return total + (ex.sets || []).reduce(
+      (sum, set) => sum + (set.weight_kg || 0) * (set.reps || 0) * multiplier, 0
+    );
+  }, 0);
+  const computedSets = exercisesDone.reduce((sum, ex) => sum + (ex.sets?.length || 0), 0);
+  const computedReps = exercisesDone.reduce(
+    (sum, ex) => sum + (ex.sets || []).reduce((s, set) => s + (set.reps || 0), 0), 0
+  );
+
+  // Backend stores this as `total_weight_kg` but accept both names + fall back
+  // to the computed total so users always see a real number.
+  const totalVolume = stats.total_weight_kg || stats.total_volume_kg || computedVolume;
   const funComparison = getFunWeightComparison(totalVolume);
   const duration = stats.total_duration_seconds || 0;
 
@@ -504,30 +520,57 @@ export function renderWorkoutSummary(workout, stats, hasModifications) {
           <div class="stat-value">${formatDuration(duration)}</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Exercises</div>
-          <div class="stat-value">${(workout.exercises || []).filter((e) => (e.sets || []).length > 0).length}</div>
+          <div class="stat-label">Sets / Reps</div>
+          <div class="stat-value" style="font-size: var(--text-2xl);">${computedSets} · ${computedReps}</div>
         </div>
       </div>
 
       <div class="card">
         <div class="card-header">
-          <h3 class="card-title"><i class="fas fa-list"></i> Summary</h3>
+          <h3 class="card-title"><i class="fas fa-list"></i> What You Did (${exercisesDone.length} exercise${exercisesDone.length === 1 ? '' : 's'})</h3>
         </div>
-        <div class="stack stack-sm">
-          ${(workout.exercises || [])
-            .filter((ex) => ex.sets?.length > 0)
-            .map((ex) => html`
-              <div class="aw-summary-row">
-                <div>
-                  <strong>${ex.name}</strong>
-                  <div class="text-muted" style="font-size: var(--text-xs);">${ex.muscle_group}</div>
-                </div>
-                <div class="text-muted">
-                  ${ex.sets.length} set${ex.sets.length === 1 ? '' : 's'}
-                </div>
+        ${exercisesDone.length === 0
+          ? html`
+              <div class="empty-state">
+                <div class="empty-state-icon">💪</div>
+                <div class="empty-state-description">No sets were logged.</div>
               </div>
-            `)}
-        </div>
+            `
+          : html`
+              <div class="stack stack-sm">
+                ${exercisesDone.map((ex) => {
+                  const exVolume = (ex.sets || []).reduce(
+                    (s, set) => s + (set.weight_kg || 0) * (set.reps || 0) * (ex.is_unilateral ? 2 : 1), 0
+                  );
+                  return html`
+                    <div class="aw-summary-exercise">
+                      <div class="aw-summary-exercise-header">
+                        <div>
+                          <strong>${ex.name}</strong>
+                          <div class="text-muted" style="font-size: var(--text-xs);">
+                            ${ex.muscle_group}${ex.is_unilateral ? ' · unilateral' : ''}
+                          </div>
+                        </div>
+                        <div style="text-align: right;">
+                          <div class="text-muted" style="font-size: var(--text-xs);">Volume</div>
+                          <strong class="text-primary">${formatWeight(exVolume)}</strong>
+                        </div>
+                      </div>
+                      <div class="aw-summary-sets">
+                        ${(ex.sets || []).map((set, i) => html`
+                          <div class="aw-summary-set">
+                            <span class="aw-summary-set-num">Set ${i + 1}</span>
+                            <span>${formatWeight(set.weight_kg || 0)}</span>
+                            <span class="text-muted">×</span>
+                            <span><strong>${set.reps || 0}</strong> reps</span>
+                          </div>
+                        `)}
+                      </div>
+                    </div>
+                  `;
+                })}
+              </div>
+            `}
       </div>
 
       <div class="card">

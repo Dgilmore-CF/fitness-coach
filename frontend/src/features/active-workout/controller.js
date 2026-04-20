@@ -412,8 +412,10 @@ async function moveExercise(index, direction) {
   setActiveIndex(newIndex);
 
   try {
+    // Backend expects `exerciseOrders: [{ id, order_index }, ...]`,
+    // not a flat array of ids.
     await api.patch(`/workouts/${workout.id}/reorder`, {
-      exercise_order: exercises.map((e) => e.id)
+      exerciseOrders: exercises.map((e, i) => ({ id: e.id, order_index: i }))
     });
   } catch (err) {
     toast.error(`Could not reorder: ${err.message}`);
@@ -831,9 +833,29 @@ async function showSummary() {
   if (!workout) return;
 
   try {
-    // Mark complete + fetch totals
+    // Mark complete (the complete endpoint returns only the updated workout
+    // row — no exercises). Then immediately GET the full workout (which
+    // joins in exercises + sets) so the summary shows what was actually done.
     const result = await api.post(`/workouts/${workout.id}/complete`);
-    const completed = result.workout || workout;
+    const completedRow = result.workout || workout;
+
+    let completed = completedRow;
+    try {
+      const fullData = await api.get(`/workouts/${workout.id}`);
+      // Merge: use freshly-fetched exercises/sets but keep the completion
+      // totals from the complete endpoint.
+      completed = {
+        ...fullData.workout,
+        total_weight_kg: completedRow.total_weight_kg,
+        total_duration_seconds: completedRow.total_duration_seconds,
+        end_time: completedRow.end_time,
+        completed: completedRow.completed,
+        perceived_exertion: completedRow.perceived_exertion ?? fullData.workout?.perceived_exertion
+      };
+    } catch (fetchErr) {
+      console.warn('Could not re-fetch workout after complete:', fetchErr);
+    }
+
     setWorkout(completed);
 
     const hasMods = getModifications().added.length > 0 || getModifications().deleted.length > 0;
