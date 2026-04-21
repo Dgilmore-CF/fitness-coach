@@ -3038,19 +3038,6 @@
   white-space: nowrap;
 }
 
-.barcode-scanner-engine {
-  position: absolute;
-  bottom: var(--space-2);
-  right: var(--space-2);
-  background: rgba(0, 0, 0, 0.6);
-  color: white;
-  font-size: 10px;
-  padding: 2px var(--space-2);
-  border-radius: var(--radius-full);
-  pointer-events: none;
-  opacity: 0.8;
-}
-
 .barcode-frame {
   position: absolute;
   top: 50%;
@@ -3062,6 +3049,112 @@
   border-radius: var(--radius-sm);
   pointer-events: none;
   box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4);
+}
+
+/* Detected-barcode highlight overlay. SVG sits on top of the video and
+   gets populated with a polygon matching the corners ZXing reported. */
+.barcode-highlight-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.barcode-highlight-poly {
+  animation: barcode-highlight-pulse 0.4s ease-out;
+}
+
+@keyframes barcode-highlight-pulse {
+  0%   { opacity: 0; transform: scale(0.92); transform-origin: center; }
+  60%  { opacity: 1; transform: scale(1.03); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* Camera controls (torch button) — floating in the top-right corner */
+.barcode-scanner-controls {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  display: flex;
+  gap: var(--space-2);
+  z-index: 4;
+}
+
+.barcode-control-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  background: rgba(0, 0, 0, 0.55);
+  color: white;
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  font-size: 16px;
+}
+
+.barcode-control-btn:hover {
+  background: rgba(0, 0, 0, 0.75);
+}
+
+.barcode-control-btn.is-active {
+  background: #fde047; /* amber-300 */
+  color: #78350f;      /* amber-900 */
+  border-color: #fde047;
+}
+
+/* Zoom slider — floating at the bottom of the video */
+.barcode-zoom-wrap {
+  position: absolute;
+  bottom: var(--space-3);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: rgba(0, 0, 0, 0.55);
+  color: white;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  min-width: 70%;
+  max-width: 90%;
+  z-index: 4;
+  font-size: 12px;
+}
+
+.barcode-zoom-slider {
+  flex: 1;
+  appearance: none;
+  -webkit-appearance: none;
+  background: rgba(255, 255, 255, 0.3);
+  height: 4px;
+  border-radius: var(--radius-full);
+  outline: none;
+  cursor: pointer;
+}
+
+.barcode-zoom-slider::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: white;
+  border: 2px solid var(--color-primary);
+  cursor: pointer;
+}
+
+.barcode-zoom-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: white;
+  border: 2px solid var(--color-primary);
+  cursor: pointer;
 }
 
 .barcode-macros {

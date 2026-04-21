@@ -111,3 +111,15 @@ export function playWarning() {
     { frequency: 400, duration: 0.12, volume: 0.3 }
   ]);
 }
+
+/**
+ * Short ascending 2-tone chirp when a barcode is successfully decoded.
+ * Deliberately quick (~150ms) so it overlaps with the lookup API call
+ * without dragging the UX.
+ */
+export function playBarcodeDetected() {
+  playSequence([
+    { frequency: 880, duration: 0.06, gap: 0.01, volume: 0.25 },  // A5
+    { frequency: 1318, duration: 0.09, volume: 0.3 }              // E6
+  ]);
+}
