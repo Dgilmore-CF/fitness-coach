@@ -492,10 +492,14 @@ async function logSet(exerciseId) {
     });
     showRestTimer();
 
-    // AI coach analysis
+    // AI coach analysis — pass exercise_id + workout_id so the backend
+    // can fetch the user's history for this exercise and tailor the tip.
     if (window.aiCoach?.analyzeSet && refreshedExercise) {
       const parsedTargetReps = parseInt(String(refreshedExercise.target_reps || '10').split(/[-–]/)[0], 10) || 10;
+      const currentWorkout = getWorkout();
       window.aiCoach.analyzeSet({
+        exerciseId: refreshedExercise.exercise_id || refreshedExercise.id,
+        workoutId: currentWorkout?.id,
         currentSets: refreshedExercise.sets || [],
         targetReps: parsedTargetReps,
         targetSets: refreshedExercise.target_sets || 3

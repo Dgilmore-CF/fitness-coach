@@ -3,6 +3,25 @@
  * Provides intelligent, personalized recommendations based on complete workout history
  */
 
+import { buildGatewayOptions } from '../utils/ai-parser.js';
+
+/**
+ * Helper to call env.AI.run() with gateway options when available.
+ * All AI calls in this service should go through this wrapper so they
+ * benefit from gateway logging + caching when AI_GATEWAY_ID is set.
+ */
+function withGateway(ai, model, inputs, env, featureName, userId, overrides = {}) {
+  const options = {};
+  const gateway = env ? buildGatewayOptions(env, {
+    metadata: { feature: featureName, userId: String(userId || 'unknown') },
+    ...overrides
+  }) : null;
+  if (gateway) options.gateway = gateway;
+  return Object.keys(options).length > 0
+    ? ai.run(model, inputs, options)
+    : ai.run(model, inputs);
+}
+
 /**
  * Aggregate comprehensive user training data for AI analysis
  */
@@ -338,7 +357,7 @@ Based on this comprehensive training data, provide your expert coaching analysis
 /**
  * Generate AI coaching analysis
  */
-export async function generateCoachingAnalysis(db, ai, userId, analysisType = 'comprehensive') {
+export async function generateCoachingAnalysis(db, ai, userId, analysisType = 'comprehensive', env = null) {
   // Aggregate all training data
   const trainingData = await aggregateTrainingData(db, userId, { days: 90 });
   
@@ -422,13 +441,21 @@ Based on their recent training, provide pre-workout guidance in JSON format:
 
   try {
     // Call AI model
-    const response = await ai.run('@cf/meta/llama-3.1-8b-instruct', {
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: fullPrompt }
-      ],
-      max_tokens: 2000
-    });
+    const response = await withGateway(
+      ai,
+      '@cf/meta/llama-3.1-8b-instruct',
+      {
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: fullPrompt }
+        ],
+        max_tokens: 2000
+      },
+      env,
+      `coach_analysis_${analysisType}`,
+      userId,
+      { cacheTtl: 300 }
+    );
 
     // Parse response
     let analysis = null;
@@ -469,7 +496,7 @@ Based on their recent training, provide pre-workout guidance in JSON format:
 /**
  * Generate exercise-specific coaching
  */
-export async function getExerciseCoaching(db, ai, userId, exerciseId) {
+export async function getExerciseCoaching(db, ai, userId, exerciseId, env = null) {
   // Get exercise details
   const exercise = await db.prepare(`
     SELECT * FROM exercises WHERE id = ?
@@ -549,12 +576,20 @@ Provide coaching in JSON format:
 }`;
 
   try {
-    const response = await ai.run('@cf/meta/llama-3.1-8b-instruct', {
-      messages: [
-        { role: 'system', content: 'You are an expert strength coach specializing in exercise programming and technique.' },
-        { role: 'user', content: prompt }
-      ]
-    });
+    const response = await withGateway(
+      ai,
+      '@cf/meta/llama-3.1-8b-instruct',
+      {
+        messages: [
+          { role: 'system', content: 'You are an expert strength coach specializing in exercise programming and technique.' },
+          { role: 'user', content: prompt }
+        ]
+      },
+      env,
+      'exercise_coaching',
+      userId,
+      { cacheTtl: 1800 }
+    );
 
     let coaching = null;
     try {
@@ -585,7 +620,7 @@ Provide coaching in JSON format:
 /**
  * AI Chat - Ask the coach anything
  */
-export async function chatWithCoach(db, ai, userId, message, conversationHistory = []) {
+export async function chatWithCoach(db, ai, userId, message, conversationHistory = [], env = null) {
   // Get comprehensive user context (90 days for better analysis)
   const trainingData = await aggregateTrainingData(db, userId, { days: 90 });
   
@@ -675,10 +710,18 @@ YOUR COACHING GUIDELINES:
   ];
 
   try {
-    const response = await ai.run('@cf/meta/llama-3.1-8b-instruct', {
-      messages,
-      max_tokens: 1500
-    });
+    const response = await withGateway(
+      ai,
+      '@cf/meta/llama-3.1-8b-instruct',
+      {
+        messages,
+        max_tokens: 1500
+      },
+      env,
+      'coach_chat',
+      userId,
+      { cacheTtl: 0, skipCache: true }
+    );
 
     return {
       success: true,

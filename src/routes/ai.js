@@ -9,7 +9,8 @@ import {
 import {
   buildPreWorkoutContext,
   predictNextSet,
-  analyzePostSet
+  analyzePostSet,
+  analyzeSetWithContext
 } from '../services/ai-realtime.js';
 import {
   analyzeNutrition,
@@ -345,7 +346,7 @@ ai.post('/coach/generate', async (c) => {
   }
 
   try {
-    const result = await generateCoachingAnalysis(db, aiModel, user.id, analysisType);
+    const result = await generateCoachingAnalysis(db, aiModel, user.id, analysisType, c.env);
     return c.json(result);
   } catch (error) {
     console.error('Error generating coaching analysis:', error);
@@ -361,7 +362,7 @@ ai.get('/coach/exercise/:exerciseId', async (c) => {
   const exerciseId = c.req.param('exerciseId');
 
   try {
-    const result = await getExerciseCoaching(db, aiModel, user.id, exerciseId);
+    const result = await getExerciseCoaching(db, aiModel, user.id, exerciseId, c.env);
     return c.json(result);
   } catch (error) {
     console.error('Error getting exercise coaching:', error);
@@ -383,7 +384,7 @@ ai.post('/coach/chat', async (c) => {
       return c.json({ error: 'Message is required' }, 400);
     }
 
-    const result = await chatWithCoach(db, aiModel, user.id, message, history);
+    const result = await chatWithCoach(db, aiModel, user.id, message, history, c.env);
     
     // Save conversation to database if successful
     if (result.success) {
@@ -532,17 +533,32 @@ ai.get('/realtime/predict/:exerciseId', async (c) => {
 });
 
 /**
- * Post-set analysis: suggest rest-time adjustments, form warnings, progression cues.
+ * Post-set analysis: personalized mid-workout coaching that references the
+ * user's actual exercise history, PRs, recent training load, and current
+ * workout trend. AI-powered with a rule-based fallback.
  *
  * POST /api/ai/realtime/analyze
- * Body: { current_sets: [{weight_kg, reps}, ...], target_reps, target_sets }
+ * Body: {
+ *   exercise_id?: number,       // required for tailored insights
+ *   workout_id?: number,        // current workout id (excluded from history)
+ *   current_sets: [{weight_kg, reps}, ...],
+ *   target_reps: number,
+ *   target_sets: number
+ * }
  */
 ai.post('/realtime/analyze', async (c) => {
-  requireAuth(c);
+  const user = requireAuth(c);
+  const db = c.env.DB;
 
   try {
     const body = await c.req.json();
-    const insight = analyzePostSet({
+    const insight = await analyzeSetWithContext({
+      ai: c.env.AI,
+      env: c.env,
+      db,
+      user,
+      exerciseId: body.exercise_id ? Number(body.exercise_id) : null,
+      workoutId: body.workout_id ? Number(body.workout_id) : null,
       currentSets: body.current_sets || [],
       targetReps: body.target_reps || 10,
       targetSets: body.target_sets || 3
@@ -550,7 +566,13 @@ ai.post('/realtime/analyze', async (c) => {
     return c.json({ success: true, insight });
   } catch (error) {
     console.error('Post-set analysis error:', error);
-    return c.json({ error: error.message }, 500);
+    // Graceful fallback: never 500 — fall back to pure rule-based
+    const fallback = analyzePostSet({
+      currentSets: (await c.req.json().catch(() => ({})))?.current_sets || [],
+      targetReps: 10,
+      targetSets: 3
+    });
+    return c.json({ success: false, error: error.message, insight: fallback });
   }
 });
 
@@ -570,7 +592,7 @@ ai.get('/nutrition/analyze', async (c) => {
   const date = c.req.query('date');
 
   try {
-    const result = await analyzeNutrition({ ai: c.env.AI, db, user, date });
+    const result = await analyzeNutrition({ ai: c.env.AI, db, user, date, env: c.env });
     return c.json({ success: true, ...result });
   } catch (error) {
     console.error('AI nutrition analyze error:', error);
@@ -601,7 +623,8 @@ ai.post('/nutrition/suggest-meal', async (c) => {
       ai: c.env.AI,
       db,
       user,
-      mealType: body?.meal_type || 'next'
+      mealType: body?.meal_type || 'next',
+      env: c.env
     });
     return c.json({ success: true, ...result });
   } catch (error) {
@@ -617,7 +640,7 @@ ai.post('/nutrition/suggest-meal', async (c) => {
  * Body: { text: "2 eggs and a banana" }
  */
 ai.post('/nutrition/parse-meal', async (c) => {
-  requireAuth(c);
+  const user = requireAuth(c);
 
   let body = {};
   try {
@@ -629,7 +652,9 @@ ai.post('/nutrition/parse-meal', async (c) => {
   try {
     const result = await parseMealFromText({
       ai: c.env.AI,
-      text: body?.text || ''
+      text: body?.text || '',
+      env: c.env,
+      userId: user.id
     });
     return c.json({ success: true, ...result });
   } catch (error) {

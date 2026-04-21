@@ -7,6 +7,7 @@ import { html, raw } from '@core/html';
 import { api } from '@core/api';
 import { openModal, closeTopModal } from '@ui/Modal';
 import { toast } from '@ui/Toast';
+import { createDecoder, hasCameraSupport, hasNativeDetector } from './barcode-decoder.js';
 
 let state = {
   mealType: 'snack',
@@ -15,6 +16,7 @@ let state = {
   scannedFood: null,
   scannerStream: null,
   scannerActive: false,
+  scannerDecoder: null,
   searchDebounce: null
 };
 
@@ -26,6 +28,7 @@ function resetState() {
     scannedFood: null,
     scannerStream: null,
     scannerActive: false,
+    scannerDecoder: null,
     searchDebounce: null
   };
 }
@@ -371,20 +374,16 @@ async function saveMeal() {
 // ============================================================================
 
 export function showBarcodeScanner() {
-  // Feature detection upfront so we can show an honest message. The native
-  // BarcodeDetector API is only available in Chrome/Edge (desktop + Android);
-  // iOS Safari and Firefox don't support it. Without it, auto-detect can't
-  // work, so we fall back to manual entry immediately.
-  const hasCamera = !!navigator.mediaDevices?.getUserMedia;
-  const hasDetector = typeof window !== 'undefined' && 'BarcodeDetector' in window;
-  const canAutoScan = hasCamera && hasDetector;
+  const hasCamera = hasCameraSupport();
+  // Engine label shown in the status bar so users know which path is running
+  const engineLabel = hasNativeDetector() ? 'Native scanner' : 'ZXing fallback';
 
   openModal({
     title: 'Scan Barcode',
     size: 'default',
     content: String(html`
       <div class="barcode-scanner-layout">
-        ${canAutoScan
+        ${hasCamera
           ? html`
               <div id="barcode-scanner-container" class="barcode-scanner-container">
                 <video id="barcode-video" playsinline muted autoplay></video>
@@ -392,6 +391,7 @@ export function showBarcodeScanner() {
                 <div id="barcode-scanner-status" class="barcode-scanner-status">
                   <i class="fas fa-circle-notch fa-spin"></i> Starting camera…
                 </div>
+                <div class="barcode-scanner-engine">${engineLabel}</div>
               </div>
               <p class="text-muted" style="font-size: var(--text-sm); text-align: center; margin: 0;">
                 Point your camera at a UPC / EAN barcode.
@@ -400,11 +400,9 @@ export function showBarcodeScanner() {
           : html`
               <div class="card card-sunken" style="text-align: center; padding: var(--space-5);">
                 <div style="font-size: 40px; margin-bottom: var(--space-2);">📷</div>
-                <strong>Auto-scan unavailable</strong>
+                <strong>Camera not available</strong>
                 <p class="text-muted" style="font-size: var(--text-sm); margin-top: var(--space-2);">
-                  ${!hasCamera
-                    ? 'Camera access is not available in this browser.'
-                    : 'This browser does not support barcode auto-detection. Use manual entry below, or try Chrome or Edge.'}
+                  This browser does not support camera access. Use manual entry below.
                 </p>
               </div>
             `}
@@ -426,7 +424,7 @@ export function showBarcodeScanner() {
     `),
     actions: [{ label: 'Close', variant: 'btn-outline' }],
     onOpen: ({ element }) => {
-      if (canAutoScan) startBarcodeScanner();
+      if (hasCamera) startBarcodeScanner();
 
       const input = element.querySelector('#manual-barcode');
       input?.focus();
@@ -457,77 +455,74 @@ function setScannerStatus(text, spinner = false) {
 async function startBarcodeScanner() {
   const video = document.getElementById('barcode-video');
   const container = document.getElementById('barcode-scanner-container');
-  if (!video || !navigator.mediaDevices?.getUserMedia) return;
+  if (!video) return;
 
-  setScannerStatus('Requesting camera…', true);
+  setScannerStatus('Starting camera…', true);
 
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' } }
-    });
-    video.srcObject = stream;
-    // iOS + some other browsers require play() to be awaited
-    try {
-      await video.play();
-    } catch {
-      // Autoplay may be blocked — user can tap the video to start
-    }
-    state.scannerStream = stream;
-    state.scannerActive = true;
-
-    if ('BarcodeDetector' in window) {
-      setScannerStatus('Looking for a barcode…', true);
-      const detector = new window.BarcodeDetector({
-        formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39']
-      });
-      detectLoop(video, detector);
-    } else {
-      setScannerStatus('Scanner unavailable — use manual entry below', false);
-    }
-  } catch (err) {
-    console.warn('Camera access failed:', err);
-    if (container) {
-      container.innerHTML = String(html`
-        <div style="text-align: center; padding: var(--space-5);">
-          <div style="font-size: 40px;">📷</div>
-          <strong>Camera blocked</strong>
-          <p class="text-muted" style="font-size: var(--text-sm); margin-top: var(--space-2);">
-            ${err.name === 'NotAllowedError'
-              ? 'Please grant camera access or use manual entry below.'
-              : 'Camera unavailable — use manual entry below.'}
-          </p>
-        </div>
-      `);
-    }
+  // Dispose any prior decoder instance (e.g. if the modal was reopened quickly)
+  if (state.scannerDecoder) {
+    try { state.scannerDecoder.stop(); } catch {}
   }
-}
 
-async function detectLoop(video, detector) {
-  if (!state.scannerActive || !video.srcObject || !document.body.contains(video)) return;
-  if (video.readyState < 2 || !video.videoWidth) {
-    setTimeout(() => detectLoop(video, detector), 100);
-    return;
-  }
-  try {
-    const codes = await detector.detect(video);
-    if (codes.length > 0) {
-      const barcode = codes[0].rawValue;
-      stopBarcodeScanner();
-      const input = document.getElementById('manual-barcode');
-      if (input) input.value = barcode;
-      await lookupBarcode();
-      return;
+  const decoder = createDecoder();
+  state.scannerDecoder = decoder;
+  state.scannerActive = true;
+
+  const handleResult = async (barcode) => {
+    if (!state.scannerActive) return;
+    state.scannerActive = false;
+    decoder.stop();
+    state.scannerDecoder = null;
+    setScannerStatus(`Found: ${barcode}`, false);
+
+    const input = document.getElementById('manual-barcode');
+    if (input) input.value = barcode;
+    await lookupBarcode();
+  };
+
+  const handleError = (err) => {
+    console.warn('Scanner error:', err);
+    state.scannerActive = false;
+    if (!container) return;
+
+    const code = err?.name || err?.message;
+    let message = 'Camera unavailable — use manual entry below.';
+    if (code === 'NotAllowedError' || code === 'PermissionDeniedError') {
+      message = 'Camera access was denied. Enable permissions or use manual entry below.';
+    } else if (code === 'NotFoundError' || code === 'DevicesNotFoundError') {
+      message = 'No camera found on this device. Use manual entry below.';
+    } else if (code === 'camera-unsupported') {
+      message = 'This browser does not expose the camera API. Use manual entry below.';
     }
-  } catch {
-    // ignore
+
+    container.innerHTML = String(html`
+      <div style="text-align: center; padding: var(--space-5);">
+        <div style="font-size: 40px;">📷</div>
+        <strong>Camera blocked</strong>
+        <p class="text-muted" style="font-size: var(--text-sm); margin-top: var(--space-2);">${message}</p>
+      </div>
+    `);
+  };
+
+  await decoder.start(video, handleResult, handleError);
+
+  // If we're still active + no error happened, the engine is running
+  if (state.scannerActive) {
+    setScannerStatus('Looking for a barcode…', true);
   }
-  if (state.scannerActive) setTimeout(() => detectLoop(video, detector), 100);
 }
 
 function stopBarcodeScanner() {
   state.scannerActive = false;
-  state.scannerStream?.getTracks().forEach((t) => t.stop());
-  state.scannerStream = null;
+  if (state.scannerDecoder) {
+    try { state.scannerDecoder.stop(); } catch {}
+    state.scannerDecoder = null;
+  }
+  // Legacy stream cleanup for backward compat
+  if (state.scannerStream) {
+    state.scannerStream.getTracks?.().forEach((t) => t.stop());
+    state.scannerStream = null;
+  }
 }
 
 async function lookupBarcode() {
