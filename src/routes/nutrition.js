@@ -1,5 +1,16 @@
 import { Hono } from 'hono';
 import { requireAuth } from '../middleware/auth';
+import {
+  normalizeMacros,
+  sumMacros,
+  setMealTotals,
+  recomputeMealTotals,
+  addToNutritionLog,
+  subtractFromNutritionLog,
+  addEntryToLog,
+  subtractEntryFromLog,
+  entryColumnFor
+} from '../utils/nutrition-ledger';
 
 const nutrition = new Hono();
 
@@ -595,6 +606,7 @@ nutrition.post('/entries', async (c) => {
   }
 
   const timestamp = logged_at || new Date().toISOString();
+  const logDate = timestamp.split(/[T ]/)[0];
 
   const result = await db.prepare(
     `INSERT INTO nutrition_entries (user_id, entry_type, amount, unit, notes, logged_at)
@@ -602,18 +614,7 @@ nutrition.post('/entries', async (c) => {
      RETURNING *`
   ).bind(user.id, entry_type, amount, unit, notes || null, timestamp).first();
 
-  // Also update the daily summary for backward compatibility
-  const logDate = timestamp.split('T')[0];
-  const column = entry_type === 'protein' ? 'protein_grams' : entry_type === 'water' ? 'water_ml' : 'creatine_grams';
-  
-  await db.prepare(
-    `INSERT INTO nutrition_log (user_id, date, ${column}, updated_at)
-     VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-     ON CONFLICT(user_id, date) 
-     DO UPDATE SET 
-       ${column} = ${column} + excluded.${column},
-       updated_at = CURRENT_TIMESTAMP`
-  ).bind(user.id, logDate, amount).run();
+  await addEntryToLog(db, user.id, logDate, entry_type, amount);
 
   return c.json({ entry: result, message: 'Entry added' });
 });
@@ -677,10 +678,14 @@ nutrition.get('/activity', async (c) => {
       ORDER BY logged_at DESC`
   ).bind(user.id, startDate, endDate).all();
 
-  // Meals with rolled-up macros from meal_foods (single query, no N+1).
-  // NULL food rows (bare meals added via AI parsing or saved-meal templates
-  // that carried no ingredient rows) still return a meal row with 0 food_count
-  // — the client needs to display them too.
+  // Meals — read the CACHED per-meal totals from the meals row (migration
+  // 0028) instead of SUMming meal_foods. This fixes the "saved meal logs
+  // show 0 macros" bug, because saved meals can have zero meal_foods rows
+  // but still carry their macros on the meal row. Also O(1) per meal, no
+  // N+1.
+  //
+  // `food_count` is still rolled up so the UI can show "3 items" vs
+  // "No items" hints.
   const mealsResult = await db.prepare(
     `SELECT m.id,
             m.date,
@@ -688,17 +693,16 @@ nutrition.get('/activity', async (c) => {
             m.name,
             m.notes,
             m.created_at,
-            COUNT(mf.id)                   AS food_count,
-            COALESCE(SUM(mf.calories), 0)  AS calories,
-            COALESCE(SUM(mf.protein_g), 0) AS protein_g,
-            COALESCE(SUM(mf.carbs_g), 0)   AS carbs_g,
-            COALESCE(SUM(mf.fat_g), 0)     AS fat_g
+            m.calories,
+            m.protein_g,
+            m.carbs_g,
+            m.fat_g,
+            m.fiber_g,
+            (SELECT COUNT(*) FROM meal_foods mf WHERE mf.meal_id = m.id) AS food_count
        FROM meals m
-       LEFT JOIN meal_foods mf ON mf.meal_id = m.id
       WHERE m.user_id = ?
         AND m.date >= ?
         AND m.date <= ?
-      GROUP BY m.id
       ORDER BY m.date DESC, m.created_at DESC`
   ).bind(user.id, startDate, endDate).all();
 
@@ -722,12 +726,13 @@ nutrition.get('/activity', async (c) => {
     name: m.name || null,
     food_count: m.food_count || 0,
     notes: m.notes,
-    totals: {
-      calories: Math.round(m.calories || 0),
-      protein_g: Math.round((m.protein_g || 0) * 10) / 10,
-      carbs_g: Math.round((m.carbs_g || 0) * 10) / 10,
-      fat_g: Math.round((m.fat_g || 0) * 10) / 10
-    }
+    totals: normalizeMacros({
+      calories: m.calories,
+      protein_g: m.protein_g,
+      carbs_g: m.carbs_g,
+      fat_g: m.fat_g,
+      fiber_g: m.fiber_g
+    })
   }));
 
   // Merge + sort by occurred_at DESC. `occurred_at` may be an ISO string
@@ -749,6 +754,11 @@ nutrition.get('/activity', async (c) => {
 });
 
 // Update nutrition entry
+//
+// If the amount OR the logged_at date changes, rebalance nutrition_log
+// on BOTH days: fully reverse the old amount from the old day, then add
+// the new amount to the new day. Previously this only adjusted the new
+// day's log, leaving the old day permanently inflated on date changes.
 nutrition.put('/entries/:id', async (c) => {
   const user = requireAuth(c);
   const entryId = c.req.param('id');
@@ -756,7 +766,6 @@ nutrition.put('/entries/:id', async (c) => {
   const { amount, notes, logged_at } = body;
   const db = c.env.DB;
 
-  // Verify ownership
   const existing = await db.prepare(
     'SELECT * FROM nutrition_entries WHERE id = ? AND user_id = ?'
   ).bind(entryId, user.id).first();
@@ -765,31 +774,33 @@ nutrition.put('/entries/:id', async (c) => {
     return c.json({ error: 'Entry not found' }, 404);
   }
 
-  const oldAmount = existing.amount;
-  const newAmount = amount !== undefined ? amount : existing.amount;
+  const oldAmount = Number(existing.amount) || 0;
+  const oldDate = (existing.logged_at || '').split(/[T ]/)[0];
+
+  const newAmount = amount !== undefined ? Number(amount) || 0 : oldAmount;
   const newNotes = notes !== undefined ? notes : existing.notes;
   const newLoggedAt = logged_at || existing.logged_at;
+  const newDate = (newLoggedAt || '').split(/[T ]/)[0];
 
-  // Update entry
   const updated = await db.prepare(
-    `UPDATE nutrition_entries 
-     SET amount = ?, notes = ?, logged_at = ?
-     WHERE id = ? AND user_id = ?
-     RETURNING *`
+    `UPDATE nutrition_entries
+        SET amount = ?, notes = ?, logged_at = ?
+      WHERE id = ? AND user_id = ?
+      RETURNING *`
   ).bind(newAmount, newNotes, newLoggedAt, entryId, user.id).first();
 
-  // Update daily summary (adjust the difference)
-  const logDate = newLoggedAt.split('T')[0];
-  const column = existing.entry_type === 'protein' ? 'protein_grams' : existing.entry_type === 'water' ? 'water_ml' : 'creatine_grams';
-  const amountDiff = newAmount - oldAmount;
-
-  if (amountDiff !== 0) {
-    await db.prepare(
-      `UPDATE nutrition_log 
-       SET ${column} = MAX(0, ${column} + ?),
-           updated_at = CURRENT_TIMESTAMP
-       WHERE user_id = ? AND date = ?`
-    ).bind(amountDiff, user.id, logDate).run();
+  if (oldDate === newDate) {
+    // Same day — adjust by the delta only.
+    const delta = newAmount - oldAmount;
+    if (delta > 0) {
+      await addEntryToLog(db, user.id, newDate, existing.entry_type, delta);
+    } else if (delta < 0) {
+      await subtractEntryFromLog(db, user.id, newDate, existing.entry_type, -delta);
+    }
+  } else {
+    // Date moved — fully reverse old day, fully add to new day.
+    await subtractEntryFromLog(db, user.id, oldDate, existing.entry_type, oldAmount);
+    await addEntryToLog(db, user.id, newDate, existing.entry_type, newAmount);
   }
 
   return c.json({ entry: updated, message: 'Entry updated' });
@@ -801,7 +812,6 @@ nutrition.delete('/entries/:id', async (c) => {
   const entryId = c.req.param('id');
   const db = c.env.DB;
 
-  // Get entry to adjust daily summary
   const entry = await db.prepare(
     'SELECT * FROM nutrition_entries WHERE id = ? AND user_id = ?'
   ).bind(entryId, user.id).first();
@@ -810,21 +820,12 @@ nutrition.delete('/entries/:id', async (c) => {
     return c.json({ error: 'Entry not found' }, 404);
   }
 
-  // Delete entry
   await db.prepare(
     'DELETE FROM nutrition_entries WHERE id = ? AND user_id = ?'
   ).bind(entryId, user.id).run();
 
-  // Update daily summary (subtract the amount)
-  const logDate = entry.logged_at.split('T')[0];
-  const column = entry.entry_type === 'protein' ? 'protein_grams' : entry.entry_type === 'water' ? 'water_ml' : 'creatine_grams';
-
-  await db.prepare(
-    `UPDATE nutrition_log 
-     SET ${column} = MAX(0, ${column} - ?),
-         updated_at = CURRENT_TIMESTAMP
-     WHERE user_id = ? AND date = ?`
-  ).bind(entry.amount, user.id, logDate).run();
+  const logDate = (entry.logged_at || '').split(/[T ]/)[0];
+  await subtractEntryFromLog(db, user.id, logDate, entry.entry_type, entry.amount);
 
   return c.json({ message: 'Entry deleted' });
 });
@@ -1497,29 +1498,36 @@ nutrition.post('/foods', async (c) => {
 });
 
 // Log a meal
+//
+// Accepts either a `foods[]` array (normal meal-logger save) or a
+// `custom_macros` object (Quick Macro Entry — user types the totals
+// directly without picking foods). In both cases the final macros are:
+//   - stored on the child meal_foods rows (when foods were provided)
+//   - cached on the meals row itself (so /activity and DELETE reads are O(1))
+//   - added to nutrition_log for the day (progress rings)
 nutrition.post('/meals', async (c) => {
   const user = requireAuth(c);
   const body = await c.req.json();
   const db = c.env.DB;
-  
-  const { date, meal_type, name, foods, notes } = body;
-  
+
+  const { date, meal_type, name, foods, notes, custom_macros } = body;
+
   const mealDate = date || new Date().toISOString().split('T')[0];
   const mealType = meal_type || 'snack';
-  
-  // Create meal
+
+  // Create meal (macros defaulted to 0; filled in below)
   const meal = await db.prepare(
     `INSERT INTO meals (user_id, date, meal_type, name, notes)
      VALUES (?, ?, ?, ?, ?)
      RETURNING *`
   ).bind(user.id, mealDate, mealType, name || null, notes || null).first();
-  
-  // Add foods to meal
-  let totalCalories = 0, totalProtein = 0, totalCarbs = 0, totalFat = 0, totalFiber = 0;
-  
-  if (foods && foods.length > 0) {
+
+  let totals = { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0 };
+
+  if (Array.isArray(foods) && foods.length > 0) {
     for (const item of foods) {
-      // Get food details
+      // Get food details — either by existing id or by UPSERTing an
+      // inline food payload (e.g. from USDA/OFF search results).
       let food;
       if (item.food_id) {
         food = await db.prepare('SELECT * FROM foods WHERE id = ?').bind(item.food_id).first();
@@ -1566,13 +1574,11 @@ nutrition.post('/meals', async (c) => {
       }
 
       if (!food) continue;
-      
+
       const quantity = item.quantity || 1;
       const unit = item.unit || 'serving';
-      
-      // Calculate macros
       const macros = calculateMacros(food, quantity, unit);
-      
+
       await db.prepare(
         `INSERT INTO meal_foods (meal_id, food_id, quantity, unit, calories, protein_g, carbs_g, fat_g, notes)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -1581,12 +1587,12 @@ nutrition.post('/meals', async (c) => {
         macros.calories, macros.protein_g, macros.carbs_g, macros.fat_g,
         item.notes || null
       ).run();
-      
-      totalCalories += macros.calories;
-      totalProtein += macros.protein_g;
-      totalCarbs += macros.carbs_g;
-      totalFat += macros.fat_g;
-      totalFiber += macros.fiber_g || 0;
+
+      totals.calories += macros.calories;
+      totals.protein_g += macros.protein_g;
+      totals.carbs_g += macros.carbs_g;
+      totals.fat_g += macros.fat_g;
+      totals.fiber_g += macros.fiber_g || 0;
 
       // Update user favorites/frequent foods
       await db.prepare(
@@ -1597,143 +1603,131 @@ nutrition.post('/meals', async (c) => {
            last_used = CURRENT_TIMESTAMP`
       ).bind(user.id, food.id).run();
     }
+  } else if (custom_macros && typeof custom_macros === 'object') {
+    // Quick Macro Entry path — no foods[], just raw macro numbers.
+    // Previously this silently dropped the macros (the handler only
+    // looked at foods[]) and created an empty meal row.
+    totals = {
+      calories:  Number(custom_macros.calories)  || 0,
+      protein_g: Number(custom_macros.protein_g ?? custom_macros.protein) || 0,
+      carbs_g:   Number(custom_macros.carbs_g   ?? custom_macros.carbs)   || 0,
+      fat_g:     Number(custom_macros.fat_g     ?? custom_macros.fat)     || 0,
+      fiber_g:   Number(custom_macros.fiber_g   ?? custom_macros.fiber)   || 0
+    };
   }
-  
-  // Also update daily nutrition log with the full macro breakdown so the
-  // Today's Nutrition rings + AI coach have a clean daily total to read.
-  await db.prepare(
-    `INSERT INTO nutrition_log
-       (user_id, date, calories, protein_grams, carbs_grams, fat_grams, fiber_grams, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-     ON CONFLICT(user_id, date) DO UPDATE SET
-       calories = COALESCE(calories, 0) + excluded.calories,
-       protein_grams = COALESCE(protein_grams, 0) + excluded.protein_grams,
-       carbs_grams = COALESCE(carbs_grams, 0) + excluded.carbs_grams,
-       fat_grams = COALESCE(fat_grams, 0) + excluded.fat_grams,
-       fiber_grams = COALESCE(fiber_grams, 0) + excluded.fiber_grams,
-       updated_at = CURRENT_TIMESTAMP`
-  ).bind(
-    user.id,
-    mealDate,
-    Math.round(totalCalories),
-    Math.round(totalProtein * 10) / 10,
-    Math.round(totalCarbs * 10) / 10,
-    Math.round(totalFat * 10) / 10,
-    Math.round(totalFiber * 10) / 10
-  ).run();
-  
+
+  // Cache the totals on the meals row — single source of truth for later
+  // reads (/activity, DELETE), so no JOIN/SUM is needed.
+  const cached = await setMealTotals(db, meal.id, totals);
+
+  // Update daily nutrition log so the Today's Nutrition rings + AI coach
+  // see the full macro breakdown.
+  await addToNutritionLog(db, user.id, mealDate, cached);
+
   return c.json({
     meal: {
       ...meal,
-      totals: {
-        calories: Math.round(totalCalories),
-        protein_g: Math.round(totalProtein * 10) / 10,
-        carbs_g: Math.round(totalCarbs * 10) / 10,
-        fat_g: Math.round(totalFat * 10) / 10
-      }
+      ...cached,
+      totals: cached
     },
     message: 'Meal logged'
   });
 });
 
 // Get meals for a date
+//
+// Returns every meal row for the day with its cached totals (from the
+// meals row, migration 0028) plus its child meal_foods for display. The
+// cached totals are the authoritative per-meal numbers — a saved-meal
+// log with no meal_foods children still shows its macros.
 nutrition.get('/meals', async (c) => {
   const user = requireAuth(c);
   const db = c.env.DB;
   const date = c.req.query('date') || new Date().toISOString().split('T')[0];
-  
+
   const meals = await db.prepare(
-    `SELECT m.*, 
-            GROUP_CONCAT(mf.id) as food_item_ids
-     FROM meals m
-     LEFT JOIN meal_foods mf ON m.id = mf.meal_id
-     WHERE m.user_id = ? AND m.date = ?
-     GROUP BY m.id
-     ORDER BY 
-       CASE m.meal_type 
-         WHEN 'breakfast' THEN 1 
-         WHEN 'lunch' THEN 2 
-         WHEN 'dinner' THEN 3 
-         WHEN 'snack' THEN 4 
-         ELSE 5 
-       END`
+    `SELECT m.*
+       FROM meals m
+      WHERE m.user_id = ? AND m.date = ?
+      ORDER BY
+        CASE m.meal_type
+          WHEN 'breakfast' THEN 1
+          WHEN 'lunch' THEN 2
+          WHEN 'dinner' THEN 3
+          WHEN 'snack' THEN 4
+          ELSE 5
+        END,
+        m.created_at ASC`
   ).bind(user.id, date).all();
-  
-  // Get foods for each meal
+
+  // Fetch child foods per meal for display (still needed for the meal
+  // card's ingredient list).
   const mealsWithFoods = await Promise.all((meals.results || []).map(async (meal) => {
     const foods = await db.prepare(
       `SELECT mf.*, f.name, f.brand, f.serving_description
-       FROM meal_foods mf
-       JOIN foods f ON mf.food_id = f.id
-       WHERE mf.meal_id = ?`
+         FROM meal_foods mf
+         JOIN foods f ON mf.food_id = f.id
+        WHERE mf.meal_id = ?`
     ).bind(meal.id).all();
-    
-    const totals = (foods.results || []).reduce((acc, f) => ({
-      calories: acc.calories + (f.calories || 0),
-      protein_g: acc.protein_g + (f.protein_g || 0),
-      carbs_g: acc.carbs_g + (f.carbs_g || 0),
-      fat_g: acc.fat_g + (f.fat_g || 0)
-    }), { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 });
-    
+
     return {
       ...meal,
       foods: foods.results || [],
-      totals
+      totals: normalizeMacros({
+        calories: meal.calories,
+        protein_g: meal.protein_g,
+        carbs_g: meal.carbs_g,
+        fat_g: meal.fat_g,
+        fiber_g: meal.fiber_g
+      })
     };
   }));
-  
-  // Calculate daily totals
-  const dailyTotals = mealsWithFoods.reduce((acc, meal) => ({
-    calories: acc.calories + meal.totals.calories,
-    protein_g: acc.protein_g + meal.totals.protein_g,
-    carbs_g: acc.carbs_g + meal.totals.carbs_g,
-    fat_g: acc.fat_g + meal.totals.fat_g
-  }), { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 });
-  
+
+  // Daily totals roll up from the cached per-meal totals.
+  const dailyTotals = sumMacros(mealsWithFoods.map((m) => m.totals));
+
   return c.json({
     date,
     meals: mealsWithFoods,
-    daily_totals: {
-      calories: Math.round(dailyTotals.calories),
-      protein_g: Math.round(dailyTotals.protein_g * 10) / 10,
-      carbs_g: Math.round(dailyTotals.carbs_g * 10) / 10,
-      fat_g: Math.round(dailyTotals.fat_g * 10) / 10
-    }
+    daily_totals: dailyTotals
   });
 });
 
 // Delete a meal
+//
+// Reads the cached macro totals from the meals row (migration 0028),
+// subtracts them from nutrition_log (clamping at 0), then deletes the
+// meal — cascade deletes its meal_foods children. Covers all meal types
+// uniformly: meal-logger, quick-add, saved-meal log, custom_macros.
 nutrition.delete('/meals/:id', async (c) => {
   const user = requireAuth(c);
   const mealId = c.req.param('id');
   const db = c.env.DB;
-  
-  // Verify ownership and get meal details for updating daily log
+
   const meal = await db.prepare(
-    `SELECT m.*, SUM(mf.protein_g) as total_protein
-     FROM meals m
-     LEFT JOIN meal_foods mf ON m.id = mf.meal_id
-     WHERE m.id = ? AND m.user_id = ?
-     GROUP BY m.id`
+    `SELECT id, user_id, date, calories, protein_g, carbs_g, fat_g, fiber_g
+       FROM meals
+      WHERE id = ? AND user_id = ?`
   ).bind(mealId, user.id).first();
-  
+
   if (!meal) {
     return c.json({ error: 'Meal not found' }, 404);
   }
-  
-  // Delete meal (cascade deletes meal_foods)
-  await db.prepare('DELETE FROM meals WHERE id = ?').bind(mealId).run();
-  
-  // Update daily nutrition log
-  if (meal.total_protein) {
-    await db.prepare(
-      `UPDATE nutrition_log 
-       SET protein_grams = MAX(0, protein_grams - ?),
-           updated_at = CURRENT_TIMESTAMP
-       WHERE user_id = ? AND date = ?`
-    ).bind(Math.round(meal.total_protein), user.id, meal.date).run();
-  }
-  
+
+  // Subtract the meal's macros from the daily log FIRST. If the delete
+  // below somehow fails, the log will still reflect reality on retry
+  // (subtract is idempotent when clamped).
+  await subtractFromNutritionLog(db, user.id, meal.date, {
+    calories: meal.calories,
+    protein_g: meal.protein_g,
+    carbs_g: meal.carbs_g,
+    fat_g: meal.fat_g,
+    fiber_g: meal.fiber_g
+  });
+
+  await db.prepare('DELETE FROM meals WHERE id = ? AND user_id = ?')
+    .bind(mealId, user.id).run();
+
   return c.json({ message: 'Meal deleted' });
 });
 
@@ -1833,53 +1827,57 @@ nutrition.post('/foods/:id/favorite', async (c) => {
   return c.json({ is_favorite: existing ? !existing.is_favorite : true });
 });
 
-// Quick add food (simplified logging)
+// Quick add food (simplified single-food logging — used by the barcode
+// scanner's "Log It" button and frequent-foods/favorites quick actions).
+//
+// Finds-or-creates an UNNAMED meal row for the (user, date, meal_type)
+// so repeated quick-adds on the same day accumulate into one "meal"
+// card instead of producing N separate rows. The cached macros on that
+// meal row are recomputed after each add.
 nutrition.post('/quick-add', async (c) => {
   const user = requireAuth(c);
   const body = await c.req.json();
   const db = c.env.DB;
-  
+
   const { food_id, quantity, unit, meal_type, date } = body;
-  
+
   if (!food_id) {
     return c.json({ error: 'food_id is required' }, 400);
   }
-  
+
   const mealDate = date || new Date().toISOString().split('T')[0];
   const mealTypeValue = meal_type || 'snack';
-  
-  // Get or create meal for this date/type
+
+  // Get or create a dedicated "quick-add bucket" meal for this slot
+  // (name IS NULL identifies it; saved-meal logs set `name`).
   let meal = await db.prepare(
-    `SELECT * FROM meals 
-     WHERE user_id = ? AND date = ? AND meal_type = ? AND name IS NULL
-     LIMIT 1`
+    `SELECT * FROM meals
+      WHERE user_id = ? AND date = ? AND meal_type = ? AND name IS NULL
+      LIMIT 1`
   ).bind(user.id, mealDate, mealTypeValue).first();
-  
+
   if (!meal) {
     meal = await db.prepare(
-      `INSERT INTO meals (user_id, date, meal_type)
-       VALUES (?, ?, ?)
-       RETURNING *`
+      `INSERT INTO meals (user_id, date, meal_type) VALUES (?, ?, ?) RETURNING *`
     ).bind(user.id, mealDate, mealTypeValue).first();
   }
-  
-  // Get food
+
   const food = await db.prepare('SELECT * FROM foods WHERE id = ?').bind(food_id).first();
   if (!food) {
     return c.json({ error: 'Food not found' }, 404);
   }
-  
+
   const qty = quantity || 1;
   const unitValue = unit || 'serving';
   const macros = calculateMacros(food, qty, unitValue);
-  
-  // Add to meal
+
+  // Insert the meal_foods row.
   await db.prepare(
     `INSERT INTO meal_foods (meal_id, food_id, quantity, unit, calories, protein_g, carbs_g, fat_g)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(meal.id, food_id, qty, unitValue, macros.calories, macros.protein_g, macros.carbs_g, macros.fat_g).run();
-  
-  // Update favorites
+
+  // Track favorite/frequent usage.
   await db.prepare(
     `INSERT INTO user_favorite_foods (user_id, food_id, use_count, last_used)
      VALUES (?, ?, 1, CURRENT_TIMESTAMP)
@@ -1887,22 +1885,23 @@ nutrition.post('/quick-add', async (c) => {
        use_count = use_count + 1,
        last_used = CURRENT_TIMESTAMP`
   ).bind(user.id, food_id).run();
-  
-  // Update daily log
-  await db.prepare(
-    `INSERT INTO nutrition_log (user_id, date, protein_grams, updated_at)
-     VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-     ON CONFLICT(user_id, date) DO UPDATE SET
-       protein_grams = protein_grams + excluded.protein_grams,
-       updated_at = CURRENT_TIMESTAMP`
-  ).bind(user.id, mealDate, Math.round(macros.protein_g)).run();
-  
+
+  // Re-sum the meal's totals from meal_foods and cache on the meals row.
+  // (Because multiple quick-adds accumulate into the same meal, we can't
+  // just add this one delta — we recompute to stay in sync.)
+  await recomputeMealTotals(db, meal.id);
+
+  // Add this add's macros to the daily log. The log is append-only here;
+  // we add the delta we just inserted, not the full recomputed total.
+  await addToNutritionLog(db, user.id, mealDate, macros);
+
   return c.json({
     added: {
+      meal_id: meal.id,
       food_name: food.name,
       quantity: qty,
       unit: unitValue,
-      macros
+      macros: normalizeMacros(macros)
     },
     message: 'Food added'
   });
@@ -2016,6 +2015,12 @@ nutrition.delete('/saved-meals/:id', async (c) => {
 });
 
 // Log a saved meal (add to today's nutrition)
+//
+// Always creates its OWN meals row (no "merge into existing meal" behavior)
+// so deleting that logged instance cleanly removes exactly what was added.
+// Caches the full macro breakdown on the meals row so /activity and
+// DELETE /meals/:id read from a single source. Also copies saved_meal_foods
+// into meal_foods (when present) so the meal card shows its ingredients.
 nutrition.post('/saved-meals/:id/log', async (c) => {
   const user = requireAuth(c);
   const mealId = c.req.param('id');
@@ -2037,7 +2042,6 @@ nutrition.post('/saved-meals/:id/log', async (c) => {
   const { date, meal_type } = body;
   const logDate = date || new Date().toISOString().split('T')[0];
 
-  // Get the saved meal
   const savedMeal = await db.prepare(
     'SELECT * FROM saved_meals WHERE id = ? AND user_id = ?'
   ).bind(mealId, user.id).first();
@@ -2048,21 +2052,32 @@ nutrition.post('/saved-meals/:id/log', async (c) => {
 
   const effectiveMealType = meal_type || savedMeal.meal_type || 'snack';
 
-  // Create or get today's meal entry so the saved meal also appears in the
-  // "Today's meals" list on the Nutrition screen.
-  let meal = await db.prepare(
-    'SELECT * FROM meals WHERE user_id = ? AND date = ? AND meal_type = ?'
-  ).bind(user.id, logDate, effectiveMealType).first();
+  // Normalize saved meal macros (any field may be null). These become both
+  // the cached meal totals AND the nutrition_log delta — single source of
+  // truth, so delete will subtract exactly what was added.
+  const macros = normalizeMacros({
+    calories:  savedMeal.calories,
+    protein_g: savedMeal.protein_g,
+    carbs_g:   savedMeal.carbs_g,
+    fat_g:     savedMeal.fat_g,
+    fiber_g:   savedMeal.fiber_g
+  });
 
-  if (!meal) {
-    meal = await db.prepare(
-      `INSERT INTO meals (user_id, date, meal_type, name) VALUES (?, ?, ?, ?) RETURNING *`
-    ).bind(user.id, logDate, effectiveMealType, savedMeal.name).first();
-  }
+  // Always create a fresh meal row for this log so deletion is surgical.
+  const meal = await db.prepare(
+    `INSERT INTO meals
+       (user_id, date, meal_type, name, calories, protein_g, carbs_g, fat_g, fiber_g)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+     RETURNING *`
+  ).bind(
+    user.id, logDate, effectiveMealType, savedMeal.name,
+    macros.calories, macros.protein_g, macros.carbs_g, macros.fat_g, macros.fiber_g
+  ).first();
 
   // Copy saved-meal foods (if any) into meal_foods so the meal card shows
   // its ingredients. Saved meals created from recipe URLs or pure macros
-  // will have no foods — that's fine, we still update the daily log below.
+  // will have no foods — in that case the cached macros on the meal row
+  // are the sole source, which is exactly what /activity + DELETE read.
   const savedFoods = await db.prepare(
     'SELECT * FROM saved_meal_foods WHERE saved_meal_id = ?'
   ).bind(mealId).all();
@@ -2084,29 +2099,8 @@ nutrition.post('/saved-meals/:id/log', async (c) => {
     ).run();
   }
 
-  // Normalize macros from the saved meal (any field may be null).
-  const calories = Math.max(0, Math.round(Number(savedMeal.calories) || 0));
-  const protein = Math.round((Number(savedMeal.protein_g) || 0) * 10) / 10;
-  const carbs = Math.round((Number(savedMeal.carbs_g) || 0) * 10) / 10;
-  const fat = Math.round((Number(savedMeal.fat_g) || 0) * 10) / 10;
-  const fiber = Math.round((Number(savedMeal.fiber_g) || 0) * 10) / 10;
-
-  // Update daily nutrition log with the FULL macro breakdown so the rings
-  // and AI nutrition coach see the logged saved meal correctly. Prior to
-  // this fix only protein was added, leaving calories/carbs/fat silently
-  // missing from the daily totals.
-  await db.prepare(
-    `INSERT INTO nutrition_log
-       (user_id, date, calories, protein_grams, carbs_grams, fat_grams, fiber_grams, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-     ON CONFLICT(user_id, date) DO UPDATE SET
-       calories = COALESCE(calories, 0) + excluded.calories,
-       protein_grams = COALESCE(protein_grams, 0) + excluded.protein_grams,
-       carbs_grams = COALESCE(carbs_grams, 0) + excluded.carbs_grams,
-       fat_grams = COALESCE(fat_grams, 0) + excluded.fat_grams,
-       fiber_grams = COALESCE(fiber_grams, 0) + excluded.fiber_grams,
-       updated_at = CURRENT_TIMESTAMP`
-  ).bind(user.id, logDate, calories, protein, carbs, fat, fiber).run();
+  // Add to daily nutrition_log.
+  await addToNutritionLog(db, user.id, logDate, macros);
 
   // Update saved meal usage
   await db.prepare(
@@ -2115,14 +2109,11 @@ nutrition.post('/saved-meals/:id/log', async (c) => {
 
   return c.json({
     logged: {
+      meal_id: meal.id,
       meal_name: savedMeal.name,
       meal_type: effectiveMealType,
       date: logDate,
-      calories,
-      protein_g: protein,
-      carbs_g: carbs,
-      fat_g: fat,
-      fiber_g: fiber
+      ...macros
     },
     message: 'Meal logged'
   });
