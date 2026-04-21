@@ -58,9 +58,14 @@ function renderGrid() {
       ? `view-day`
       : (!isFuture ? `log-past` : null);
 
+    // NOTE: interpolated attributes must be wrapped in raw() or the html`…`
+    // tag will HTML-entity-escape the " characters, producing broken markup
+    // like data-action=&quot;view-day&quot; — which the parser then reads as
+    // an unquoted attribute whose value includes literal quotes. That silently
+    // breaks every click on a calendar day.
     cells.push(html`
       <div class="cal-cell ${hasWorkout ? 'has-workout' : ''} ${isToday ? 'is-today' : ''} ${isFuture ? 'is-future' : ''}"
-           ${action ? `data-action="${action}" data-date="${key}"` : ''}
+           ${action ? raw(`data-action="${action}" data-date="${key}"`) : ''}
            title="${hasWorkout ? 'View workouts' : (!isFuture ? 'Click to log a workout' : '')}">
         <div class="cal-day-num">${day}</div>
         ${hasWorkout

@@ -205,7 +205,7 @@ registerScreen('start-workout-day', 'startWorkoutDay', startWorkoutDay);
 registerScreen('export-center', 'openUnifiedExporter', openUnifiedExporter);
 registerScreen('export-center-alias', 'openReportBuilder', openUnifiedExporter);
 
-// Advanced Analytics (rendered into #advancedAnalyticsSection by Insights)
+// Advanced Analytics (opens as a wide modal on demand)
 registerScreen('advanced-analytics', 'loadAdvancedAnalytics', loadAdvancedAnalytics);
 registerScreen('ai-recs-generate', 'generateRecommendations', generateRecommendations);
 registerScreen('ai-recs-apply', 'applyRecommendation', applyRecommendation);
