@@ -707,6 +707,27 @@ function stopBarcodeScanner() {
   }
 }
 
+// Auto-detect a reasonable meal type based on local time of day.
+// Used as the default when the barcode scanner is opened standalone
+// (no parent meal-logger modal carrying an explicit meal type).
+function autoMealTypeByTime(date = new Date()) {
+  const h = date.getHours();
+  if (h >= 4 && h < 11) return 'breakfast';
+  if (h >= 11 && h < 15) return 'lunch';
+  if (h >= 17 && h < 21) return 'dinner';
+  return 'snack';
+}
+
+// Ensure a scanned food has an id in our `foods` table. The barcode
+// endpoint already UPSERTs, so `food.id` is almost always set — but
+// fall back to POST /nutrition/foods if a caller somehow loses it.
+async function ensureFoodPersisted(food) {
+  if (food && food.id) return food;
+  if (!food) throw new Error('No food data to save');
+  const saved = await api.post('/nutrition/foods', food);
+  return saved.food;
+}
+
 async function lookupBarcode() {
   const input = document.getElementById('manual-barcode');
   const barcode = input?.value?.trim();
@@ -744,40 +765,127 @@ async function lookupBarcode() {
       return;
     }
 
-    if (resultEl) {
-      resultEl.innerHTML = String(html`
-        <div class="card card-sunken">
-          <h3>${food.name}</h3>
-          ${food.brand ? html`<p class="text-muted" style="font-size: var(--text-sm);">${food.brand}</p>` : ''}
-          <div class="barcode-macros">
-            <div><strong>${Math.round(food.calories || 0)}</strong><br><span class="text-muted">cal</span></div>
-            <div class="text-success"><strong>${(food.protein_g || 0).toFixed(1)}g</strong><br><span class="text-muted">P</span></div>
-            <div class="text-primary"><strong>${(food.carbs_g || 0).toFixed(1)}g</strong><br><span class="text-muted">C</span></div>
-            <div class="text-warning"><strong>${(food.fat_g || 0).toFixed(1)}g</strong><br><span class="text-muted">F</span></div>
-          </div>
-          <button class="btn btn-primary btn-block" id="add-scanned-food">
-            <i class="fas fa-plus"></i> Add to Meal
-          </button>
-        </div>
-      `);
+    // Detect whether the scanner was opened from inside the meal-logger
+    // modal (Path A) or standalone from the Nutrition screen (Path B).
+    // Path B used to silently do nothing after a scan — now it lets the
+    // user log the food immediately, save it to favorites, or promote
+    // the scan into a full meal builder.
+    const isInMealLogger = !!document.getElementById('meal-selected-foods');
+    const defaultMealType = isInMealLogger ? state.mealType : autoMealTypeByTime();
 
+    if (!resultEl) return;
+
+    resultEl.innerHTML = String(html`
+      <div class="card card-sunken">
+        <h3>${food.name}</h3>
+        ${food.brand ? html`<p class="text-muted" style="font-size: var(--text-sm);">${food.brand}</p>` : ''}
+        <div class="barcode-macros">
+          <div><strong>${Math.round(food.calories || 0)}</strong><br><span class="text-muted">cal</span></div>
+          <div class="text-success"><strong>${(food.protein_g || 0).toFixed(1)}g</strong><br><span class="text-muted">P</span></div>
+          <div class="text-primary"><strong>${(food.carbs_g || 0).toFixed(1)}g</strong><br><span class="text-muted">C</span></div>
+          <div class="text-warning"><strong>${(food.fat_g || 0).toFixed(1)}g</strong><br><span class="text-muted">F</span></div>
+        </div>
+
+        ${isInMealLogger
+          ? html`
+              <button class="btn btn-primary btn-block" id="add-scanned-food">
+                <i class="fas fa-plus"></i> Add to Meal
+              </button>
+            `
+          : html`
+              <div class="barcode-log-controls">
+                <label class="form-label" style="margin: 0;">Quantity</label>
+                <input type="number" id="scan-qty" class="input"
+                       min="0.25" step="0.25" value="1"
+                       style="max-width: 6rem;" />
+                <label class="form-label" style="margin: 0;">Meal</label>
+                <select id="scan-meal-type" class="input" style="flex: 1; min-width: 8rem;">
+                  <option value="breakfast" ${defaultMealType === 'breakfast' ? 'selected' : ''}>Breakfast</option>
+                  <option value="lunch" ${defaultMealType === 'lunch' ? 'selected' : ''}>Lunch</option>
+                  <option value="dinner" ${defaultMealType === 'dinner' ? 'selected' : ''}>Dinner</option>
+                  <option value="snack" ${defaultMealType === 'snack' ? 'selected' : ''}>Snack</option>
+                </select>
+              </div>
+              <div class="cluster" style="margin-top: var(--space-3);">
+                <button class="btn btn-primary" id="scan-log-now" style="flex: 1;">
+                  <i class="fas fa-check"></i> Log It
+                </button>
+                <button class="btn btn-outline" id="scan-save-favorite" title="Save this food to your Favorites">
+                  <i class="far fa-star"></i> Save
+                </button>
+              </div>
+              <button class="btn btn-ghost btn-sm btn-block" id="scan-build-meal"
+                      style="margin-top: var(--space-2);">
+                <i class="fas fa-utensils"></i> Build a full meal with this
+              </button>
+            `}
+      </div>
+    `);
+
+    if (isInMealLogger) {
+      // Legacy path: add to the open meal-logger's selection buffer.
       document.getElementById('add-scanned-food')?.addEventListener('click', async () => {
-        let toAdd = food;
-        if (!toAdd.id && toAdd.source) {
-          try {
-            const saved = await api.post('/nutrition/foods', toAdd);
-            toAdd = saved.food;
-          } catch (err) {
-            toast.error(`Error saving food: ${err.message}`);
-            return;
-          }
+        try {
+          const toAdd = await ensureFoodPersisted(food);
+          state.selectedFoods.push({ food_id: toAdd.id, food: toAdd, quantity: 1, unit: 'serving' });
+          closeTopModal();
+          updateSelectedFoodsDisplay();
+          toast.success(`Added ${toAdd.name}`);
+        } catch (err) {
+          toast.error(`Error: ${err.message}`);
         }
+      });
+      return;
+    }
+
+    // Standalone path: three actions.
+
+    // 1) Log It — quick-add a single-food meal to today in the chosen meal slot.
+    document.getElementById('scan-log-now')?.addEventListener('click', async () => {
+      const qty = parseFloat(document.getElementById('scan-qty')?.value) || 1;
+      const mealType = document.getElementById('scan-meal-type')?.value || defaultMealType;
+      try {
+        const toAdd = await ensureFoodPersisted(food);
+        await api.post('/nutrition/quick-add', {
+          food_id: toAdd.id,
+          quantity: qty,
+          unit: 'serving',
+          meal_type: mealType
+        });
+        closeTopModal();
+        toast.success(`Logged ${toAdd.name}`);
+        if (typeof window.loadNutrition === 'function') window.loadNutrition();
+      } catch (err) {
+        toast.error(`Error logging food: ${err.message}`);
+      }
+    });
+
+    // 2) Save — toggle the food as a user favorite so it shows up in the
+    //    Favorites list on future meal logs, without creating a meal entry.
+    document.getElementById('scan-save-favorite')?.addEventListener('click', async () => {
+      try {
+        const toAdd = await ensureFoodPersisted(food);
+        const res = await api.post(`/nutrition/foods/${toAdd.id}/favorite`);
+        toast.success(res?.is_favorite ? 'Saved to Favorites' : 'Removed from Favorites');
+      } catch (err) {
+        toast.error(`Error: ${err.message}`);
+      }
+    });
+
+    // 3) Build a full meal — close the scanner, open the meal logger with
+    //    this food pre-loaded so the user can keep adding items and save
+    //    one combined meal.
+    document.getElementById('scan-build-meal')?.addEventListener('click', async () => {
+      try {
+        const toAdd = await ensureFoodPersisted(food);
+        const mealType = document.getElementById('scan-meal-type')?.value || defaultMealType;
         state.selectedFoods.push({ food_id: toAdd.id, food: toAdd, quantity: 1, unit: 'serving' });
         closeTopModal();
-        updateSelectedFoodsDisplay();
-        toast.success(`Added ${toAdd.name}`);
-      });
-    }
+        await showLogMealModal(mealType, /* preserveFoods */ true);
+      } catch (err) {
+        toast.error(`Error: ${err.message}`);
+      }
+    });
   } catch (err) {
     if (resultEl) resultEl.innerHTML = `<div class="empty-state"><div class="empty-state-description text-danger">${err.message}</div></div>`;
   }
