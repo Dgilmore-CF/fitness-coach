@@ -8,7 +8,9 @@ import {
   subtractFromNutritionLog,
   addEntryToLog,
   subtractEntryFromLog,
-  entryColumnFor
+  entryColumnFor,
+  reconcileNutritionLog,
+  reconcileNutritionLogRange
 } from '../../src/utils/nutrition-ledger.js';
 
 /**
@@ -233,5 +235,138 @@ describe('addEntryToLog / subtractEntryFromLog', () => {
     await addEntryToLog(db, 1, '2026-04-21', 'protein', 0);
     await addEntryToLog(db, 1, '2026-04-21', 'protein', -5);
     expect(db.calls).toHaveLength(0);
+  });
+});
+
+describe('reconcileNutritionLog', () => {
+  /**
+   * Specialized mock that returns different results for each prepared
+   * statement based on which SQL fragment it contains. Lets us simulate
+   * meals + entries + upsert in a single reconcile call.
+   */
+  function reconcileMock({ mealTotals, entryRows }) {
+    const calls = [];
+    return {
+      calls,
+      prepare(sql) {
+        const call = { sql, params: null };
+        calls.push(call);
+        return {
+          bind(...params) {
+            call.params = params;
+            return {
+              first: async () => {
+                if (sql.includes('FROM meals')) return mealTotals;
+                return null;
+              },
+              all: async () => {
+                if (sql.includes('FROM nutrition_entries')) {
+                  return { results: entryRows };
+                }
+                if (sql.includes('FROM (')) {
+                  // Range enumeration query
+                  return { results: [] };
+                }
+                return { results: [] };
+              },
+              run: async () => ({ success: true })
+            };
+          }
+        };
+      }
+    };
+  }
+
+  it('sums meals + per-type entries and UPSERTs the reconciled totals', async () => {
+    const db = reconcileMock({
+      mealTotals: { calories: 474, protein_g: 56.5, carbs_g: 10.8, fat_g: 22, fiber_g: 0 },
+      entryRows: [
+        { entry_type: 'protein',  total: 30 },
+        { entry_type: 'water',    total: 500 },
+        { entry_type: 'creatine', total: 5 }
+      ]
+    });
+
+    const totals = await reconcileNutritionLog(db, 1, '2026-04-21');
+
+    // Expect: 3 prepare()s — meals sum, entries group-by, upsert
+    expect(db.calls.length).toBe(3);
+
+    // Calories/carbs/fat/fiber come from meals only.
+    expect(totals.calories).toBe(474);
+    expect(totals.carbs_grams).toBe(10.8);
+    expect(totals.fat_grams).toBe(22);
+    expect(totals.fiber_grams).toBe(0);
+
+    // Protein is sum of meals + protein entries (56.5 + 30 = 86.5).
+    expect(totals.protein_grams).toBe(86.5);
+
+    // Water and creatine come from entries only.
+    expect(totals.water_ml).toBe(500);
+    expect(totals.creatine_grams).toBe(5);
+
+    // Verify the upsert uses excluded.* (overwrites, not adds).
+    const upsert = db.calls[2];
+    expect(upsert.sql).toMatch(/ON CONFLICT\(user_id, date\) DO UPDATE SET/);
+    expect(upsert.sql).toMatch(/protein_grams\s+=\s+excluded\.protein_grams/);
+    expect(upsert.params.slice(0, 2)).toEqual([1, '2026-04-21']);
+  });
+
+  it('handles days with meals only (no entries) correctly', async () => {
+    const db = reconcileMock({
+      mealTotals: { calories: 300, protein_g: 25, carbs_g: 40, fat_g: 10, fiber_g: 3 },
+      entryRows: []
+    });
+    const totals = await reconcileNutritionLog(db, 1, '2026-04-21');
+    expect(totals.protein_grams).toBe(25);
+    expect(totals.water_ml).toBe(0);
+    expect(totals.creatine_grams).toBe(0);
+  });
+
+  it('handles days with entries only (no meals) correctly', async () => {
+    const db = reconcileMock({
+      mealTotals: null, // no meals
+      entryRows: [{ entry_type: 'protein', total: 40 }]
+    });
+    const totals = await reconcileNutritionLog(db, 1, '2026-04-21');
+    expect(totals.calories).toBe(0);
+    expect(totals.protein_grams).toBe(40);
+    expect(totals.carbs_grams).toBe(0);
+  });
+});
+
+describe('reconcileNutritionLogRange', () => {
+  it('enumerates distinct dates from meals/entries/log then reconciles each', async () => {
+    const dates = ['2026-04-20', '2026-04-21'];
+    let enumerateCalled = false;
+    const db = {
+      calls: [],
+      prepare(sql) {
+        this.calls.push(sql);
+        return {
+          bind: () => ({
+            first: async () => {
+              if (sql.includes('FROM meals\n')) {
+                // Per-date reconcile — return some macros
+                return { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0 };
+              }
+              return null;
+            },
+            all: async () => {
+              if (sql.includes('FROM (') && !enumerateCalled) {
+                enumerateCalled = true;
+                return { results: dates.map((d) => ({ date: d })) };
+              }
+              if (sql.includes('FROM nutrition_entries')) return { results: [] };
+              return { results: [] };
+            },
+            run: async () => ({ success: true })
+          })
+        };
+      }
+    };
+
+    const result = await reconcileNutritionLogRange(db, 1, '2026-04-15', '2026-04-21');
+    expect(Object.keys(result)).toEqual(dates);
   });
 });

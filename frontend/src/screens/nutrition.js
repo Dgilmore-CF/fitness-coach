@@ -341,6 +341,33 @@ async function logAllQuick() {
   }
 }
 
+/**
+ * Rebuild the daily nutrition_log totals from the ground-truth rows
+ * (meals + nutrition_entries) for the last 30 days, then refresh the
+ * screen. Used when the progress rings have drifted from the actual
+ * logged data (e.g. accumulated historical drift from older code paths).
+ */
+async function reconcileLog(btn) {
+  const original = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Recalculating…';
+  }
+  try {
+    const res = await api.post('/nutrition/reconcile');
+    const days = res?.count || Object.keys(res?.reconciled || {}).length || 0;
+    toast.success(`Totals recalculated for ${days} day${days === 1 ? '' : 's'}`);
+    loadNutrition();
+  } catch (err) {
+    toast.error(`Couldn't recalculate: ${err.message}`);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = original;
+    }
+  }
+}
+
 function attachNutritionHandlers(container) {
   delegate(container, 'click', (event) => {
     const target = event.target.closest('[data-action]');
@@ -365,6 +392,9 @@ function attachNutritionHandlers(container) {
         break;
       case 'view-entries':
         delegateToLegacy('loadNutritionEntries');
+        break;
+      case 'reconcile-log':
+        reconcileLog(target);
         break;
       case 'create-saved':
         delegateToLegacy('showCreateSavedMeal');
@@ -461,9 +491,15 @@ export async function loadNutrition() {
         <div class="card">
           <div class="card-header">
             <h2 class="card-title"><i class="fas fa-calendar-alt"></i> Last 14 Days</h2>
-            <button class="btn btn-outline btn-sm" data-action="view-entries">
-              <i class="fas fa-list"></i> View all entries
-            </button>
+            <div class="cluster" style="gap: var(--space-2);">
+              <button class="btn btn-ghost btn-sm" data-action="reconcile-log"
+                      title="If the progress rings ever disagree with your logged entries, this rebuilds the daily totals from the source.">
+                <i class="fas fa-sync-alt"></i> Recalculate
+              </button>
+              <button class="btn btn-outline btn-sm" data-action="view-entries">
+                <i class="fas fa-list"></i> View all entries
+              </button>
+            </div>
           </div>
           ${renderRecentDays(dailyData, summary)}
         </div>
