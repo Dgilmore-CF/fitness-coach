@@ -73,7 +73,7 @@ async function getRecentLogs(db, userId, days = 7) {
  * Build rule-based insights that are always available, then optionally
  * enhance with an AI-generated narrative summary.
  */
-export async function analyzeNutrition({ ai, db, user, date }) {
+export async function analyzeNutrition({ ai, db, user, date, env }) {
   const today = date || new Date().toISOString().split('T')[0];
   const [todayLog, recentLogs, targets] = await Promise.all([
     getDailyLog(db, user.id, today),
@@ -211,7 +211,9 @@ export async function analyzeNutrition({ ai, db, user, date }) {
       systemPrompt:
         'You are a direct, evidence-based fitness nutrition coach. Reply in 2-3 sentences max. Focus on the most actionable thing the user can do right now. Never exceed 60 words.',
       userPrompt: `Nutrition data:\n${promptSummary}\n\nGive one specific, actionable coaching tip for the rest of today.`,
-      maxTokens: 200
+      maxTokens: 200,
+      env,
+      gateway: { cacheTtl: 600, metadata: { feature: 'nutrition_analyze', userId: String(user.id) } }
     });
 
     if (result.success && result.text) {
@@ -238,7 +240,7 @@ export async function analyzeNutrition({ ai, db, user, date }) {
  * Suggest a meal that helps hit the user's remaining macros for the day.
  * Uses AI for variety; falls back to rule-based suggestions.
  */
-export async function suggestNextMeal({ ai, db, user, mealType = 'next' }) {
+export async function suggestNextMeal({ ai, db, user, mealType = 'next', env }) {
   const today = new Date().toISOString().split('T')[0];
   const [todayLog, targets] = await Promise.all([
     getDailyLog(db, user.id, today),
@@ -272,7 +274,9 @@ export async function suggestNextMeal({ ai, db, user, mealType = 'next' }) {
 Meal type hint: ${mealType}. Prefer whole foods. Portion sizes must be realistic.`,
     maxTokens: 800,
     parseJson: true,
-    fallbackJson: { suggestions: [fallback] }
+    fallbackJson: { suggestions: [fallback] },
+    env,
+    gateway: { cacheTtl: 300, metadata: { feature: 'meal_suggest', userId: String(user.id) } }
   });
 
   const parsed = result.parsed || { suggestions: [fallback] };
@@ -349,7 +353,7 @@ function buildFallbackSuggestion(remaining, mealType) {
  *
  * Example input:  "2 eggs, a slice of whole-wheat toast, and a banana"
  */
-export async function parseMealFromText({ ai, text }) {
+export async function parseMealFromText({ ai, text, env, userId }) {
   if (!text || text.trim().length < 2) {
     return { foods: [], error: 'Please describe what you ate.' };
   }
@@ -403,7 +407,14 @@ Output: {"foods":[{"name":"Chicken breast, grilled","quantity":6,"unit":"oz","ca
       model,
       maxTokens: 1200,
       parseJson: true,
-      fallbackJson: { foods: [] }
+      fallbackJson: { foods: [] },
+      env,
+      gateway: {
+        // Cache identical meal descriptions for 24h — common strings like
+        // "2 eggs and toast" benefit a lot from caching.
+        cacheTtl: 86400,
+        metadata: { feature: 'meal_parse', userId: String(userId || 'unknown') }
+      }
     });
     if (result.success && Array.isArray(result.parsed?.foods) && result.parsed.foods.length > 0) {
       break;

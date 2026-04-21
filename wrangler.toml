@@ -28,6 +28,15 @@ binding = "AI"
 # Environment variables
 [vars]
 ENVIRONMENT = "production"
+# AI Gateway — when set, every Workers AI call is routed through the
+# named gateway for analytics, caching, rate limiting, and cost controls.
+# See the Cloudflare dashboard: AI → AI Gateway → Create Gateway.
+# Replace the value below with your gateway slug (lowercase, no spaces).
+# To disable routing, comment this line out.
+AI_GATEWAY_ID = "fitness-coach"
 
-# JWT Secret (use wrangler secret put JWT_SECRET)
-# wrangler secret put JWT_SECRET
+# Secrets (set via CLI, never commit):
+#   wrangler secret put JWT_SECRET
+#   wrangler secret put USDA_API_KEY
+# Gateway ID is NOT secret (it appears in logs / browser responses only
+# as request metadata), so it lives in [vars] for easy rotation.

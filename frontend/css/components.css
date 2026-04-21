@@ -2053,6 +2053,41 @@
 
 .live-coach-actions .btn { flex: 1; }
 
+/* Richer context panel for the live AI coach */
+.live-coach-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: 0 var(--space-4) var(--space-3);
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-2);
+}
+
+.live-coach-context-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px var(--space-2);
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.live-coach-source {
+  margin-left: var(--space-2);
+  padding: 1px var(--space-2);
+  font-size: 9px;
+  font-weight: var(--font-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  border-radius: var(--radius-full);
+  vertical-align: middle;
+}
+
 /* ---------- Workout Tab ---------- */
 .workout-hero {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -3001,6 +3036,19 @@
   border-radius: var(--radius-full);
   pointer-events: none;
   white-space: nowrap;
+}
+
+.barcode-scanner-engine {
+  position: absolute;
+  bottom: var(--space-2);
+  right: var(--space-2);
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  font-size: 10px;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+  pointer-events: none;
+  opacity: 0.8;
 }
 
 .barcode-frame {
