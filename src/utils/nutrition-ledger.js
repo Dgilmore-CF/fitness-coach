@@ -189,3 +189,121 @@ export async function subtractEntryFromLog(db, userId, date, entryType, amount) 
       WHERE user_id = ? AND date = ?`
   ).bind(n, userId, date).run();
 }
+
+/**
+ * Rebuild `nutrition_log` for a single (user, date) from the ground-truth
+ * source rows: sum of `meals` macros + sum of `nutrition_entries` amounts
+ * by type. Overwrites whatever was in `nutrition_log` for that date.
+ *
+ * Use when the log has drifted from the underlying rows (e.g. due to a
+ * historical bug in the add/subtract path) or when you want a "recompute
+ * from scratch" guarantee after a batch operation.
+ *
+ * Returns the freshly-computed totals.
+ */
+export async function reconcileNutritionLog(db, userId, date) {
+  // Sum cached meal totals for the date.
+  const meals = await db.prepare(
+    `SELECT COALESCE(SUM(calories),  0) AS calories,
+            COALESCE(SUM(protein_g), 0) AS protein_g,
+            COALESCE(SUM(carbs_g),   0) AS carbs_g,
+            COALESCE(SUM(fat_g),     0) AS fat_g,
+            COALESCE(SUM(fiber_g),   0) AS fiber_g
+       FROM meals
+      WHERE user_id = ? AND date = ?`
+  ).bind(userId, date).first();
+
+  // Sum scalar entries by type for the date.
+  const entries = await db.prepare(
+    `SELECT entry_type, COALESCE(SUM(amount), 0) AS total
+       FROM nutrition_entries
+      WHERE user_id = ?
+        AND date(logged_at) = ?
+      GROUP BY entry_type`
+  ).bind(userId, date).all();
+
+  let proteinFromEntries = 0;
+  let waterFromEntries = 0;
+  let creatineFromEntries = 0;
+  for (const row of (entries.results || [])) {
+    if (row.entry_type === 'protein')  proteinFromEntries  = Number(row.total) || 0;
+    if (row.entry_type === 'water')    waterFromEntries    = Number(row.total) || 0;
+    if (row.entry_type === 'creatine') creatineFromEntries = Number(row.total) || 0;
+  }
+
+  const mealMacros = normalizeMacros({
+    calories:  meals?.calories,
+    protein_g: meals?.protein_g,
+    carbs_g:   meals?.carbs_g,
+    fat_g:     meals?.fat_g,
+    fiber_g:   meals?.fiber_g
+  });
+
+  const totals = {
+    calories:      mealMacros.calories,
+    protein_grams: Math.round((mealMacros.protein_g + proteinFromEntries) * 10) / 10,
+    carbs_grams:   mealMacros.carbs_g,
+    fat_grams:     mealMacros.fat_g,
+    fiber_grams:   mealMacros.fiber_g,
+    water_ml:      Math.round(waterFromEntries),
+    creatine_grams: Math.round(creatineFromEntries * 10) / 10
+  };
+
+  // UPSERT the reconciled row. If none exists yet, this creates it.
+  await db.prepare(
+    `INSERT INTO nutrition_log
+       (user_id, date, calories, protein_grams, carbs_grams, fat_grams,
+        fiber_grams, water_ml, creatine_grams, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+     ON CONFLICT(user_id, date) DO UPDATE SET
+       calories        = excluded.calories,
+       protein_grams   = excluded.protein_grams,
+       carbs_grams     = excluded.carbs_grams,
+       fat_grams       = excluded.fat_grams,
+       fiber_grams     = excluded.fiber_grams,
+       water_ml        = excluded.water_ml,
+       creatine_grams  = excluded.creatine_grams,
+       updated_at      = CURRENT_TIMESTAMP`
+  ).bind(
+    userId, date,
+    totals.calories, totals.protein_grams, totals.carbs_grams,
+    totals.fat_grams, totals.fiber_grams,
+    totals.water_ml, totals.creatine_grams
+  ).run();
+
+  return totals;
+}
+
+/**
+ * Reconcile nutrition_log for every date in a window (inclusive). Iterates
+ * in JS so each date is fully independent — one bad row doesn't taint
+ * the others. Returns an object keyed by date with the reconciled totals.
+ */
+export async function reconcileNutritionLogRange(db, userId, startDate, endDate) {
+  // Enumerate candidate dates from the union of meals.date + entries.logged_at
+  // (falling back to the raw range if the user asked for a specific window).
+  const datesResult = await db.prepare(
+    `SELECT DISTINCT date FROM (
+       SELECT date AS date          FROM meals
+        WHERE user_id = ? AND date >= ? AND date <= ?
+       UNION
+       SELECT date(logged_at) AS date FROM nutrition_entries
+        WHERE user_id = ? AND date(logged_at) >= ? AND date(logged_at) <= ?
+       UNION
+       SELECT date AS date          FROM nutrition_log
+        WHERE user_id = ? AND date >= ? AND date <= ?
+     )
+     ORDER BY date ASC`
+  ).bind(
+    userId, startDate, endDate,
+    userId, startDate, endDate,
+    userId, startDate, endDate
+  ).all();
+
+  const reconciled = {};
+  for (const row of (datesResult.results || [])) {
+    if (!row.date) continue;
+    reconciled[row.date] = await reconcileNutritionLog(db, userId, row.date);
+  }
+  return reconciled;
+}

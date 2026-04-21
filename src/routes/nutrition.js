@@ -9,7 +9,9 @@ import {
   subtractFromNutritionLog,
   addEntryToLog,
   subtractEntryFromLog,
-  entryColumnFor
+  entryColumnFor,
+  reconcileNutritionLog,
+  reconcileNutritionLogRange
 } from '../utils/nutrition-ledger';
 
 const nutrition = new Hono();
@@ -590,6 +592,97 @@ nutrition.delete('/daily/:date', async (c) => {
   ).bind(user.id, date).run();
 
   return c.json({ message: 'Nutrition log deleted' });
+});
+
+// ============================================================================
+// Daily nutrition log: direct edit / delete by date.
+//
+// The "Edit daily log" modal in the UI posts to these paths. Previously
+// there were no backend handlers at all — every request silently 404'd.
+// These edits bypass the entries/meals ground truth, so a subsequent
+// /reconcile will overwrite them with the recomputed sum. That's
+// intentional: this is an escape hatch for ad-hoc fixes.
+// ============================================================================
+
+// Direct edit of today's protein/water/creatine totals.
+nutrition.patch('/logs/:date', async (c) => {
+  const user = requireAuth(c);
+  const date = c.req.param('date');
+  const body = await c.req.json().catch(() => ({}));
+  const db = c.env.DB;
+
+  const protein  = Number(body.protein_grams)  || 0;
+  const water    = Number(body.water_ml)       || 0;
+  const creatine = Number(body.creatine_grams) || 0;
+
+  await db.prepare(
+    `INSERT INTO nutrition_log (user_id, date, protein_grams, water_ml, creatine_grams, updated_at)
+     VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+     ON CONFLICT(user_id, date) DO UPDATE SET
+       protein_grams  = excluded.protein_grams,
+       water_ml       = excluded.water_ml,
+       creatine_grams = excluded.creatine_grams,
+       updated_at     = CURRENT_TIMESTAMP`
+  ).bind(user.id, date, protein, water, creatine).run();
+
+  const log = await db.prepare(
+    'SELECT * FROM nutrition_log WHERE user_id = ? AND date = ?'
+  ).bind(user.id, date).first();
+
+  return c.json({ log, message: 'Nutrition log updated' });
+});
+
+// Direct delete of today's log row (rings reset to zero for that day).
+nutrition.delete('/logs/:date', async (c) => {
+  const user = requireAuth(c);
+  const date = c.req.param('date');
+  const db = c.env.DB;
+
+  await db.prepare(
+    'DELETE FROM nutrition_log WHERE user_id = ? AND date = ?'
+  ).bind(user.id, date).run();
+
+  return c.json({ message: 'Nutrition log deleted' });
+});
+
+// ============================================================================
+// Reconcile nutrition_log from ground truth.
+//
+// Rebuilds the daily aggregate row(s) from the actual `meals` + `nutrition_entries`
+// rows for the specified date range. Use this to heal historical drift
+// that accumulated under older write/delete code paths, or after any
+// batch operation where consistency is uncertain.
+//
+// Accepted query params:
+//   ?date=YYYY-MM-DD                  — reconcile a single date
+//   ?start_date=...&end_date=...      — reconcile a range (inclusive)
+//   (none)                            — reconcile the last 30 days
+//
+// Returns { reconciled: { "YYYY-MM-DD": { calories, protein_grams, ... } } }
+// ============================================================================
+nutrition.post('/reconcile', async (c) => {
+  const user = requireAuth(c);
+  const db = c.env.DB;
+
+  const singleDate = c.req.query('date');
+  if (singleDate) {
+    const totals = await reconcileNutritionLog(db, user.id, singleDate);
+    return c.json({ reconciled: { [singleDate]: totals } });
+  }
+
+  const today = new Date().toISOString().split('T')[0];
+  const defaultStart = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000)
+    .toISOString().split('T')[0];
+  const startDate = c.req.query('start_date') || defaultStart;
+  const endDate   = c.req.query('end_date')   || today;
+
+  const reconciled = await reconcileNutritionLogRange(db, user.id, startDate, endDate);
+  return c.json({
+    start_date: startDate,
+    end_date: endDate,
+    reconciled,
+    count: Object.keys(reconciled).length
+  });
 });
 
 // ========== INDIVIDUAL NUTRITION ENTRIES (Timestamped) ==========
