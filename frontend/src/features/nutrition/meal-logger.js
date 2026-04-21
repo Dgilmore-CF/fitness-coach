@@ -7,7 +7,8 @@ import { html, raw } from '@core/html';
 import { api } from '@core/api';
 import { openModal, closeTopModal } from '@ui/Modal';
 import { toast } from '@ui/Toast';
-import { createDecoder, hasCameraSupport, hasNativeDetector } from './barcode-decoder.js';
+import { playBarcodeDetected } from '@utils/audio';
+import { createDecoder, hasCameraSupport, mapPointsToDisplay } from './barcode-decoder.js';
 
 let state = {
   mealType: 'snack',
@@ -375,8 +376,6 @@ async function saveMeal() {
 
 export function showBarcodeScanner() {
   const hasCamera = hasCameraSupport();
-  // Engine label shown in the status bar so users know which path is running
-  const engineLabel = hasNativeDetector() ? 'Native scanner' : 'ZXing fallback';
 
   openModal({
     title: 'Scan Barcode',
@@ -388,13 +387,29 @@ export function showBarcodeScanner() {
               <div id="barcode-scanner-container" class="barcode-scanner-container">
                 <video id="barcode-video" playsinline muted autoplay></video>
                 <div class="barcode-frame"></div>
+                <svg id="barcode-highlight-svg" class="barcode-highlight-svg"
+                     xmlns="http://www.w3.org/2000/svg"
+                     preserveAspectRatio="none"></svg>
                 <div id="barcode-scanner-status" class="barcode-scanner-status">
                   <i class="fas fa-circle-notch fa-spin"></i> Starting camera…
                 </div>
-                <div class="barcode-scanner-engine">${engineLabel}</div>
+                <div class="barcode-scanner-controls">
+                  <button id="barcode-torch-btn" type="button"
+                          class="barcode-control-btn"
+                          hidden aria-pressed="false" title="Toggle flashlight">
+                    <i class="fas fa-bolt"></i>
+                  </button>
+                </div>
+                <div id="barcode-zoom-wrap" class="barcode-zoom-wrap" hidden>
+                  <i class="fas fa-search-minus"></i>
+                  <input type="range" id="barcode-zoom-slider"
+                         class="barcode-zoom-slider"
+                         min="1" max="5" step="0.1" value="1" aria-label="Zoom" />
+                  <i class="fas fa-search-plus"></i>
+                </div>
               </div>
               <p class="text-muted" style="font-size: var(--text-sm); text-align: center; margin: 0;">
-                Point your camera at a UPC / EAN barcode.
+                Point your camera at a UPC / EAN barcode. Pinch or use the slider to zoom.
               </p>
             `
           : html`
@@ -427,7 +442,11 @@ export function showBarcodeScanner() {
       if (hasCamera) startBarcodeScanner();
 
       const input = element.querySelector('#manual-barcode');
-      input?.focus();
+      // On mobile we don't want to steal focus (pops up the keyboard over
+      // the camera view). On desktop, focusing the input is fine.
+      if (!/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)) {
+        input?.focus();
+      }
       input?.addEventListener('keydown', (event) => {
         if (event.key === 'Enter') {
           event.preventDefault();
@@ -452,6 +471,151 @@ function setScannerStatus(text, spinner = false) {
   statusEl.innerHTML = `${spinner ? '<i class="fas fa-circle-notch fa-spin"></i> ' : ''}${text}`;
 }
 
+// ============================================================================
+// Success-detected visual highlight
+//
+// We draw a green polygon over the video using an <svg> overlay. Points
+// come from ZXing and are in video-pixel coordinates; mapPointsToDisplay()
+// converts them into CSS pixel coordinates matching the displayed frame.
+// ============================================================================
+
+let highlightTimer = null;
+
+function drawHighlight(points) {
+  const svg = document.getElementById('barcode-highlight-svg');
+  const video = document.getElementById('barcode-video');
+  if (!svg || !video) return;
+
+  const rect = video.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+
+  // Size the SVG viewport to match the displayed video
+  svg.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
+  svg.setAttribute('width', rect.width);
+  svg.setAttribute('height', rect.height);
+
+  const mapped = mapPointsToDisplay(points, video);
+  if (!mapped || mapped.length === 0) {
+    svg.innerHTML = '';
+    return;
+  }
+
+  const pointsAttr = mapped.map((p) => `${p.x},${p.y}`).join(' ');
+  svg.innerHTML =
+    `<polygon class="barcode-highlight-poly" points="${pointsAttr}" ` +
+    `fill="rgba(34,197,94,0.25)" stroke="#22c55e" stroke-width="3" stroke-linejoin="round" />`;
+
+  if (highlightTimer) clearTimeout(highlightTimer);
+  highlightTimer = setTimeout(() => {
+    if (svg) svg.innerHTML = '';
+  }, 600);
+}
+
+function clearHighlight() {
+  const svg = document.getElementById('barcode-highlight-svg');
+  if (svg) svg.innerHTML = '';
+  if (highlightTimer) {
+    clearTimeout(highlightTimer);
+    highlightTimer = null;
+  }
+}
+
+// ============================================================================
+// Camera controls: torch, zoom (slider + pinch + double-tap)
+// ============================================================================
+
+function wireCameraControls(camera) {
+  const torchBtn = document.getElementById('barcode-torch-btn');
+  const zoomWrap = document.getElementById('barcode-zoom-wrap');
+  const zoomSlider = document.getElementById('barcode-zoom-slider');
+  const video = document.getElementById('barcode-video');
+
+  // --- Torch toggle ---
+  if (camera?.capabilities?.torch && torchBtn) {
+    let torchOn = false;
+    torchBtn.hidden = false;
+    torchBtn.addEventListener('click', async () => {
+      torchOn = !torchOn;
+      const applied = await camera.setTorch(torchOn);
+      if (applied) {
+        torchBtn.classList.toggle('is-active', torchOn);
+        torchBtn.setAttribute('aria-pressed', String(torchOn));
+      } else {
+        torchOn = !torchOn; // revert state on failure
+        toast.info('Flashlight not available on this camera');
+      }
+    });
+  }
+
+  // --- Zoom (slider + pinch + double-tap) ---
+  if (camera?.capabilities?.zoom && zoomWrap && zoomSlider && video) {
+    const { min, max, step } = camera.capabilities.zoom;
+    zoomSlider.min = String(min);
+    zoomSlider.max = String(max);
+    zoomSlider.step = String(step);
+    zoomSlider.value = String(min);
+    zoomWrap.hidden = false;
+
+    let currentZoom = min;
+
+    const applyZoom = (next) => {
+      const clamped = Math.min(max, Math.max(min, next));
+      if (Math.abs(clamped - currentZoom) < step / 2) return; // throttle
+      currentZoom = clamped;
+      zoomSlider.value = String(clamped);
+      camera.setZoom(clamped);
+    };
+
+    zoomSlider.addEventListener('input', (e) => {
+      applyZoom(parseFloat(e.target.value));
+    });
+
+    // Pinch: track two-touch distance and map ratio to zoom
+    let pinchStart = null;
+    video.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 2) {
+        pinchStart = {
+          dist: pinchDistance(e.touches),
+          zoom: currentZoom
+        };
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    video.addEventListener('touchmove', (e) => {
+      if (e.touches.length === 2 && pinchStart) {
+        const dist = pinchDistance(e.touches);
+        const ratio = dist / pinchStart.dist;
+        applyZoom(pinchStart.zoom * ratio);
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    video.addEventListener('touchend', () => {
+      pinchStart = null;
+    });
+
+    // Double-tap: toggle 2× zoom
+    let lastTap = 0;
+    video.addEventListener('touchend', (e) => {
+      if (e.changedTouches.length !== 1) return;
+      const now = Date.now();
+      if (now - lastTap < 350) {
+        const midpoint = (min + max) / 2;
+        applyZoom(currentZoom > midpoint ? min : midpoint);
+        e.preventDefault();
+      }
+      lastTap = now;
+    });
+  }
+}
+
+function pinchDistance(touches) {
+  const dx = touches[0].clientX - touches[1].clientX;
+  const dy = touches[0].clientY - touches[1].clientY;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
 async function startBarcodeScanner() {
   const video = document.getElementById('barcode-video');
   const container = document.getElementById('barcode-scanner-container');
@@ -468,15 +632,30 @@ async function startBarcodeScanner() {
   state.scannerDecoder = decoder;
   state.scannerActive = true;
 
-  const handleResult = async (barcode) => {
+  const handleResult = async (barcode, result) => {
     if (!state.scannerActive) return;
+
+    // Draw the highlight overlay on EVERY detected frame so the user gets
+    // immediate visual feedback. This can fire multiple times in quick
+    // succession — state.scannerActive gates the actual lookup below.
+    if (result?.points) drawHighlight(result.points);
+
+    // First successful detection "wins" — freeze, beep, vibrate, look up.
     state.scannerActive = false;
     decoder.stop();
     state.scannerDecoder = null;
+
+    // Sensory feedback
+    try { playBarcodeDetected(); } catch {}
+    try { if (navigator.vibrate) navigator.vibrate(80); } catch {}
+
     setScannerStatus(`Found: ${barcode}`, false);
 
     const input = document.getElementById('manual-barcode');
     if (input) input.value = barcode;
+
+    // Short delay so the highlight + beep register before modal changes
+    await new Promise((r) => setTimeout(r, 250));
     await lookupBarcode();
   };
 
@@ -504,16 +683,19 @@ async function startBarcodeScanner() {
     `);
   };
 
-  await decoder.start(video, handleResult, handleError);
+  const { camera } = await decoder.start(video, handleResult, handleError);
 
-  // If we're still active + no error happened, the engine is running
   if (state.scannerActive) {
     setScannerStatus('Looking for a barcode…', true);
+  }
+  if (camera) {
+    wireCameraControls(camera);
   }
 }
 
 function stopBarcodeScanner() {
   state.scannerActive = false;
+  clearHighlight();
   if (state.scannerDecoder) {
     try { state.scannerDecoder.stop(); } catch {}
     state.scannerDecoder = null;
