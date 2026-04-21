@@ -1917,67 +1917,112 @@ nutrition.delete('/saved-meals/:id', async (c) => {
 nutrition.post('/saved-meals/:id/log', async (c) => {
   const user = requireAuth(c);
   const mealId = c.req.param('id');
-  const body = await c.req.json();
   const db = c.env.DB;
-  
+
+  // Body is optional — the frontend logs saved meals with no body, but
+  // advanced callers may pass { date, meal_type } to override.
+  let body = {};
+  try {
+    const ct = c.req.header('content-type') || '';
+    if (ct.includes('application/json')) {
+      const text = await c.req.text();
+      if (text && text.trim().length > 0) body = JSON.parse(text);
+    }
+  } catch (_) {
+    body = {};
+  }
+
   const { date, meal_type } = body;
   const logDate = date || new Date().toISOString().split('T')[0];
-  
+
   // Get the saved meal
   const savedMeal = await db.prepare(
     'SELECT * FROM saved_meals WHERE id = ? AND user_id = ?'
   ).bind(mealId, user.id).first();
-  
+
   if (!savedMeal) {
     return c.json({ error: 'Saved meal not found' }, 404);
   }
-  
-  // Create or get today's meal entry
+
+  const effectiveMealType = meal_type || savedMeal.meal_type || 'snack';
+
+  // Create or get today's meal entry so the saved meal also appears in the
+  // "Today's meals" list on the Nutrition screen.
   let meal = await db.prepare(
     'SELECT * FROM meals WHERE user_id = ? AND date = ? AND meal_type = ?'
-  ).bind(user.id, logDate, meal_type || savedMeal.meal_type || 'snack').first();
-  
+  ).bind(user.id, logDate, effectiveMealType).first();
+
   if (!meal) {
     meal = await db.prepare(
       `INSERT INTO meals (user_id, date, meal_type, name) VALUES (?, ?, ?, ?) RETURNING *`
-    ).bind(user.id, logDate, meal_type || savedMeal.meal_type || 'snack', savedMeal.name).first();
+    ).bind(user.id, logDate, effectiveMealType, savedMeal.name).first();
   }
-  
-  // Get saved meal foods and add them
+
+  // Copy saved-meal foods (if any) into meal_foods so the meal card shows
+  // its ingredients. Saved meals created from recipe URLs or pure macros
+  // will have no foods — that's fine, we still update the daily log below.
   const savedFoods = await db.prepare(
     'SELECT * FROM saved_meal_foods WHERE saved_meal_id = ?'
   ).bind(mealId).all();
-  
+
   for (const food of (savedFoods.results || [])) {
     await db.prepare(
       `INSERT INTO meal_foods (meal_id, food_id, quantity, unit, calories, protein_g, carbs_g, fat_g, notes)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(meal.id, food.food_id, food.quantity, food.unit, food.calories, food.protein_g, food.carbs_g, food.fat_g, food.custom_name).run();
+    ).bind(
+      meal.id,
+      food.food_id,
+      food.quantity,
+      food.unit,
+      food.calories,
+      food.protein_g,
+      food.carbs_g,
+      food.fat_g,
+      food.custom_name
+    ).run();
   }
-  
-  // Update nutrition log
+
+  // Normalize macros from the saved meal (any field may be null).
+  const calories = Math.max(0, Math.round(Number(savedMeal.calories) || 0));
+  const protein = Math.round((Number(savedMeal.protein_g) || 0) * 10) / 10;
+  const carbs = Math.round((Number(savedMeal.carbs_g) || 0) * 10) / 10;
+  const fat = Math.round((Number(savedMeal.fat_g) || 0) * 10) / 10;
+  const fiber = Math.round((Number(savedMeal.fiber_g) || 0) * 10) / 10;
+
+  // Update daily nutrition log with the FULL macro breakdown so the rings
+  // and AI nutrition coach see the logged saved meal correctly. Prior to
+  // this fix only protein was added, leaving calories/carbs/fat silently
+  // missing from the daily totals.
   await db.prepare(
-    `INSERT INTO nutrition_log (user_id, date, protein_grams, updated_at)
-     VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+    `INSERT INTO nutrition_log
+       (user_id, date, calories, protein_grams, carbs_grams, fat_grams, fiber_grams, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
      ON CONFLICT(user_id, date) DO UPDATE SET
-       protein_grams = protein_grams + excluded.protein_grams,
+       calories = COALESCE(calories, 0) + excluded.calories,
+       protein_grams = COALESCE(protein_grams, 0) + excluded.protein_grams,
+       carbs_grams = COALESCE(carbs_grams, 0) + excluded.carbs_grams,
+       fat_grams = COALESCE(fat_grams, 0) + excluded.fat_grams,
+       fiber_grams = COALESCE(fiber_grams, 0) + excluded.fiber_grams,
        updated_at = CURRENT_TIMESTAMP`
-  ).bind(user.id, logDate, Math.round(savedMeal.protein_g)).run();
-  
+  ).bind(user.id, logDate, calories, protein, carbs, fat, fiber).run();
+
   // Update saved meal usage
   await db.prepare(
     `UPDATE saved_meals SET use_count = use_count + 1, last_used = CURRENT_TIMESTAMP WHERE id = ?`
   ).bind(mealId).run();
-  
-  return c.json({ 
+
+  return c.json({
     logged: {
       meal_name: savedMeal.name,
-      calories: savedMeal.calories,
-      protein_g: savedMeal.protein_g,
-      carbs_g: savedMeal.carbs_g,
-      fat_g: savedMeal.fat_g
+      meal_type: effectiveMealType,
+      date: logDate,
+      calories,
+      protein_g: protein,
+      carbs_g: carbs,
+      fat_g: fat,
+      fiber_g: fiber
     },
-    message: 'Meal logged' 
+    message: 'Meal logged'
   });
 });
 

@@ -468,49 +468,174 @@ export async function logAllQuick() {
 
 // ============================================================================
 // Nutrition entries list (edit/delete individual entries)
+//
+// Shows the last 14 days of protein / water / creatine entries grouped
+// by date (newest first). Each row can be deleted inline. The backend
+// has a single `/nutrition/entries` endpoint that takes optional
+// start_date + end_date query params — no `/entries/today` route exists
+// (that was the bug: frontend was calling a 404 URL).
 // ============================================================================
 
-export async function loadNutritionEntries() {
-  try {
-    const data = await api.get('/nutrition/entries/today');
-    const entries = data.entries || [];
+const ENTRY_TYPE_META = {
+  protein: { icon: 'fa-drumstick-bite', color: 'var(--color-secondary)', label: 'Protein' },
+  water:   { icon: 'fa-tint',           color: 'var(--color-primary)',   label: 'Water' },
+  creatine:{ icon: 'fa-flask',          color: '#8b5cf6',                label: 'Creatine' }
+};
 
-    openModal({
-      title: "Today's Entries",
-      size: 'default',
-      content: String(html`
-        <div class="stack stack-sm" style="max-height: 500px; overflow-y: auto;">
-          ${entries.length === 0
-            ? html`<div class="empty-state"><div class="empty-state-description">No entries today.</div></div>`
-            : entries.map((e) => html`
-                <div class="saved-meal-row">
-                  <div>
-                    <strong>${e.entry_type}</strong>
-                    <div class="text-muted" style="font-size: var(--text-xs);">
-                      ${Math.round(e.amount)}${e.unit} · ${new Date(e.logged_at).toLocaleTimeString()}
-                    </div>
-                  </div>
-                  <button class="btn btn-ghost btn-icon btn-sm text-danger" data-delete-entry="${e.id}">
-                    <i class="fas fa-trash"></i>
-                  </button>
-                </div>
-              `)}
-        </div>
-      `),
-      actions: [{ label: 'Close', variant: 'btn-outline' }],
-      onOpen: ({ element }) => {
-        element.addEventListener('click', async (event) => {
-          const btn = event.target.closest('[data-delete-entry]');
-          if (!btn) return;
-          await deleteNutritionEntry(parseInt(btn.getAttribute('data-delete-entry'), 10));
-          closeTopModal();
-          loadNutritionEntries();
-        });
-      }
-    });
-  } catch (err) {
-    toast.error(`Error: ${err.message}`);
+function formatEntryTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso.includes('T') || iso.includes('Z') ? iso : iso.replace(' ', 'T') + 'Z');
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+function formatEntryDateHeader(dateKey, today) {
+  if (dateKey === today) return 'Today';
+  const y = new Date(today);
+  y.setDate(y.getDate() - 1);
+  const yesterday = y.toISOString().split('T')[0];
+  if (dateKey === yesterday) return 'Yesterday';
+  // Parse YYYY-MM-DD as local date for display
+  const [yr, mo, dy] = dateKey.split('-').map(Number);
+  const d = new Date(yr, mo - 1, dy);
+  return d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function groupEntriesByDate(entries) {
+  const groups = new Map();
+  for (const e of entries) {
+    // logged_at is UTC from DB; take the local-date key for grouping
+    const raw = e.logged_at || '';
+    const iso = raw.includes('T') || raw.includes('Z') ? raw : raw.replace(' ', 'T') + 'Z';
+    const d = new Date(iso);
+    const key = Number.isNaN(d.getTime())
+      ? 'unknown'
+      : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(e);
   }
+  return Array.from(groups.entries())
+    .map(([date, items]) => ({ date, items }))
+    .sort((a, b) => (a.date < b.date ? 1 : -1));
+}
+
+function renderEntriesBody(entries) {
+  if (!entries || entries.length === 0) {
+    return html`
+      <div class="empty-state" style="padding: var(--space-8) var(--space-4);">
+        <div class="empty-state-icon">🍽️</div>
+        <div class="empty-state-title">No entries yet</div>
+        <div class="empty-state-description">
+          Log protein, water, or creatine and it'll appear here.
+        </div>
+      </div>
+    `;
+  }
+
+  const today = new Date().toISOString().split('T')[0];
+  const groups = groupEntriesByDate(entries);
+
+  return html`
+    <div class="stack stack-md" style="max-height: 500px; overflow-y: auto;">
+      ${groups.map((group) => {
+        const totals = group.items.reduce((acc, e) => {
+          acc[e.entry_type] = (acc[e.entry_type] || 0) + (Number(e.amount) || 0);
+          return acc;
+        }, {});
+        return html`
+          <div>
+            <div class="nutrition-entries-group-header">
+              <strong>${formatEntryDateHeader(group.date, today)}</strong>
+              <span class="text-muted" style="font-size: var(--text-xs);">
+                ${totals.protein ? `${Math.round(totals.protein)}g P` : ''}
+                ${totals.water ? ` · ${Math.round(totals.water)}ml W` : ''}
+                ${totals.creatine ? ` · ${Math.round(totals.creatine * 10) / 10}g C` : ''}
+              </span>
+            </div>
+            <div class="stack stack-sm">
+              ${group.items.map((e) => {
+                const meta = ENTRY_TYPE_META[e.entry_type] || {
+                  icon: 'fa-utensils', color: 'var(--color-text-muted)', label: e.entry_type
+                };
+                return html`
+                  <div class="nutrition-entry-row">
+                    <div class="nutrition-entry-icon" style="background: ${meta.color}20; color: ${meta.color};">
+                      <i class="fas ${meta.icon}"></i>
+                    </div>
+                    <div style="flex: 1; min-width: 0;">
+                      <strong>${meta.label}</strong>
+                      <div class="text-muted" style="font-size: var(--text-xs);">
+                        ${Math.round((Number(e.amount) || 0) * 10) / 10}${e.unit || ''}
+                        · ${formatEntryTime(e.logged_at)}
+                        ${e.notes ? ` · ${e.notes}` : ''}
+                      </div>
+                    </div>
+                    <button class="btn btn-ghost btn-icon btn-sm text-danger"
+                            data-delete-entry="${e.id}" title="Delete entry">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+                `;
+              })}
+            </div>
+          </div>
+        `;
+      })}
+    </div>
+  `;
+}
+
+export async function loadNutritionEntries() {
+  // Last 14 days window (matches the "Last 14 Days" section the button sits in)
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - 13); // inclusive 14-day window
+  const start = startDate.toISOString().split('T')[0];
+  const end = endDate.toISOString().split('T')[0];
+
+  let data;
+  try {
+    data = await api.get(
+      `/nutrition/entries?start_date=${start}&end_date=${end}`
+    );
+  } catch (err) {
+    toast.error(`Couldn't load entries: ${err.message}`);
+    return;
+  }
+
+  const entries = Array.isArray(data?.entries) ? data.entries : [];
+
+  const api_ = openModal({
+    title: 'Nutrition Entries (Last 14 Days)',
+    size: 'default',
+    content: String(renderEntriesBody(entries)),
+    actions: [{ label: 'Close', variant: 'btn-outline' }],
+    onOpen: ({ element }) => {
+      element.addEventListener('click', async (event) => {
+        const btn = event.target.closest('[data-delete-entry]');
+        if (!btn) return;
+        const id = parseInt(btn.getAttribute('data-delete-entry'), 10);
+        if (!id) return;
+
+        await deleteNutritionEntry(id);
+        // Re-fetch + re-render the modal body in place (don't close + reopen
+        // — that flashes the modal and resets scroll position).
+        try {
+          const refreshed = await api.get(
+            `/nutrition/entries?start_date=${start}&end_date=${end}`
+          );
+          const body = element.querySelector('.modal-body');
+          if (body) {
+            body.innerHTML = String(renderEntriesBody(refreshed?.entries || []));
+          }
+        } catch (err) {
+          console.warn('Failed to refresh entries list:', err);
+          closeTopModal();
+        }
+      });
+    }
+  });
+  return api_;
 }
 
 export function editNutritionEntry(id, type, currentAmount) {
