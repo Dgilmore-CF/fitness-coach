@@ -467,20 +467,32 @@ export async function logAllQuick() {
 }
 
 // ============================================================================
-// Nutrition entries list (edit/delete individual entries)
+// Nutrition activity feed (protein/water/creatine entries + logged meals)
 //
-// Shows the last 14 days of protein / water / creatine entries grouped
-// by date (newest first). Each row can be deleted inline. The backend
-// has a single `/nutrition/entries` endpoint that takes optional
-// start_date + end_date query params — no `/entries/today` route exists
-// (that was the bug: frontend was calling a 404 URL).
+// The "View all entries" modal previously only pulled from
+// /nutrition/entries (protein / water / creatine only) — so foods and
+// meals logged through the meal-logger, barcode scanner, AI parser, or
+// saved-meal templates were silently omitted. This now calls the unified
+// /nutrition/activity endpoint which returns a merged `items[]` with a
+// `kind` discriminator.
 // ============================================================================
 
 const ENTRY_TYPE_META = {
-  protein: { icon: 'fa-drumstick-bite', color: 'var(--color-secondary)', label: 'Protein' },
-  water:   { icon: 'fa-tint',           color: 'var(--color-primary)',   label: 'Water' },
-  creatine:{ icon: 'fa-flask',          color: '#8b5cf6',                label: 'Creatine' }
+  protein:  { icon: 'fa-drumstick-bite', color: 'var(--color-secondary)', label: 'Protein' },
+  water:    { icon: 'fa-tint',           color: 'var(--color-primary)',   label: 'Water' },
+  creatine: { icon: 'fa-flask',          color: '#8b5cf6',                label: 'Creatine' }
 };
+
+const MEAL_TYPE_META = {
+  breakfast: { icon: 'fa-sun',        color: '#f59e0b', label: 'Breakfast' },
+  lunch:     { icon: 'fa-utensils',   color: '#10b981', label: 'Lunch' },
+  dinner:    { icon: 'fa-moon',       color: '#6366f1', label: 'Dinner' },
+  snack:     { icon: 'fa-cookie-bite', color: '#8b5cf6', label: 'Snack' }
+};
+
+function mealMeta(mealType) {
+  return MEAL_TYPE_META[mealType] || MEAL_TYPE_META.snack;
+}
 
 function formatEntryTime(iso) {
   if (!iso) return '';
@@ -495,94 +507,149 @@ function formatEntryDateHeader(dateKey, today) {
   y.setDate(y.getDate() - 1);
   const yesterday = y.toISOString().split('T')[0];
   if (dateKey === yesterday) return 'Yesterday';
-  // Parse YYYY-MM-DD as local date for display
   const [yr, mo, dy] = dateKey.split('-').map(Number);
   const d = new Date(yr, mo - 1, dy);
   return d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
-function groupEntriesByDate(entries) {
+function groupActivityByDate(items) {
   const groups = new Map();
-  for (const e of entries) {
-    // logged_at is UTC from DB; take the local-date key for grouping
-    const raw = e.logged_at || '';
-    const iso = raw.includes('T') || raw.includes('Z') ? raw : raw.replace(' ', 'T') + 'Z';
-    const d = new Date(iso);
-    const key = Number.isNaN(d.getTime())
-      ? 'unknown'
-      : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  for (const it of items) {
+    // Prefer the server's explicit `date` (canonical local day), but fall
+    // back to parsing occurred_at if missing.
+    let key = it.date;
+    if (!key) {
+      const raw = it.occurred_at || '';
+      const iso = raw.includes('T') || raw.includes('Z') ? raw : raw.replace(' ', 'T') + 'Z';
+      const d = new Date(iso);
+      key = Number.isNaN(d.getTime())
+        ? 'unknown'
+        : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
     if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(e);
+    groups.get(key).push(it);
   }
   return Array.from(groups.entries())
-    .map(([date, items]) => ({ date, items }))
+    .map(([date, list]) => ({ date, items: list }))
     .sort((a, b) => (a.date < b.date ? 1 : -1));
 }
 
-function renderEntriesBody(entries) {
-  if (!entries || entries.length === 0) {
+function renderEntryRow(entry) {
+  const meta = ENTRY_TYPE_META[entry.entry_type] || {
+    icon: 'fa-pen', color: 'var(--color-text-muted)', label: entry.entry_type || 'Entry'
+  };
+  return html`
+    <div class="nutrition-entry-row">
+      <div class="nutrition-entry-icon" style="background: ${meta.color}20; color: ${meta.color};">
+        <i class="fas ${meta.icon}"></i>
+      </div>
+      <div style="flex: 1; min-width: 0;">
+        <strong>${meta.label}</strong>
+        <div class="text-muted" style="font-size: var(--text-xs);">
+          ${Math.round((Number(entry.amount) || 0) * 10) / 10}${entry.unit || ''}
+          · ${formatEntryTime(entry.occurred_at)}
+          ${entry.notes ? ` · ${entry.notes}` : ''}
+        </div>
+      </div>
+      <button class="btn btn-ghost btn-icon btn-sm text-danger"
+              data-delete-kind="entry" data-delete-id="${entry.id}" title="Delete entry">
+        <i class="fas fa-trash"></i>
+      </button>
+    </div>
+  `;
+}
+
+function renderMealRow(meal) {
+  const meta = mealMeta(meal.meal_type);
+  const t = meal.totals || {};
+  const macroBits = [
+    Number(t.calories) ? `${Math.round(t.calories)} cal` : null,
+    Number(t.protein_g) ? `${Math.round(t.protein_g)}g P` : null,
+    Number(t.carbs_g) ? `${Math.round(t.carbs_g)}g C` : null,
+    Number(t.fat_g) ? `${Math.round(t.fat_g)}g F` : null
+  ].filter(Boolean).join(' · ');
+  const foodBit = meal.food_count
+    ? `${meal.food_count} item${meal.food_count === 1 ? '' : 's'}`
+    : 'No items';
+  const timeBit = formatEntryTime(meal.occurred_at);
+
+  return html`
+    <div class="nutrition-entry-row">
+      <div class="nutrition-entry-icon" style="background: ${meta.color}20; color: ${meta.color};">
+        <i class="fas ${meta.icon}"></i>
+      </div>
+      <div style="flex: 1; min-width: 0;">
+        <strong>${meal.name || meta.label}</strong>
+        <div class="text-muted" style="font-size: var(--text-xs);">
+          ${macroBits || foodBit}${timeBit ? ` · ${timeBit}` : ''}${meal.name && meal.meal_type ? ` · ${meta.label}` : ''}
+          ${meal.notes ? ` · ${meal.notes}` : ''}
+        </div>
+      </div>
+      <button class="btn btn-ghost btn-icon btn-sm text-danger"
+              data-delete-kind="meal" data-delete-id="${meal.id}" title="Delete meal">
+        <i class="fas fa-trash"></i>
+      </button>
+    </div>
+  `;
+}
+
+function renderActivityBody(items) {
+  if (!items || items.length === 0) {
     return html`
       <div class="empty-state" style="padding: var(--space-8) var(--space-4);">
         <div class="empty-state-icon">🍽️</div>
         <div class="empty-state-title">No entries yet</div>
         <div class="empty-state-description">
-          Log protein, water, or creatine and it'll appear here.
+          Log protein, water, creatine, or a meal and it'll appear here.
         </div>
       </div>
     `;
   }
 
   const today = new Date().toISOString().split('T')[0];
-  const groups = groupEntriesByDate(entries);
+  const groups = groupActivityByDate(items);
 
   return html`
     <div class="stack stack-md" style="max-height: 500px; overflow-y: auto;">
       ${groups.map((group) => {
-        const totals = group.items.reduce((acc, e) => {
-          acc[e.entry_type] = (acc[e.entry_type] || 0) + (Number(e.amount) || 0);
+        const totals = group.items.reduce((acc, it) => {
+          if (it.kind === 'entry') {
+            acc[it.entry_type] = (acc[it.entry_type] || 0) + (Number(it.amount) || 0);
+          } else if (it.kind === 'meal' && it.totals) {
+            acc.calories = (acc.calories || 0) + (Number(it.totals.calories) || 0);
+            acc.protein = (acc.protein || 0) + (Number(it.totals.protein_g) || 0);
+          }
           return acc;
         }, {});
+        const summary = [
+          totals.calories ? `${Math.round(totals.calories)} cal` : null,
+          totals.protein ? `${Math.round(totals.protein)}g P` : null,
+          totals.water ? `${Math.round(totals.water)}ml W` : null,
+          totals.creatine ? `${Math.round(totals.creatine * 10) / 10}g C` : null
+        ].filter(Boolean).join(' · ');
         return html`
           <div>
             <div class="nutrition-entries-group-header">
               <strong>${formatEntryDateHeader(group.date, today)}</strong>
-              <span class="text-muted" style="font-size: var(--text-xs);">
-                ${totals.protein ? `${Math.round(totals.protein)}g P` : ''}
-                ${totals.water ? ` · ${Math.round(totals.water)}ml W` : ''}
-                ${totals.creatine ? ` · ${Math.round(totals.creatine * 10) / 10}g C` : ''}
-              </span>
+              <span class="text-muted" style="font-size: var(--text-xs);">${summary}</span>
             </div>
             <div class="stack stack-sm">
-              ${group.items.map((e) => {
-                const meta = ENTRY_TYPE_META[e.entry_type] || {
-                  icon: 'fa-utensils', color: 'var(--color-text-muted)', label: e.entry_type
-                };
-                return html`
-                  <div class="nutrition-entry-row">
-                    <div class="nutrition-entry-icon" style="background: ${meta.color}20; color: ${meta.color};">
-                      <i class="fas ${meta.icon}"></i>
-                    </div>
-                    <div style="flex: 1; min-width: 0;">
-                      <strong>${meta.label}</strong>
-                      <div class="text-muted" style="font-size: var(--text-xs);">
-                        ${Math.round((Number(e.amount) || 0) * 10) / 10}${e.unit || ''}
-                        · ${formatEntryTime(e.logged_at)}
-                        ${e.notes ? ` · ${e.notes}` : ''}
-                      </div>
-                    </div>
-                    <button class="btn btn-ghost btn-icon btn-sm text-danger"
-                            data-delete-entry="${e.id}" title="Delete entry">
-                      <i class="fas fa-trash"></i>
-                    </button>
-                  </div>
-                `;
-              })}
+              ${group.items.map((it) =>
+                it.kind === 'meal' ? renderMealRow(it) : renderEntryRow(it)
+              )}
             </div>
           </div>
         `;
       })}
     </div>
   `;
+}
+
+async function fetchActivityItems(start, end) {
+  const data = await api.get(
+    `/nutrition/activity?start_date=${start}&end_date=${end}`
+  );
+  return Array.isArray(data?.items) ? data.items : [];
 }
 
 export async function loadNutritionEntries() {
@@ -593,43 +660,49 @@ export async function loadNutritionEntries() {
   const start = startDate.toISOString().split('T')[0];
   const end = endDate.toISOString().split('T')[0];
 
-  let data;
+  let items;
   try {
-    data = await api.get(
-      `/nutrition/entries?start_date=${start}&end_date=${end}`
-    );
+    items = await fetchActivityItems(start, end);
   } catch (err) {
     toast.error(`Couldn't load entries: ${err.message}`);
     return;
   }
 
-  const entries = Array.isArray(data?.entries) ? data.entries : [];
-
   const api_ = openModal({
     title: 'Nutrition Entries (Last 14 Days)',
     size: 'default',
-    content: String(renderEntriesBody(entries)),
+    content: String(renderActivityBody(items)),
     actions: [{ label: 'Close', variant: 'btn-outline' }],
     onOpen: ({ element }) => {
       element.addEventListener('click', async (event) => {
-        const btn = event.target.closest('[data-delete-entry]');
+        const btn = event.target.closest('[data-delete-kind]');
         if (!btn) return;
-        const id = parseInt(btn.getAttribute('data-delete-entry'), 10);
+        const kind = btn.getAttribute('data-delete-kind');
+        const id = parseInt(btn.getAttribute('data-delete-id'), 10);
         if (!id) return;
 
-        await deleteNutritionEntry(id);
-        // Re-fetch + re-render the modal body in place (don't close + reopen
-        // — that flashes the modal and resets scroll position).
         try {
-          const refreshed = await api.get(
-            `/nutrition/entries?start_date=${start}&end_date=${end}`
-          );
+          if (kind === 'meal') {
+            await api.delete(`/nutrition/meals/${id}`);
+          } else {
+            await api.delete(`/nutrition/entries/${id}`);
+          }
+          toast.success('Deleted');
+          if (typeof window.loadNutrition === 'function') window.loadNutrition();
+        } catch (err) {
+          toast.error(`Error: ${err.message}`);
+          return;
+        }
+
+        // Re-fetch + re-render in place so scroll/selection aren't lost.
+        try {
+          const refreshed = await fetchActivityItems(start, end);
           const body = element.querySelector('.modal-body');
           if (body) {
-            body.innerHTML = String(renderEntriesBody(refreshed?.entries || []));
+            body.innerHTML = String(renderActivityBody(refreshed));
           }
         } catch (err) {
-          console.warn('Failed to refresh entries list:', err);
+          console.warn('Failed to refresh activity list:', err);
           closeTopModal();
         }
       });

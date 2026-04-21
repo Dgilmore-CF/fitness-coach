@@ -646,6 +646,108 @@ nutrition.get('/entries', async (c) => {
   return c.json({ entries: entries.results || [] });
 });
 
+// ============================================================================
+// Combined nutrition activity feed (manual entries + logged meals)
+//
+// The Nutrition Entries modal in the UI wants a single chronological list of
+// every nutrition-related thing the user logged: manual protein/water/creatine
+// entries AND full meals (which can come from meal-logger, AI parsing, saved
+// meal templates, or barcode scans). `/entries` alone only returns the first
+// kind, so the modal used to silently omit meals.
+//
+// Response shape is a flat `items[]` array with a `kind` discriminator so the
+// frontend can render each row uniformly. Meals are rolled up to totals per
+// meal (single GROUP BY query, no N+1 per-meal food fetch).
+// ============================================================================
+nutrition.get('/activity', async (c) => {
+  const user = requireAuth(c);
+  const db = c.env.DB;
+  const today = new Date().toISOString().split('T')[0];
+  const defaultStart = new Date(Date.now() - 13 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const startDate = c.req.query('start_date') || defaultStart;
+  const endDate = c.req.query('end_date') || today;
+
+  // Manual entries (protein / water / creatine)
+  const entriesResult = await db.prepare(
+    `SELECT id, entry_type, amount, unit, notes, logged_at
+       FROM nutrition_entries
+      WHERE user_id = ?
+        AND date(logged_at) >= ?
+        AND date(logged_at) <= ?
+      ORDER BY logged_at DESC`
+  ).bind(user.id, startDate, endDate).all();
+
+  // Meals with rolled-up macros from meal_foods (single query, no N+1).
+  // NULL food rows (bare meals added via AI parsing or saved-meal templates
+  // that carried no ingredient rows) still return a meal row with 0 food_count
+  // — the client needs to display them too.
+  const mealsResult = await db.prepare(
+    `SELECT m.id,
+            m.date,
+            m.meal_type,
+            m.name,
+            m.notes,
+            m.created_at,
+            COUNT(mf.id)                   AS food_count,
+            COALESCE(SUM(mf.calories), 0)  AS calories,
+            COALESCE(SUM(mf.protein_g), 0) AS protein_g,
+            COALESCE(SUM(mf.carbs_g), 0)   AS carbs_g,
+            COALESCE(SUM(mf.fat_g), 0)     AS fat_g
+       FROM meals m
+       LEFT JOIN meal_foods mf ON mf.meal_id = m.id
+      WHERE m.user_id = ?
+        AND m.date >= ?
+        AND m.date <= ?
+      GROUP BY m.id
+      ORDER BY m.date DESC, m.created_at DESC`
+  ).bind(user.id, startDate, endDate).all();
+
+  const entries = (entriesResult.results || []).map((e) => ({
+    kind: 'entry',
+    id: e.id,
+    date: (e.logged_at || '').split(/[T ]/)[0] || null,
+    occurred_at: e.logged_at,
+    entry_type: e.entry_type,
+    amount: e.amount,
+    unit: e.unit,
+    notes: e.notes
+  }));
+
+  const meals = (mealsResult.results || []).map((m) => ({
+    kind: 'meal',
+    id: m.id,
+    date: m.date,
+    occurred_at: m.created_at,
+    meal_type: m.meal_type || 'snack',
+    name: m.name || null,
+    food_count: m.food_count || 0,
+    notes: m.notes,
+    totals: {
+      calories: Math.round(m.calories || 0),
+      protein_g: Math.round((m.protein_g || 0) * 10) / 10,
+      carbs_g: Math.round((m.carbs_g || 0) * 10) / 10,
+      fat_g: Math.round((m.fat_g || 0) * 10) / 10
+    }
+  }));
+
+  // Merge + sort by occurred_at DESC. `occurred_at` may be an ISO string
+  // with T/Z or a SQLite "YYYY-MM-DD HH:MM:SS" string — normalize with
+  // Date.parse, falling back to string compare.
+  const ts = (s) => {
+    if (!s) return 0;
+    const norm = s.includes('T') || s.includes('Z') ? s : s.replace(' ', 'T') + 'Z';
+    const t = Date.parse(norm);
+    return Number.isNaN(t) ? 0 : t;
+  };
+  const items = [...entries, ...meals].sort((a, b) => ts(b.occurred_at) - ts(a.occurred_at));
+
+  return c.json({
+    start_date: startDate,
+    end_date: endDate,
+    items
+  });
+});
+
 // Update nutrition entry
 nutrition.put('/entries/:id', async (c) => {
   const user = requireAuth(c);

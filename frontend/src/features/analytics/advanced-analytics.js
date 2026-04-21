@@ -232,48 +232,73 @@ function renderImbalances(balance) {
   `;
 }
 
+/**
+ * Advanced Analytics modal — opens the full ML-powered dashboard
+ * (recovery, consistency, muscle balance, strength predictions, volume
+ * forecast, imbalances, AI insights) in a wide modal.
+ *
+ * Previously this rendered into a DOM element `#advancedAnalyticsSection`
+ * that the migrated Insights screen never actually creates, so the button
+ * appeared to do nothing. Using a modal makes it work regardless of what
+ * tab the user is on and matches the "Full Analysis" button pattern.
+ */
 export async function loadAdvancedAnalytics() {
-  const container = document.getElementById('advancedAnalyticsSection');
-  if (!container) return;
-
-  container.innerHTML = String(html`
-    <div class="card"><div class="skeleton skeleton-card"></div></div>
-  `);
-
+  let data;
   try {
-    const data = await api.get('/analytics/advanced');
-
-    container.innerHTML = String(html`
-      <div class="stack stack-lg">
-        <div class="card advanced-hero">
-          <h2><i class="fas fa-brain"></i> Advanced Analytics</h2>
-          <p>ML-powered predictions and insights based on ${data.summary?.total_workouts_analyzed || 0} workouts.</p>
-        </div>
-
-        <div class="grid grid-cols-auto">
-          ${renderRecoveryCard(data.recovery)}
-          ${renderConsistencyCard(data.consistency)}
-          ${renderBalanceCard(data.muscle_balance)}
-          ${renderTrendCard(data.volume_predictions)}
-        </div>
-
-        ${renderInsights(data.ai_insights)}
-        ${renderStrengthPredictions(data.strength_predictions)}
-        ${renderVolumeForecast(data.volume_predictions)}
-        ${renderImbalances(data.muscle_balance)}
-      </div>
-    `);
+    data = await api.get('/analytics/advanced');
   } catch (err) {
     console.error('Error loading advanced analytics:', err);
-    container.innerHTML = String(html`
-      <div class="card">
-        <div class="empty-state">
-          <div class="empty-state-icon">⚠️</div>
-          <div class="empty-state-description">${err.message}</div>
-        </div>
-      </div>
-    `);
+    toast.error(`Couldn't load advanced analytics: ${err.message}`);
+    return;
   }
+
+  if (!data || typeof data !== 'object') {
+    toast.info('No advanced analytics data available yet.');
+    return;
+  }
+
+  const totalWorkouts = data.summary?.total_workouts_analyzed || 0;
+
+  openModal({
+    title: 'Advanced Analytics',
+    size: 'wide',
+    content: String(html`
+      <div class="stack stack-lg">
+        <div class="card advanced-hero">
+          <h2 style="margin: 0;"><i class="fas fa-brain"></i> ML-Powered Insights</h2>
+          <p class="text-muted" style="margin-top: var(--space-2);">
+            Predictions and analysis based on
+            ${totalWorkouts === 1 ? '1 workout' : `${totalWorkouts} workouts`}.
+          </p>
+        </div>
+
+        ${totalWorkouts === 0
+          ? html`
+              <div class="empty-state" style="padding: var(--space-6) var(--space-4);">
+                <div class="empty-state-icon">📊</div>
+                <div class="empty-state-title">Not enough data yet</div>
+                <div class="empty-state-description">
+                  Log a few workouts and advanced analytics will unlock.
+                </div>
+              </div>
+            `
+          : html`
+              <div class="grid grid-cols-auto">
+                ${renderRecoveryCard(data.recovery)}
+                ${renderConsistencyCard(data.consistency)}
+                ${renderBalanceCard(data.muscle_balance)}
+                ${renderTrendCard(data.volume_predictions)}
+              </div>
+
+              ${renderInsights(data.ai_insights)}
+              ${renderStrengthPredictions(data.strength_predictions)}
+              ${renderVolumeForecast(data.volume_predictions)}
+              ${renderImbalances(data.muscle_balance)}
+            `}
+      </div>
+    `),
+    actions: [{ label: 'Close', primary: true, variant: 'btn-primary' }]
+  });
 }
 
 // ============================================================================
