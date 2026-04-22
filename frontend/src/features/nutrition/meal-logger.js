@@ -811,8 +811,9 @@ async function lookupBarcode() {
                 <button class="btn btn-primary" id="scan-log-now" style="flex: 1;">
                   <i class="fas fa-check"></i> Log It
                 </button>
-                <button class="btn btn-outline" id="scan-save-favorite" title="Save this food to your Favorites">
-                  <i class="far fa-star"></i> Save
+                <button class="btn btn-outline" id="scan-save-meal"
+                        title="Save this product as a one-tap template in Saved Meals">
+                  <i class="fas fa-bookmark"></i> Save
                 </button>
               </div>
               <button class="btn btn-ghost btn-sm btn-block" id="scan-build-meal"
@@ -862,15 +863,46 @@ async function lookupBarcode() {
       }
     });
 
-    // 2) Save — toggle the food as a user favorite so it shows up in the
-    //    Favorites list on future meal logs, without creating a meal entry.
-    document.getElementById('scan-save-favorite')?.addEventListener('click', async () => {
+    // 2) Save — persist this product as a single-food Saved Meal template
+    //    so the user can one-tap log it again later from Saved Meals.
+    //    The backend de-dupes on (user_id, name), so re-scanning the same
+    //    item just refreshes its macros instead of creating duplicates.
+    document.getElementById('scan-save-meal')?.addEventListener('click', async () => {
+      const btn = document.getElementById('scan-save-meal');
+      const originalHTML = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…';
+      }
       try {
         const toAdd = await ensureFoodPersisted(food);
-        const res = await api.post(`/nutrition/foods/${toAdd.id}/favorite`);
-        toast.success(res?.is_favorite ? 'Saved to Favorites' : 'Removed from Favorites');
+        const mealType = document.getElementById('scan-meal-type')?.value || defaultMealType;
+        const res = await api.post('/nutrition/saved-meals', {
+          name: toAdd.name,
+          meal_type: mealType,
+          // One-food template: copy per-serving macros from the food row.
+          foods: [{
+            food_id: toAdd.id,
+            custom_name: toAdd.name,
+            quantity: 1,
+            unit: 'serving',
+            calories: toAdd.calories || 0,
+            protein_g: toAdd.protein_g || 0,
+            carbs_g: toAdd.carbs_g || 0,
+            fat_g: toAdd.fat_g || 0,
+            fiber_g: toAdd.fiber_g || 0
+          }]
+        });
+        toast.success(res?.created === false
+          ? `Updated "${toAdd.name}" in Saved Meals`
+          : `Saved "${toAdd.name}" to Saved Meals`);
       } catch (err) {
         toast.error(`Error: ${err.message}`);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalHTML;
+        }
       }
     });
 
