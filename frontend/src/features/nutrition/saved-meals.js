@@ -8,6 +8,7 @@ import { api } from '@core/api';
 import { delegate } from '@core/delegate';
 import { openModal, confirmDialog, closeTopModal } from '@ui/Modal';
 import { toast } from '@ui/Toast';
+import { todayLocal, daysAgoLocal, dateLocal, nowLocalISO } from '@utils/date';
 
 // ============================================================================
 // Saved meals list (preview in Nutrition tab)
@@ -384,7 +385,7 @@ async function logQuickMacros(modalApi) {
   try {
     // Log as a custom meal (no foods, just macros)
     await api.post('/nutrition/meals', {
-      date: new Date().toISOString().split('T')[0],
+      date: todayLocal(),
       meal_type: 'snack',
       custom_macros: { calories, protein_g: protein, carbs_g: carbs, fat_g: fat }
     });
@@ -496,16 +497,17 @@ function mealMeta(mealType) {
 
 function formatEntryTime(iso) {
   if (!iso) return '';
-  const d = new Date(iso.includes('T') || iso.includes('Z') ? iso : iso.replace(' ', 'T') + 'Z');
+  // `logged_at` can arrive as a naive local ISO (new writes) or a UTC Z-ISO
+  // (legacy rows). Treat naive strings as local time (drop the `+ 'Z'`
+  // fallback that used to flip them to UTC and misdisplay the hour).
+  const d = new Date(iso.includes('T') ? iso : iso.replace(' ', 'T'));
   if (Number.isNaN(d.getTime())) return '';
   return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
 function formatEntryDateHeader(dateKey, today) {
   if (dateKey === today) return 'Today';
-  const y = new Date(today);
-  y.setDate(y.getDate() - 1);
-  const yesterday = y.toISOString().split('T')[0];
+  const yesterday = daysAgoLocal(-1);
   if (dateKey === yesterday) return 'Yesterday';
   const [yr, mo, dy] = dateKey.split('-').map(Number);
   const d = new Date(yr, mo - 1, dy);
@@ -516,15 +518,13 @@ function groupActivityByDate(items) {
   const groups = new Map();
   for (const it of items) {
     // Prefer the server's explicit `date` (canonical local day), but fall
-    // back to parsing occurred_at if missing.
+    // back to parsing occurred_at as local time (naive ISO) if missing.
     let key = it.date;
     if (!key) {
       const raw = it.occurred_at || '';
-      const iso = raw.includes('T') || raw.includes('Z') ? raw : raw.replace(' ', 'T') + 'Z';
+      const iso = raw.includes('T') ? raw : raw.replace(' ', 'T');
       const d = new Date(iso);
-      key = Number.isNaN(d.getTime())
-        ? 'unknown'
-        : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      key = Number.isNaN(d.getTime()) ? 'unknown' : dateLocal(d);
     }
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(it);
@@ -606,7 +606,7 @@ function renderActivityBody(items) {
     `;
   }
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayLocal();
   const groups = groupActivityByDate(items);
 
   return html`
@@ -653,12 +653,11 @@ async function fetchActivityItems(start, end) {
 }
 
 export async function loadNutritionEntries() {
-  // Last 14 days window (matches the "Last 14 Days" section the button sits in)
-  const endDate = new Date();
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - 13); // inclusive 14-day window
-  const start = startDate.toISOString().split('T')[0];
-  const end = endDate.toISOString().split('T')[0];
+  // Last 14 days window (matches the "Last 14 Days" section the button sits in).
+  // Uses local-date math so the window boundaries line up with the user's
+  // clock, not UTC.
+  const end = todayLocal();
+  const start = daysAgoLocal(-13);
 
   let items;
   try {

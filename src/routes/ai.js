@@ -17,6 +17,7 @@ import {
   suggestNextMeal,
   parseMealFromText
 } from '../services/ai-nutrition.js';
+import { todayForRequest } from '../utils/local-date.js';
 
 const ai = new Hono();
 
@@ -589,7 +590,9 @@ ai.post('/realtime/analyze', async (c) => {
 ai.get('/nutrition/analyze', async (c) => {
   const user = requireAuth(c);
   const db = c.env.DB;
-  const date = c.req.query('date');
+  // Default to the user's LOCAL today (via the request's CF timezone)
+  // so late-evening users don't get an empty "tomorrow" log.
+  const date = c.req.query('date') || todayForRequest(c);
 
   try {
     const result = await analyzeNutrition({ ai: c.env.AI, db, user, date, env: c.env });
@@ -624,6 +627,9 @@ ai.post('/nutrition/suggest-meal', async (c) => {
       db,
       user,
       mealType: body?.meal_type || 'next',
+      // User's local today, so the "remaining macros for today" math is
+      // anchored to the calendar day the user is actually on.
+      date: todayForRequest(c),
       env: c.env
     });
     return c.json({ success: true, ...result });

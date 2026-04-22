@@ -74,7 +74,14 @@ async function getRecentLogs(db, userId, days = 7) {
  * enhance with an AI-generated narrative summary.
  */
 export async function analyzeNutrition({ ai, db, user, date, env }) {
-  const today = date || new Date().toISOString().split('T')[0];
+  // Caller is expected to pass the user's local today (routes pull this
+  // from the CF request timezone). UTC fallback is only for tests /
+  // scripted callers that don't have a Hono context.
+  const today = date || (() => {
+    const n = new Date();
+    const p = (v) => String(v).padStart(2, '0');
+    return `${n.getUTCFullYear()}-${p(n.getUTCMonth() + 1)}-${p(n.getUTCDate())}`;
+  })();
   const [todayLog, recentLogs, targets] = await Promise.all([
     getDailyLog(db, user.id, today),
     getRecentLogs(db, user.id, 7),
@@ -240,8 +247,14 @@ export async function analyzeNutrition({ ai, db, user, date, env }) {
  * Suggest a meal that helps hit the user's remaining macros for the day.
  * Uses AI for variety; falls back to rule-based suggestions.
  */
-export async function suggestNextMeal({ ai, db, user, mealType = 'next', env }) {
-  const today = new Date().toISOString().split('T')[0];
+export async function suggestNextMeal({ ai, db, user, mealType = 'next', date, env }) {
+  // Caller passes local today from the request's timezone. UTC fallback
+  // only applies to tests / scripted callers.
+  const today = date || (() => {
+    const n = new Date();
+    const p = (v) => String(v).padStart(2, '0');
+    return `${n.getUTCFullYear()}-${p(n.getUTCMonth() + 1)}-${p(n.getUTCDate())}`;
+  })();
   const [todayLog, targets] = await Promise.all([
     getDailyLog(db, user.id, today),
     getTargets(db, user.id, user.weight_kg)

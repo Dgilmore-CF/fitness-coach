@@ -13,6 +13,7 @@ import { api } from '@core/api';
 import { openModal, closeTopModal } from '@ui/Modal';
 import { toast } from '@ui/Toast';
 import { withLoading } from '@ui/LoadingOverlay';
+import { todayLocal } from '@utils/date';
 
 const PRIORITY_BADGE = {
   high: 'badge-danger',
@@ -258,7 +259,7 @@ async function logSuggestionAsMeal(suggestion) {
   const macros = suggestion.macros || {};
   try {
     await api.post('/nutrition/meals', {
-      date: new Date().toISOString().split('T')[0],
+      date: todayLocal(),
       meal_type: 'snack',
       name: suggestion.name,
       // Inline-save the AI suggestion as a food so the backend records the
@@ -441,7 +442,7 @@ function renderParseResults({ foods, totals }) {
 async function logParsedMeal(parseResult) {
   try {
     await api.post('/nutrition/meals', {
-      date: new Date().toISOString().split('T')[0],
+      date: todayLocal(),
       meal_type: 'snack',
       name: 'Parsed meal',
       foods: parseResult.foods.map((f) => ({

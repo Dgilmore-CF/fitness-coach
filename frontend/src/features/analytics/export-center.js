@@ -13,6 +13,7 @@ import { html, htmlToElement, raw } from '@core/html';
 import { api } from '@core/api';
 import { openModal, closeTopModal } from '@ui/Modal';
 import { toast } from '@ui/Toast';
+import { todayLocal, daysAgoLocal } from '@utils/date';
 import { formatWeight, formatDate, formatDuration } from '@utils/formatters';
 
 // ============================================================================
@@ -50,7 +51,7 @@ async function downloadExport(type, { start, end, format }) {
   }
 
   const contentType = response.headers.get('content-type') || '';
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayLocal();
 
   if (contentType.includes('text/csv')) {
     const blob = await response.blob();
@@ -83,8 +84,8 @@ async function fetchReportData(startDate, endDate) {
 
   return {
     period: {
-      start: startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      end: endDate || new Date().toISOString().split('T')[0]
+      start: startDate || daysAgoLocal(-30),
+      end: endDate || todayLocal()
     },
     overview: progressData.overview || {},
     advanced: advancedData.data || {},
@@ -236,7 +237,7 @@ async function generatePDF(modalEl) {
       heightLeft -= pageHeight;
     }
 
-    pdf.save(`fitness-report-${new Date().toISOString().split('T')[0]}.pdf`);
+    pdf.save(`fitness-report-${todayLocal()}.pdf`);
     toast.success('PDF downloaded');
   } catch (err) {
     console.error('PDF generation failed:', err);
@@ -249,10 +250,8 @@ async function generatePDF(modalEl) {
 // ============================================================================
 
 export function openUnifiedExporter() {
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const today = new Date().toISOString().split('T')[0];
-  const start = thirtyDaysAgo.toISOString().split('T')[0];
+  const today = todayLocal();
+  const start = daysAgoLocal(-30);
 
   let activeTab = 'data';
 

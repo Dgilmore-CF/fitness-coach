@@ -13,6 +13,11 @@ import {
   reconcileNutritionLog,
   reconcileNutritionLogRange
 } from '../utils/nutrition-ledger';
+import {
+  todayForRequest,
+  daysAgoForRequest,
+  toDateKey
+} from '../utils/local-date';
 
 const nutrition = new Hono();
 
@@ -23,7 +28,7 @@ nutrition.post('/protein', async (c) => {
   const { grams, date } = body;
   const db = c.env.DB;
 
-  const logDate = date || new Date().toISOString().split('T')[0];
+  const logDate = date || todayForRequest(c);
 
   // Upsert nutrition log
   const log = await db.prepare(
@@ -46,7 +51,7 @@ nutrition.post('/water', async (c) => {
   const { ml, date } = body;
   const db = c.env.DB;
 
-  const logDate = date || new Date().toISOString().split('T')[0];
+  const logDate = date || todayForRequest(c);
 
   // Upsert nutrition log
   const log = await db.prepare(
@@ -69,7 +74,7 @@ nutrition.post('/creatine', async (c) => {
   const { grams, date } = body;
   const db = c.env.DB;
 
-  const logDate = date || new Date().toISOString().split('T')[0];
+  const logDate = date || todayForRequest(c);
 
   // Upsert nutrition log
   const log = await db.prepare(
@@ -89,7 +94,7 @@ nutrition.post('/creatine', async (c) => {
 nutrition.get('/daily', async (c) => {
   const user = requireAuth(c);
   const db = c.env.DB;
-  const date = c.req.query('date') || new Date().toISOString().split('T')[0];
+  const date = c.req.query('date') || todayForRequest(c);
 
   const log = await db.prepare(
     'SELECT * FROM nutrition_log WHERE user_id = ? AND date = ?'
@@ -238,14 +243,16 @@ nutrition.get('/analytics', async (c) => {
   let currentStreak = 0;
   let longestStreak = 0;
   let tempStreak = 0;
-  
+
+  // Iterate backwards from the user's LOCAL today (not UTC) so a streak
+  // that includes today doesn't get dropped by a UTC-vs-local date skew.
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  
+
   for (let i = 0; i < days; i++) {
     const checkDate = new Date(today);
     checkDate.setDate(checkDate.getDate() - i);
-    const dateStr = checkDate.toISOString().split('T')[0];
+    const dateStr = toDateKey(checkDate);
     
     const log = logs.find(l => l.date === dateStr);
     const hitGoals = log && 
@@ -376,7 +383,7 @@ nutrition.get('/streaks', async (c) => {
     for (let i = 0; i < 90; i++) {
       const checkDate = new Date(today);
       checkDate.setDate(checkDate.getDate() - i);
-      const dateStr = checkDate.toISOString().split('T')[0];
+      const dateStr = toDateKey(checkDate);
       
       const log = logs.find(l => l.date === dateStr);
       let hit = false;
@@ -410,7 +417,7 @@ nutrition.put('/daily', async (c) => {
   const { date, protein_grams, water_ml, creatine_grams } = body;
   const db = c.env.DB;
 
-  const logDate = date || new Date().toISOString().split('T')[0];
+  const logDate = date || todayForRequest(c);
 
   const log = await db.prepare(
     `INSERT INTO nutrition_log (user_id, date, protein_grams, water_ml, creatine_grams, updated_at)
@@ -670,9 +677,8 @@ nutrition.post('/reconcile', async (c) => {
     return c.json({ reconciled: { [singleDate]: totals } });
   }
 
-  const today = new Date().toISOString().split('T')[0];
-  const defaultStart = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000)
-    .toISOString().split('T')[0];
+  const today = todayForRequest(c);
+  const defaultStart = daysAgoForRequest(c, -29);
   const startDate = c.req.query('start_date') || defaultStart;
   const endDate   = c.req.query('end_date')   || today;
 
@@ -698,8 +704,12 @@ nutrition.post('/entries', async (c) => {
     return c.json({ error: 'Invalid entry_type' }, 400);
   }
 
-  const timestamp = logged_at || new Date().toISOString();
-  const logDate = timestamp.split(/[T ]/)[0];
+  // Preserve the client's `logged_at` when provided (frontend sends a naive
+  // local ISO like "2026-04-21T22:13:00.000" so SQLite's date() returns
+  // the user's local day). Fall back to a naive local-now derived from the
+  // request's Cloudflare-attested timezone when the client doesn't specify.
+  const timestamp = logged_at || `${todayForRequest(c)}T00:00:00.000`;
+  const logDate = toDateKey(timestamp) || todayForRequest(c);
 
   const result = await db.prepare(
     `INSERT INTO nutrition_entries (user_id, entry_type, amount, unit, notes, logged_at)
@@ -716,8 +726,8 @@ nutrition.post('/entries', async (c) => {
 nutrition.get('/entries', async (c) => {
   const user = requireAuth(c);
   const db = c.env.DB;
-  const startDate = c.req.query('start_date') || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-  const endDate = c.req.query('end_date') || new Date().toISOString().split('T')[0];
+  const startDate = c.req.query('start_date') || daysAgoForRequest(c, -6);
+  const endDate = c.req.query('end_date') || todayForRequest(c);
   const entryType = c.req.query('entry_type'); // optional filter
 
   let query = `
@@ -756,8 +766,8 @@ nutrition.get('/entries', async (c) => {
 nutrition.get('/activity', async (c) => {
   const user = requireAuth(c);
   const db = c.env.DB;
-  const today = new Date().toISOString().split('T')[0];
-  const defaultStart = new Date(Date.now() - 13 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const today = todayForRequest(c);
+  const defaultStart = daysAgoForRequest(c, -13);
   const startDate = c.req.query('start_date') || defaultStart;
   const endDate = c.req.query('end_date') || today;
 
@@ -1605,7 +1615,7 @@ nutrition.post('/meals', async (c) => {
 
   const { date, meal_type, name, foods, notes, custom_macros } = body;
 
-  const mealDate = date || new Date().toISOString().split('T')[0];
+  const mealDate = date || todayForRequest(c);
   const mealType = meal_type || 'snack';
 
   // Create meal (macros defaulted to 0; filled in below)
@@ -1736,7 +1746,7 @@ nutrition.post('/meals', async (c) => {
 nutrition.get('/meals', async (c) => {
   const user = requireAuth(c);
   const db = c.env.DB;
-  const date = c.req.query('date') || new Date().toISOString().split('T')[0];
+  const date = c.req.query('date') || todayForRequest(c);
 
   const meals = await db.prepare(
     `SELECT m.*
@@ -1873,9 +1883,9 @@ nutrition.post('/macro-targets', async (c) => {
     fat_g || null,
     fiber_g || null,
     water_ml || null,
-    effective_date || new Date().toISOString().split('T')[0]
+    effective_date || todayForRequest(c)
   ).first();
-  
+
   return c.json({ targets: result, message: 'Macro targets saved' });
 });
 
@@ -1938,7 +1948,7 @@ nutrition.post('/quick-add', async (c) => {
     return c.json({ error: 'food_id is required' }, 400);
   }
 
-  const mealDate = date || new Date().toISOString().split('T')[0];
+  const mealDate = date || todayForRequest(c);
   const mealTypeValue = meal_type || 'snack';
 
   // Get or create a dedicated "quick-add bucket" meal for this slot
@@ -2133,7 +2143,7 @@ nutrition.post('/saved-meals/:id/log', async (c) => {
   }
 
   const { date, meal_type } = body;
-  const logDate = date || new Date().toISOString().split('T')[0];
+  const logDate = date || todayForRequest(c);
 
   const savedMeal = await db.prepare(
     'SELECT * FROM saved_meals WHERE id = ? AND user_id = ?'
