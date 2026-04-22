@@ -13,6 +13,7 @@ import { html, raw } from '@core/html';
 import { api } from '@core/api';
 import { store } from '@core/state';
 import { toast } from '@ui/Toast';
+import { todayLocal } from '@utils/date';
 import { openModal } from '@ui/Modal';
 import {
   isImperialSystem,
@@ -59,7 +60,7 @@ export async function showLogPastWorkout(preselectedDate = null) {
     }
   }
 
-  flowState.date = preselectedDate || new Date().toISOString().split('T')[0];
+  flowState.date = preselectedDate || todayLocal();
 
   renderMainModal();
 }
@@ -76,7 +77,7 @@ function renderMainModal() {
         <div class="grid grid-cols-2" style="gap: var(--space-3);">
           <div class="form-group">
             <label class="form-label">Date</label>
-            <input type="date" id="past-date" class="input" value="${flowState.date}" max="${new Date().toISOString().split('T')[0]}" />
+            <input type="date" id="past-date" class="input" value="${flowState.date}" max="${todayLocal()}" />
           </div>
           <div class="form-group">
             <label class="form-label">Duration (minutes)</label>

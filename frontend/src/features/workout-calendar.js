@@ -15,6 +15,7 @@ import {
   formatDate,
   getExertionEmoji
 } from '@utils/formatters';
+import { todayLocal, dateLocal } from '@utils/date';
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -33,7 +34,7 @@ function renderGrid() {
   const totalDays = lastDay.getDate();
 
   const today = new Date();
-  const todayKey = today.toISOString().split('T')[0];
+  const todayKey = todayLocal();
 
   const cells = [];
 
@@ -247,9 +248,13 @@ export async function loadWorkoutCalendar(hostEl) {
     const data = await api.get('/workouts?limit=100');
     const workouts = data.workouts || [];
 
+    // Bucket workouts by the user's local calendar day. The raw
+    // `start_time` is a UTC timestamp; converting via toISOString would
+    // attribute late-evening workouts to the next UTC day, which looks
+    // wrong on the calendar grid.
     const byDate = {};
     for (const w of workouts) {
-      const key = new Date(w.start_time).toISOString().split('T')[0];
+      const key = dateLocal(new Date(w.start_time));
       if (!byDate[key]) byDate[key] = [];
       byDate[key].push(w);
     }

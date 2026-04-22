@@ -14,6 +14,7 @@ import { delegate } from '@core/delegate';
 import { toast } from '@ui/Toast';
 import { progressRing } from '@ui/ProgressRing';
 import { formatDate, formatNumber } from '@utils/formatters';
+import { todayLocal, nowLocalISO } from '@utils/date';
 
 // =============================================================================
 // Rendering helpers
@@ -267,7 +268,7 @@ function renderRecentDays(dailyData, summary) {
       ${recent.map((day) => {
         const proteinPct = Math.min((day.protein / day.protein_goal) * 100, 100);
         const waterPct = Math.min((day.water / day.water_goal) * 100, 100);
-        const isToday = day.date === new Date().toISOString().split('T')[0];
+        const isToday = day.date === todayLocal();
         return html`
           <div class="nutrition-bar-day ${isToday ? 'is-today' : ''}">
             <div class="nutrition-bar-label">${formatDate(day.date, { month: 'short', day: 'numeric' })}</div>
@@ -317,15 +318,19 @@ async function logAllQuick() {
   }
 
   try {
+    // Stamp each entry with a local-time ISO so it's filed under the user's
+    // current calendar day, not UTC's (which may be tomorrow in the evening
+    // for Western-Hemisphere users).
+    const loggedAt = nowLocalISO();
     const ops = [];
     if (protein > 0) {
-      ops.push(api.post('/nutrition/entries', { entry_type: 'protein', amount: protein, unit: 'g' }));
+      ops.push(api.post('/nutrition/entries', { entry_type: 'protein', amount: protein, unit: 'g', logged_at: loggedAt }));
     }
     if (water > 0) {
-      ops.push(api.post('/nutrition/entries', { entry_type: 'water', amount: water, unit: 'ml' }));
+      ops.push(api.post('/nutrition/entries', { entry_type: 'water', amount: water, unit: 'ml', logged_at: loggedAt }));
     }
     if (creatine > 0) {
-      ops.push(api.post('/nutrition/entries', { entry_type: 'creatine', amount: creatine, unit: 'g' }));
+      ops.push(api.post('/nutrition/entries', { entry_type: 'creatine', amount: creatine, unit: 'g', logged_at: loggedAt }));
     }
 
     await Promise.all(ops);
@@ -444,8 +449,9 @@ export async function loadNutrition() {
   container.innerHTML = String(renderLoadingState());
 
   try {
+    const today = todayLocal();
     const [daily, analytics, streaks] = await Promise.all([
-      api.get('/nutrition/daily'),
+      api.get(`/nutrition/daily?date=${today}`),
       api.get('/nutrition/analytics?days=30'),
       api.get('/nutrition/streaks')
     ]);

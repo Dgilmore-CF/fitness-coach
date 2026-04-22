@@ -8,6 +8,7 @@ import { api } from '@core/api';
 import { openModal, closeTopModal } from '@ui/Modal';
 import { toast } from '@ui/Toast';
 import { playBarcodeDetected } from '@utils/audio';
+import { todayLocal } from '@utils/date';
 import { createDecoder, hasCameraSupport, mapPointsToDisplay } from './barcode-decoder.js';
 
 let state = {
@@ -346,7 +347,7 @@ async function saveMeal() {
 
   try {
     await api.post('/nutrition/meals', {
-      date: new Date().toISOString().split('T')[0],
+      date: todayLocal(),
       meal_type: state.mealType,
       foods: state.selectedFoods.map((item) => {
         const payload = {
@@ -850,7 +851,8 @@ async function lookupBarcode() {
           food_id: toAdd.id,
           quantity: qty,
           unit: 'serving',
-          meal_type: mealType
+          meal_type: mealType,
+          date: todayLocal()
         });
         closeTopModal();
         toast.success(`Logged ${toAdd.name}`);
