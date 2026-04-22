@@ -2026,51 +2026,113 @@ nutrition.get('/saved-meals', async (c) => {
   return c.json({ saved_meals: meals.results || [] });
 });
 
-// Create a saved meal
+// Create or UPDATE a saved meal by name.
+//
+// De-dupes on (user_id, name) so the barcode-save flow (which calls this
+// with the scanned product's name) doesn't pile up duplicates when the
+// user re-scans the same item. If an existing saved meal matches, its
+// macros are overwritten, its saved_meal_foods are replaced, and the
+// existing row is returned with a `created: false` flag.
 nutrition.post('/saved-meals', async (c) => {
   const user = requireAuth(c);
   const body = await c.req.json();
   const db = c.env.DB;
-  
+
   const { name, description, meal_type, calories, protein_g, carbs_g, fat_g, fiber_g, recipe_url, foods } = body;
-  
+
   if (!name) {
     return c.json({ error: 'Meal name is required' }, 400);
   }
-  
-  // Calculate totals if foods provided
+
+  // If foods[] is provided, derive totals from them; otherwise use the
+  // macro fields from the body directly (quick-macro saved meals).
   let totalCalories = calories || 0;
   let totalProtein = protein_g || 0;
   let totalCarbs = carbs_g || 0;
   let totalFat = fat_g || 0;
   let totalFiber = fiber_g || 0;
-  
+
   if (foods && foods.length > 0) {
-    totalCalories = foods.reduce((sum, f) => sum + (f.calories || 0), 0);
-    totalProtein = foods.reduce((sum, f) => sum + (f.protein_g || 0), 0);
-    totalCarbs = foods.reduce((sum, f) => sum + (f.carbs_g || 0), 0);
-    totalFat = foods.reduce((sum, f) => sum + (f.fat_g || 0), 0);
-    totalFiber = foods.reduce((sum, f) => sum + (f.fiber_g || 0), 0);
+    totalCalories = foods.reduce((sum, f) => sum + (Number(f.calories) || 0), 0);
+    totalProtein = foods.reduce((sum, f) => sum + (Number(f.protein_g) || 0), 0);
+    totalCarbs = foods.reduce((sum, f) => sum + (Number(f.carbs_g) || 0), 0);
+    totalFat = foods.reduce((sum, f) => sum + (Number(f.fat_g) || 0), 0);
+    totalFiber = foods.reduce((sum, f) => sum + (Number(f.fiber_g) || 0), 0);
   }
-  
-  const meal = await db.prepare(
-    `INSERT INTO saved_meals (user_id, name, description, meal_type, calories, protein_g, carbs_g, fat_g, fiber_g, recipe_url)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     RETURNING *`
-  ).bind(user.id, name, description || null, meal_type || 'any', totalCalories, totalProtein, totalCarbs, totalFat, totalFiber, recipe_url || null).first();
-  
-  // Add foods if provided
+
+  // Look for an existing saved meal with the same name for this user.
+  const existing = await db.prepare(
+    `SELECT * FROM saved_meals WHERE user_id = ? AND name = ? LIMIT 1`
+  ).bind(user.id, name).first();
+
+  let meal;
+  let created = true;
+
+  if (existing) {
+    // Update the existing saved meal's macros in place.
+    meal = await db.prepare(
+      `UPDATE saved_meals
+          SET description = COALESCE(?, description),
+              meal_type   = COALESCE(?, meal_type),
+              calories    = ?,
+              protein_g   = ?,
+              carbs_g     = ?,
+              fat_g       = ?,
+              fiber_g     = ?,
+              recipe_url  = COALESCE(?, recipe_url),
+              updated_at  = CURRENT_TIMESTAMP
+        WHERE id = ? AND user_id = ?
+        RETURNING *`
+    ).bind(
+      description || null,
+      meal_type || null,
+      totalCalories, totalProtein, totalCarbs, totalFat, totalFiber,
+      recipe_url || null,
+      existing.id, user.id
+    ).first();
+    created = false;
+
+    // Replace child foods so the saved meal's ingredients stay in sync
+    // with what the caller just sent.
+    await db.prepare(
+      `DELETE FROM saved_meal_foods WHERE saved_meal_id = ?`
+    ).bind(existing.id).run();
+  } else {
+    meal = await db.prepare(
+      `INSERT INTO saved_meals (user_id, name, description, meal_type, calories, protein_g, carbs_g, fat_g, fiber_g, recipe_url)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       RETURNING *`
+    ).bind(
+      user.id, name, description || null, meal_type || 'any',
+      totalCalories, totalProtein, totalCarbs, totalFat, totalFiber,
+      recipe_url || null
+    ).first();
+  }
+
   if (foods && foods.length > 0) {
     for (const food of foods) {
       await db.prepare(
         `INSERT INTO saved_meal_foods (saved_meal_id, food_id, custom_name, quantity, unit, calories, protein_g, carbs_g, fat_g)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(meal.id, food.food_id || null, food.custom_name || null, food.quantity || 1, food.unit || 'serving',
-             food.calories || 0, food.protein_g || 0, food.carbs_g || 0, food.fat_g || 0).run();
+      ).bind(
+        meal.id,
+        food.food_id || null,
+        food.custom_name || null,
+        food.quantity || 1,
+        food.unit || 'serving',
+        Number(food.calories) || 0,
+        Number(food.protein_g) || 0,
+        Number(food.carbs_g) || 0,
+        Number(food.fat_g) || 0
+      ).run();
     }
   }
-  
-  return c.json({ saved_meal: meal, message: 'Meal saved' });
+
+  return c.json({
+    saved_meal: meal,
+    created,
+    message: created ? 'Meal saved' : 'Saved meal updated'
+  });
 });
 
 // Update a saved meal
