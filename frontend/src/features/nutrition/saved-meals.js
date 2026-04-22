@@ -265,7 +265,13 @@ export const updateSavedMeal = async (mealId) => {
 
 export async function logSavedMeal(mealId) {
   try {
-    await api.post(`/nutrition/saved-meals/${mealId}/log`);
+    // Always send the client's local date explicitly. The backend has a
+    // Cloudflare-timezone-aware fallback, but that's best-effort (VPNs,
+    // missing cf fields, etc.) — the browser knows for sure what day the
+    // user is on, so authoritative date = client date.
+    await api.post(`/nutrition/saved-meals/${mealId}/log`, {
+      date: todayLocal()
+    });
     toast.success('Meal logged!');
     if (typeof window.loadNutrition === 'function') window.loadNutrition();
   } catch (err) {
@@ -424,7 +430,13 @@ export function applyMacroPreset(calories, protein, carbs, fat) {
 
 async function logMacro(entryType, amount, unit) {
   try {
-    await api.post('/nutrition/entries', { entry_type: entryType, amount, unit });
+    await api.post('/nutrition/entries', {
+      entry_type: entryType, amount, unit,
+      // Stamp the entry with the user's local wall-clock time so it gets
+      // filed under today (not UTC-tomorrow if the user is west of GMT
+      // in the evening).
+      logged_at: nowLocalISO()
+    });
     toast.success('Logged!');
     if (typeof window.loadNutrition === 'function') window.loadNutrition();
   } catch (err) {
@@ -449,10 +461,11 @@ export async function logAllQuick() {
   }
 
   try {
+    const loggedAt = nowLocalISO();
     const ops = [];
-    if (protein > 0) ops.push(api.post('/nutrition/entries', { entry_type: 'protein', amount: protein, unit: 'g' }));
-    if (water > 0) ops.push(api.post('/nutrition/entries', { entry_type: 'water', amount: water, unit: 'ml' }));
-    if (creatine > 0) ops.push(api.post('/nutrition/entries', { entry_type: 'creatine', amount: creatine, unit: 'g' }));
+    if (protein > 0) ops.push(api.post('/nutrition/entries', { entry_type: 'protein', amount: protein, unit: 'g', logged_at: loggedAt }));
+    if (water > 0) ops.push(api.post('/nutrition/entries', { entry_type: 'water', amount: water, unit: 'ml', logged_at: loggedAt }));
+    if (creatine > 0) ops.push(api.post('/nutrition/entries', { entry_type: 'creatine', amount: creatine, unit: 'g', logged_at: loggedAt }));
     await Promise.all(ops);
 
     ['nq-protein', 'nq-water', 'nq-creatine'].forEach((id) => {

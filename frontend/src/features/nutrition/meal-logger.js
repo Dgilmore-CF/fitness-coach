@@ -136,11 +136,10 @@ function attachHandlers(modalEl) {
     } else if (action === 'show-barcode') {
       showBarcodeScanner();
     } else if (action === 'select-food') {
-      const foodId = parseInt(target.getAttribute('data-food-id'), 10);
       const foodJson = target.getAttribute('data-food-json');
       if (foodJson) {
         try {
-          selectFood(JSON.parse(foodJson));
+          await selectFood(JSON.parse(foodJson));
         } catch (err) {
           console.error('Failed to parse food:', err);
         }
@@ -266,17 +265,44 @@ function renderResults(foods, source) {
   `);
 }
 
-function selectFood(food) {
+async function selectFood(food) {
   const quantity = 1;
   const unit = 'serving';
+
+  // USDA / Open Food Facts search results arrive with no `id` (they're
+  // not in our local `foods` table yet). Persist them NOW so they:
+  //   1) show up in local-DB search next time the user types a few letters
+  //   2) don't evaporate if the user closes the modal without tapping
+  //      "Save Meal" (the toast used to say "Added ${name}" which read
+  //      like a durable save — in reality the food was only in an
+  //      in-memory buffer)
+  // Already-local foods skip the round-trip.
+  let persisted = food;
+  if (!food.id && food.source) {
+    try {
+      persisted = await ensureFoodPersisted(food);
+    } catch (err) {
+      toast.error(`Couldn't save food: ${err.message}`);
+      return;
+    }
+  }
+
   state.selectedFoods.push({
-    food_id: food.id,
-    food,
+    food_id: persisted.id,
+    food: persisted,
     quantity,
     unit
   });
   updateSelectedFoodsDisplay();
-  toast.success(`Added ${food.name}`);
+
+  // Bring the "Selected Foods" card into view so the user sees their
+  // queued items and the Save Meal button at the bottom of the modal.
+  const totalsCard = document.getElementById('meal-totals-card');
+  if (totalsCard?.scrollIntoView) {
+    totalsCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  toast.success(`${persisted.name} added — tap Save Meal to log`);
 }
 
 function updateSelectedFoodsDisplay() {
@@ -935,7 +961,11 @@ export function quickAddFood(foodId, mealType = 'snack') {
     food_id: foodId,
     quantity: 1,
     unit: 'serving',
-    meal_type: mealType
+    meal_type: mealType,
+    // Always send the client's local date so the meal is filed under
+    // the right calendar day even if the backend's CF-timezone fallback
+    // misses.
+    date: todayLocal()
   }).then(() => {
     toast.success('Food added!');
     if (typeof window.loadNutrition === 'function') window.loadNutrition();
