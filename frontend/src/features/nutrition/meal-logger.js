@@ -19,7 +19,14 @@ let state = {
   scannerStream: null,
   scannerActive: false,
   scannerDecoder: null,
-  searchDebounce: null
+  searchDebounce: null,
+  // Multi-scan accumulator for the standalone Scan Barcode flow.
+  // Items: { food_id, food, quantity, unit }. Cleared on scanner close.
+  pendingScans: [],
+  // Tracks whether wireCameraControls() has already been called for the
+  // currently-open scanner modal. Prevents double-binding torch/zoom/pinch
+  // listeners when the decoder is restarted between multi-scan additions.
+  cameraControlsWired: false
 };
 
 function resetState() {
@@ -31,7 +38,9 @@ function resetState() {
     scannerStream: null,
     scannerActive: false,
     scannerDecoder: null,
-    searchDebounce: null
+    searchDebounce: null,
+    pendingScans: [],
+    cameraControlsWired: false
   };
 }
 
@@ -409,6 +418,8 @@ export function showBarcodeScanner() {
     size: 'default',
     content: String(html`
       <div class="barcode-scanner-layout">
+        <div id="pending-scans-panel" hidden></div>
+
         ${hasCamera
           ? html`
               <div id="barcode-scanner-container" class="barcode-scanner-container">
@@ -481,13 +492,53 @@ export function showBarcodeScanner() {
         }
       });
 
-      element.addEventListener('click', (event) => {
-        const target = event.target.closest('[data-action="lookup-barcode"]');
-        if (target) lookupBarcode();
+      element.addEventListener('click', async (event) => {
+        if (event.target.closest('[data-action="lookup-barcode"]')) {
+          lookupBarcode();
+          return;
+        }
+
+        // Pending-scans panel actions ----------------------------------------
+        const removeBtn = event.target.closest('[data-action="remove-pending-scan"]');
+        if (removeBtn) {
+          const idx = parseInt(removeBtn.getAttribute('data-index'), 10);
+          if (Number.isInteger(idx)) removePendingScan(idx);
+          return;
+        }
+
+        const incBtn = event.target.closest('[data-action="inc-pending-qty"]');
+        if (incBtn) {
+          const idx = parseInt(incBtn.getAttribute('data-index'), 10);
+          if (Number.isInteger(idx)) bumpPendingScanQty(idx, +1);
+          return;
+        }
+
+        const decBtn = event.target.closest('[data-action="dec-pending-qty"]');
+        if (decBtn) {
+          const idx = parseInt(decBtn.getAttribute('data-index'), 10);
+          if (Number.isInteger(idx)) bumpPendingScanQty(idx, -1);
+          return;
+        }
+
+        const clearBtn = event.target.closest('[data-action="clear-pending-scans"]');
+        if (clearBtn) {
+          clearPendingScans();
+          return;
+        }
+
+        const logBtn = event.target.closest('[data-action="log-pending-meal"]');
+        if (logBtn) {
+          await logPendingMeal();
+          return;
+        }
       });
     },
     onClose: () => {
       stopBarcodeScanner();
+      // Discard any in-progress multi-scan meal. We don't persist this across
+      // sessions; users either tap "Log Meal" to commit or accept the loss
+      // when they explicitly close the scanner.
+      state.pendingScans = [];
     }
   });
 }
@@ -715,13 +766,19 @@ async function startBarcodeScanner() {
   if (state.scannerActive) {
     setScannerStatus('Looking for a barcode…', true);
   }
-  if (camera) {
+  // Wire torch/zoom/pinch listeners exactly once per modal lifetime.
+  // The decoder gets restarted on each multi-scan add, but the camera
+  // controls are bound to DOM elements that persist across restarts —
+  // re-binding would multi-fire on every touch.
+  if (camera && !state.cameraControlsWired) {
     wireCameraControls(camera);
+    state.cameraControlsWired = true;
   }
 }
 
 function stopBarcodeScanner() {
   state.scannerActive = false;
+  state.cameraControlsWired = false;
   clearHighlight();
   if (state.scannerDecoder) {
     try { state.scannerDecoder.stop(); } catch {}
@@ -821,6 +878,11 @@ async function lookupBarcode() {
               </button>
             `
           : html`
+              <button class="btn btn-primary btn-block" id="scan-add-to-meal"
+                      style="margin-bottom: var(--space-3);">
+                <i class="fas fa-plus"></i> Add to Meal
+              </button>
+
               <div class="barcode-log-controls">
                 <label class="form-label" style="margin: 0;">Quantity</label>
                 <input type="number" id="scan-qty" class="input"
@@ -835,8 +897,9 @@ async function lookupBarcode() {
                 </select>
               </div>
               <div class="cluster" style="margin-top: var(--space-3);">
-                <button class="btn btn-primary" id="scan-log-now" style="flex: 1;">
-                  <i class="fas fa-check"></i> Log It
+                <button class="btn btn-outline" id="scan-log-now" style="flex: 1;"
+                        title="Log just this single item now (skip building a meal)">
+                  <i class="fas fa-check"></i> Log Just This
                 </button>
                 <button class="btn btn-outline" id="scan-save-meal"
                         title="Save this product as a one-tap template in Saved Meals">
@@ -867,7 +930,36 @@ async function lookupBarcode() {
       return;
     }
 
-    // Standalone path: three actions.
+    // Standalone path: four actions (multi-scan + three single-item shortcuts).
+
+    // 0) Add to Meal — primary action for building a meal from multiple scans.
+    //    Appends to state.pendingScans (deduped by food_id), refreshes the
+    //    panel above the camera, then clears the result card and restarts
+    //    the scanner so the user can immediately scan the next item.
+    document.getElementById('scan-add-to-meal')?.addEventListener('click', async () => {
+      const qty = parseFloat(document.getElementById('scan-qty')?.value) || 1;
+      try {
+        const toAdd = await ensureFoodPersisted(food);
+        addPendingScan(toAdd, qty);
+        toast.success(`Added ${toAdd.name}`);
+
+        // Clear the result card and reset the manual-entry input so the
+        // viewport returns to "ready to scan" state.
+        if (resultEl) resultEl.innerHTML = '';
+        const manualInput = document.getElementById('manual-barcode');
+        if (manualInput) manualInput.value = '';
+
+        // Restart the camera decoder so the next barcode is detected
+        // automatically (the previous handleResult disabled it after the
+        // first hit). Safe to call multiple times — startBarcodeScanner()
+        // disposes any prior decoder.
+        if (hasCameraSupport()) {
+          await startBarcodeScanner();
+        }
+      } catch (err) {
+        toast.error(`Error: ${err.message}`);
+      }
+    });
 
     // 1) Log It — quick-add a single-food meal to today in the chosen meal slot.
     document.getElementById('scan-log-now')?.addEventListener('click', async () => {
@@ -949,6 +1041,236 @@ async function lookupBarcode() {
     });
   } catch (err) {
     if (resultEl) resultEl.innerHTML = `<div class="empty-state"><div class="empty-state-description text-danger">${err.message}</div></div>`;
+  }
+}
+
+// ============================================================================
+// Multi-scan "build a meal from N barcodes" panel
+// ----------------------------------------------------------------------------
+// Lives inside the standalone Scan Barcode modal. Each scan offers an
+// "Add to Meal" button that pushes (or merges by food_id) into
+// state.pendingScans. The panel at the top of the modal renders the running
+// list + macros and a "Log Meal" button that submits all items as a single
+// meal via POST /nutrition/meals (the same endpoint showLogMealModal uses).
+// Cleared on scanner modal close.
+// ============================================================================
+
+// Compute per-line macros for a pending scan (matches the meal-logger's math).
+function pendingScanMult(item) {
+  if (item.unit === 'serving') return item.quantity;
+  const ss = item.food.serving_size || 1;
+  return item.quantity / ss;
+}
+
+function computePendingTotals(items) {
+  return items.reduce((acc, item) => {
+    const m = pendingScanMult(item);
+    acc.calories += (item.food.calories || 0) * m;
+    acc.protein_g += (item.food.protein_g || 0) * m;
+    acc.carbs_g += (item.food.carbs_g || 0) * m;
+    acc.fat_g += (item.food.fat_g || 0) * m;
+    acc.fiber_g += (item.food.fiber_g || 0) * m;
+    return acc;
+  }, { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0 });
+}
+
+// Auto-generate a meal name from the scanned items. Comma-separated, with
+// duplicates collapsed by food_id. Truncates at the last comma that fits in
+// 80 chars to avoid awkward mid-word cuts.
+function buildPendingMealName(items, maxLength = 80) {
+  const names = items.map((it) => (it.food?.name || '').trim()).filter(Boolean);
+  if (names.length === 0) return 'Scanned meal';
+  const joined = names.join(', ');
+  if (joined.length <= maxLength) return joined;
+  const cut = joined.slice(0, maxLength);
+  const lastComma = cut.lastIndexOf(',');
+  return (lastComma > 0 ? cut.slice(0, lastComma) : cut.replace(/[\s,]+$/, '')) + '…';
+}
+
+// Push a scanned food into the pending list. If the same food_id is already
+// pending, just bump its quantity — re-scanning the same item is the natural
+// way to say "I have two of these".
+function addPendingScan(food, quantity = 1) {
+  const qty = Number.isFinite(quantity) && quantity > 0 ? quantity : 1;
+  const existing = state.pendingScans.find((it) => it.food_id === food.id);
+  if (existing) {
+    existing.quantity = Math.round((existing.quantity + qty) * 100) / 100;
+  } else {
+    state.pendingScans.push({
+      food_id: food.id,
+      food,
+      quantity: qty,
+      unit: 'serving'
+    });
+  }
+  renderPendingScansPanel();
+}
+
+function removePendingScan(idx) {
+  if (idx < 0 || idx >= state.pendingScans.length) return;
+  state.pendingScans.splice(idx, 1);
+  renderPendingScansPanel();
+}
+
+// Adjust quantity by `delta`. Removes the row when qty would go to 0 or below.
+function bumpPendingScanQty(idx, delta) {
+  const item = state.pendingScans[idx];
+  if (!item) return;
+  const next = Math.round((item.quantity + delta) * 100) / 100;
+  if (next <= 0) {
+    state.pendingScans.splice(idx, 1);
+  } else {
+    item.quantity = next;
+  }
+  renderPendingScansPanel();
+}
+
+function clearPendingScans() {
+  if (state.pendingScans.length === 0) return;
+  state.pendingScans = [];
+  renderPendingScansPanel();
+}
+
+function renderPendingScansPanel() {
+  const panel = document.getElementById('pending-scans-panel');
+  if (!panel) return;
+
+  const items = state.pendingScans;
+  if (items.length === 0) {
+    panel.hidden = true;
+    panel.innerHTML = '';
+    return;
+  }
+
+  const totals = computePendingTotals(items);
+  const defaultMealType = autoMealTypeByTime();
+
+  // Preserve user choices across re-renders (when adding/removing/qty change).
+  const prevMealType = document.getElementById('pending-meal-type')?.value;
+  const selectedMealType = ['breakfast', 'lunch', 'dinner', 'snack'].includes(prevMealType)
+    ? prevMealType
+    : defaultMealType;
+
+  panel.hidden = false;
+  panel.innerHTML = String(html`
+    <div class="card" style="margin-bottom: var(--space-3);">
+      <div class="cluster" style="justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
+        <strong>
+          <i class="fas fa-utensils"></i>
+          Building meal · ${items.length} ${items.length === 1 ? 'item' : 'items'}
+        </strong>
+        <button class="btn btn-ghost btn-sm text-danger"
+                data-action="clear-pending-scans"
+                title="Discard all scanned items">
+          Clear
+        </button>
+      </div>
+
+      <div>
+        ${items.map((item, idx) => {
+          const m = pendingScanMult(item);
+          const cals = Math.round((item.food.calories || 0) * m);
+          return html`
+            <div class="meal-selected-food">
+              <div style="flex: 1; min-width: 0;">
+                <strong style="display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                  ${item.food.name}
+                </strong>
+                <div class="text-muted" style="font-size: var(--text-xs);">
+                  ${cals} cal
+                </div>
+              </div>
+              <div class="cluster" style="gap: var(--space-1); align-items: center;">
+                <button class="btn btn-ghost btn-icon btn-sm"
+                        data-action="dec-pending-qty" data-index="${idx}"
+                        title="Decrease quantity" aria-label="Decrease quantity">
+                  <i class="fas fa-minus"></i>
+                </button>
+                <span style="min-width: 2.5rem; text-align: center; font-variant-numeric: tabular-nums;">
+                  ${item.quantity}
+                </span>
+                <button class="btn btn-ghost btn-icon btn-sm"
+                        data-action="inc-pending-qty" data-index="${idx}"
+                        title="Increase quantity" aria-label="Increase quantity">
+                  <i class="fas fa-plus"></i>
+                </button>
+                <button class="btn btn-ghost btn-icon btn-sm text-danger"
+                        data-action="remove-pending-scan" data-index="${idx}"
+                        title="Remove" aria-label="Remove item">
+                  <i class="fas fa-times"></i>
+                </button>
+              </div>
+            </div>
+          `;
+        })}
+      </div>
+
+      <div class="meal-totals-row">
+        <span class="meal-total-cal">${Math.round(totals.calories)} cal</span>
+        <span class="text-success">${totals.protein_g.toFixed(1)}g P</span>
+        <span class="text-primary">${totals.carbs_g.toFixed(1)}g C</span>
+        <span class="text-warning">${totals.fat_g.toFixed(1)}g F</span>
+      </div>
+
+      <div class="form-group" style="margin-top: var(--space-3); margin-bottom: var(--space-2);">
+        <label class="form-label" for="pending-meal-type">Meal</label>
+        <select id="pending-meal-type" class="select">
+          <option value="breakfast" ${selectedMealType === 'breakfast' ? 'selected' : ''}>Breakfast</option>
+          <option value="lunch" ${selectedMealType === 'lunch' ? 'selected' : ''}>Lunch</option>
+          <option value="dinner" ${selectedMealType === 'dinner' ? 'selected' : ''}>Dinner</option>
+          <option value="snack" ${selectedMealType === 'snack' ? 'selected' : ''}>Snack</option>
+        </select>
+      </div>
+
+      <button class="btn btn-primary btn-block"
+              data-action="log-pending-meal">
+        <i class="fas fa-check"></i>
+        Log Meal · ${Math.round(totals.calories)} cal
+      </button>
+    </div>
+  `);
+}
+
+async function logPendingMeal() {
+  if (state.pendingScans.length === 0) {
+    toast.warning('Scan at least one item first.');
+    return;
+  }
+
+  const mealType = document.getElementById('pending-meal-type')?.value || autoMealTypeByTime();
+  const mealName = buildPendingMealName(state.pendingScans);
+  const itemCount = state.pendingScans.length;
+
+  const logBtn = document.querySelector('[data-action="log-pending-meal"]');
+  const originalHTML = logBtn?.innerHTML || '';
+  if (logBtn) {
+    logBtn.disabled = true;
+    logBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Logging…';
+  }
+
+  try {
+    await api.post('/nutrition/meals', {
+      date: todayLocal(),
+      meal_type: mealType,
+      name: mealName,
+      foods: state.pendingScans.map((it) => ({
+        food_id: it.food_id,
+        quantity: it.quantity,
+        unit: it.unit
+      }))
+    });
+
+    state.pendingScans = [];
+    renderPendingScansPanel();
+    closeTopModal();
+    toast.success(`Logged ${mealType}: ${itemCount} ${itemCount === 1 ? 'item' : 'items'}`);
+    if (typeof window.loadNutrition === 'function') window.loadNutrition();
+  } catch (err) {
+    toast.error(`Error logging meal: ${err.message}`);
+    if (logBtn) {
+      logBtn.disabled = false;
+      logBtn.innerHTML = originalHTML;
+    }
   }
 }
 
