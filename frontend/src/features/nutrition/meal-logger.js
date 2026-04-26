@@ -736,8 +736,9 @@ function stopBarcodeScanner() {
 
 // Auto-detect a reasonable meal type based on local time of day.
 // Used as the default when the barcode scanner is opened standalone
-// (no parent meal-logger modal carrying an explicit meal type).
-function autoMealTypeByTime(date = new Date()) {
+// (no parent meal-logger modal carrying an explicit meal type), and
+// also re-used by the AI parse-meal modal for the same purpose.
+export function autoMealTypeByTime(date = new Date()) {
   const h = date.getHours();
   if (h >= 4 && h < 11) return 'breakfast';
   if (h >= 11 && h < 15) return 'lunch';

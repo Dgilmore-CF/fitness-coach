@@ -14,6 +14,26 @@ import { openModal, closeTopModal } from '@ui/Modal';
 import { toast } from '@ui/Toast';
 import { withLoading } from '@ui/LoadingOverlay';
 import { todayLocal } from '@utils/date';
+import { autoMealTypeByTime } from '@features/nutrition/meal-logger';
+
+const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'];
+
+// Build a human-friendly meal name from parsed foods.
+// e.g. ['Eggs', 'Whole-wheat toast', 'Banana'] → 'Eggs, Whole-wheat toast, Banana'
+// Falls back to 'Parsed meal' when foods are missing/empty (defensive only —
+// the modal blocks logging when foods.length === 0).
+function buildMealNameFromFoods(foods, maxLength = 80) {
+  const names = (foods || [])
+    .map((f) => (f && typeof f.name === 'string' ? f.name.trim() : ''))
+    .filter(Boolean);
+  if (names.length === 0) return 'Parsed meal';
+  const joined = names.join(', ');
+  if (joined.length <= maxLength) return joined;
+  // Trim at the last comma that fits, otherwise hard-truncate with an ellipsis.
+  const cut = joined.slice(0, maxLength);
+  const lastComma = cut.lastIndexOf(',');
+  return (lastComma > 0 ? cut.slice(0, lastComma) : cut.replace(/[\s,]+$/, '')) + '…';
+}
 
 const PRIORITY_BADGE = {
   high: 'badge-danger',
@@ -294,6 +314,7 @@ async function logSuggestionAsMeal(suggestion) {
 
 export function showParseMeal() {
   let parseResult = null;
+  const defaultMealType = autoMealTypeByTime();
 
   const modal = openModal({
     title: 'Describe Your Meal',
@@ -305,7 +326,18 @@ export function showParseMeal() {
         </div>
 
         <div class="form-group">
-          <label class="form-label">What did you eat?</label>
+          <label class="form-label" for="parse-meal-type">Meal</label>
+          <select id="parse-meal-type" class="select">
+            ${MEAL_TYPES.map((mt) => html`
+              <option value="${mt}" ${mt === defaultMealType ? 'selected' : ''}>
+                ${mt.charAt(0).toUpperCase() + mt.slice(1)}
+              </option>
+            `)}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="parse-meal-input">What did you eat?</label>
           <textarea
             id="parse-meal-input"
             class="textarea"
@@ -336,7 +368,11 @@ export function showParseMeal() {
             toast.warning('Parse a meal first.');
             return;
           }
-          await logParsedMeal(parseResult);
+          const mealTypeEl = m.element.querySelector('#parse-meal-type');
+          const mealType = MEAL_TYPES.includes(mealTypeEl?.value)
+            ? mealTypeEl.value
+            : defaultMealType;
+          await logParsedMeal(parseResult, { mealType });
           m.close();
         }
       }
@@ -439,12 +475,14 @@ function renderParseResults({ foods, totals }) {
   `;
 }
 
-async function logParsedMeal(parseResult) {
+async function logParsedMeal(parseResult, { mealType } = {}) {
+  const safeMealType = MEAL_TYPES.includes(mealType) ? mealType : autoMealTypeByTime();
+  const mealName = buildMealNameFromFoods(parseResult.foods);
   try {
     await api.post('/nutrition/meals', {
       date: todayLocal(),
-      meal_type: 'snack',
-      name: 'Parsed meal',
+      meal_type: safeMealType,
+      name: mealName,
       foods: parseResult.foods.map((f) => ({
         quantity: f.quantity,
         unit: f.unit,
@@ -463,7 +501,7 @@ async function logParsedMeal(parseResult) {
         }
       }))
     });
-    toast.success('Meal logged from text!');
+    toast.success(`Logged ${safeMealType}: ${mealName}`);
     if (typeof window.loadNutrition === 'function') window.loadNutrition();
   } catch (err) {
     toast.error(`Error logging meal: ${err.message}`);
