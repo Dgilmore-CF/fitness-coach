@@ -21,71 +21,95 @@ import { progressRing } from '@ui/ProgressRing';
 import { getBodyweightExerciseConfig, getWarmups } from './warmup-data.js';
 
 // ============================================================================
-// Warmup + AI briefing screen (combined)
+// Pre-workout screen (single combined screen)
 //
-// Single pre-workout screen that merges the AI readiness briefing with the
-// warm-up routine. `preview` is optional — when the AI endpoint fails (or is
-// disabled for the user), the screen still renders the warm-up + tips and
-// the "Ready — Start Workout" CTA.
+// Tight, single-viewport layout that puts the day name, AI readiness, and
+// the primary "Start Workout" CTA above the fold on a 375x667 viewport.
+// Secondary details (exercise weight suggestions, warm-up routine, pro tips)
+// live in collapsed <details> sections that the user can expand if they want
+// to review before lifting. `preview` is optional — when the AI endpoint
+// fails or is disabled, the readiness/muscles/suggestions blocks gracefully
+// disappear and the warm-up + tips disclosures remain.
 // ============================================================================
 
 const READINESS_META = {
-  primed: { label: 'Primed to Go', emoji: '🔥', color: 'var(--color-secondary)' },
-  ready: { label: 'Ready', emoji: '✅', color: 'var(--color-primary)' },
-  fatigued: { label: 'Fatigued', emoji: '😮‍💨', color: 'var(--color-warning)' },
-  needs_rest: { label: 'Needs Rest', emoji: '😴', color: 'var(--color-danger)' }
+  primed:     { label: 'Primed',     emoji: '🔥',   color: 'var(--color-secondary)' },
+  ready:      { label: 'Ready',      emoji: '✅',   color: 'var(--color-primary)' },
+  fatigued:   { label: 'Fatigued',   emoji: '😮‍💨', color: 'var(--color-warning)' },
+  needs_rest: { label: 'Needs rest', emoji: '😴',   color: 'var(--color-danger)' }
 };
 
-function renderReadinessCard(readiness) {
+function renderReadinessRow(readiness) {
   if (!readiness) return '';
   const meta = READINESS_META[readiness.status] || READINESS_META.ready;
+  const reasons = readiness.rationale || [];
   return html`
-    <div class="preview-readiness">
-      <div class="preview-readiness-ring">
+    <div class="aw-prew-readiness">
+      <div class="aw-prew-readiness-ring">
         ${raw(progressRing({
           value: readiness.score,
           max: 100,
-          size: 140,
+          size: 96,
+          strokeWidth: 8,
           unit: '',
-          label: 'Readiness',
+          label: '',
           color: meta.color
         }))}
       </div>
-      <div class="preview-readiness-body">
-        <div class="preview-readiness-status">
-          <span class="preview-readiness-emoji">${meta.emoji}</span>
-          ${meta.label}
+      <div class="aw-prew-readiness-summary">
+        <div class="aw-prew-readiness-status">
+          <span class="aw-prew-readiness-emoji">${meta.emoji}</span>
+          <span>${meta.label}</span>
+          <span class="aw-prew-readiness-score">· ${readiness.score}</span>
         </div>
-        <ul class="preview-readiness-reasons">
-          ${(readiness.rationale || []).map((r) => html`<li>${r}</li>`)}
-        </ul>
+        ${reasons.length > 0
+          ? html`
+              <ul class="aw-prew-readiness-reasons">
+                ${reasons.slice(0, 3).map((r) => html`<li>${r}</li>`)}
+              </ul>
+            `
+          : ''}
       </div>
     </div>
   `;
 }
 
-function renderPreviewExercise(ex) {
+function renderPrewExerciseRow(ex) {
   const unit = getWeightUnit();
-  const weight = ex.suggested_weight_kg != null
+  const hasWeight = ex.suggested_weight_kg != null;
+  const weight = hasWeight
     ? `${Math.round(toDisplayWeight(ex.suggested_weight_kg) * 10) / 10} ${unit}`
-    : 'No data yet';
-
-  const confidenceClass =
-    ex.confidence === 'high' ? 'confidence-high' :
-    ex.confidence === 'medium' ? 'confidence-medium' : 'confidence-low';
+    : '—';
+  const dotClass =
+    ex.confidence === 'high' ? 'aw-prew-confidence-high'
+    : ex.confidence === 'medium' ? 'aw-prew-confidence-medium'
+    : 'aw-prew-confidence-low';
 
   return html`
-    <div class="preview-exercise">
-      <div class="preview-exercise-main">
+    <div class="aw-prew-exercise-row" title="${ex.rationale || ''}">
+      <div class="aw-prew-exercise-main">
         <strong>${ex.exercise_name}</strong>
-        <div class="text-muted" style="font-size: var(--text-xs);">
-          ${ex.muscle_group} · ${ex.target_sets} × ${ex.target_reps}
+        <div class="aw-prew-exercise-meta">
+          ${ex.target_sets} × ${ex.target_reps}
         </div>
       </div>
-      <div class="preview-exercise-suggestion">
-        <div class="preview-suggested-weight">${weight}</div>
-        <div class="preview-confidence ${confidenceClass}" title="${ex.rationale || ''}">
-          <i class="fas fa-magic"></i> ${ex.confidence}
+      <div class="aw-prew-exercise-weight">
+        ${weight}
+        ${hasWeight ? html`<span class="aw-prew-confidence-dot ${dotClass}" title="${ex.confidence} confidence"></span>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+// Fallback for when the AI preview isn't available: render bare exercise
+// names from the workout itself so the user can still see what's planned.
+function renderPrewExerciseRowBasic(ex) {
+  return html`
+    <div class="aw-prew-exercise-row">
+      <div class="aw-prew-exercise-main">
+        <strong>${ex.name || ex.exercise_name}</strong>
+        <div class="aw-prew-exercise-meta">
+          ${ex.target_sets || 3} × ${ex.target_reps || '8-12'}
         </div>
       </div>
     </div>
@@ -96,97 +120,95 @@ export function renderWarmupScreen(workout, preview = null) {
   const muscleGroups = [...new Set((workout.exercises || []).map((e) => e.muscle_group).filter(Boolean))];
   const warmups = getWarmups(muscleGroups);
 
-  const previewExercises = preview?.exercises || [];
-  const previewTargetMuscles = preview?.target_muscles || [];
   const readiness = preview?.readiness || null;
+  const targetMuscles = preview?.target_muscles || [];
+  const previewExercises = preview?.exercises || [];
+  const exerciseList = previewExercises.length > 0 ? previewExercises : (workout.exercises || []);
+  const hasAiSuggestions = previewExercises.length > 0;
+  const exerciseCount = exerciseList.length;
 
   return html`
-    <div class="aw-warmup-container">
-      <div class="aw-warmup-header">
-        <div class="aw-warmup-icon">
-          <i class="fas fa-running"></i>
-        </div>
-        <h1>Ready for ${workout.day_name || 'Your Workout'}?</h1>
-        <p class="text-muted" style="font-size: var(--text-lg);">
-          ${readiness
-            ? 'AI-prepped briefing + warm-up'
-            : 'Warm up, then start lifting'}
-        </p>
+    <div class="aw-prew-container">
+      <header class="aw-prew-header">
+        <div class="aw-prew-eyebrow">Today's workout</div>
+        <h1 class="aw-prew-title">${workout.day_name || 'Workout'}</h1>
+        ${targetMuscles.length > 0
+          ? html`<div class="aw-prew-muscles">${targetMuscles.join(' · ')}</div>`
+          : ''}
+      </header>
+
+      ${renderReadinessRow(readiness)}
+
+      <div class="aw-prew-cta">
+        <button class="btn btn-primary btn-block btn-lg" data-action="start-exercises">
+          <i class="fas fa-play"></i> Start Workout
+        </button>
+        <button class="btn btn-ghost btn-block btn-sm" data-action="cancel-workout">
+          Cancel
+        </button>
       </div>
 
-      ${readiness ? renderReadinessCard(readiness) : ''}
-
-      ${previewTargetMuscles.length > 0
+      ${exerciseCount > 0
         ? html`
-            <div>
-              <div class="section-label">Today's target muscles</div>
-              <div class="cluster">
-                ${previewTargetMuscles.map((m) => html`<span class="badge badge-primary">${m}</span>`)}
+            <details class="aw-prew-section">
+              <summary>
+                <span>
+                  <i class="fas fa-dumbbell"></i>
+                  ${exerciseCount} ${exerciseCount === 1 ? 'exercise' : 'exercises'}${hasAiSuggestions ? ' · suggested weights' : ''}
+                </span>
+              </summary>
+              <div class="aw-prew-section-body">
+                <div class="aw-prew-exercise-list">
+                  ${hasAiSuggestions
+                    ? exerciseList.map(renderPrewExerciseRow)
+                    : exerciseList.map(renderPrewExerciseRowBasic)}
+                </div>
+                ${hasAiSuggestions
+                  ? html`<div class="aw-prew-footnote">Suggested from your last 14 days. Confidence dot: <span class="aw-prew-confidence-dot aw-prew-confidence-high"></span> high · <span class="aw-prew-confidence-dot aw-prew-confidence-medium"></span> medium · <span class="aw-prew-confidence-dot aw-prew-confidence-low"></span> low</div>`
+                  : ''}
               </div>
-            </div>
+            </details>
           `
         : ''}
 
-      ${previewExercises.length > 0
+      ${warmups.length > 0
         ? html`
-            <div class="card">
-              <div class="card-header">
-                <h3 class="card-title">
-                  <i class="fas fa-dumbbell"></i> Today's Exercises (${previewExercises.length})
-                </h3>
-                <span class="text-muted" style="font-size: var(--text-xs);">
-                  AI-suggested weights based on your last 14 days
+            <details class="aw-prew-section">
+              <summary>
+                <span>
+                  <i class="fas fa-running"></i>
+                  Warm-up · ${Math.min(warmups.length, 6)} stretches
                 </span>
+              </summary>
+              <div class="aw-prew-section-body">
+                <ol class="aw-prew-warmup-list">
+                  ${warmups.slice(0, 6).map((w) => html`
+                    <li>
+                      <strong>${w.name}</strong>
+                      <span class="text-muted"> · ${w.muscle} · 30-60 sec</span>
+                    </li>
+                  `)}
+                </ol>
               </div>
-              <div class="stack stack-sm">
-                ${previewExercises.map(renderPreviewExercise)}
-              </div>
-            </div>
+            </details>
           `
         : ''}
 
-      <div class="card">
-        <div class="card-header">
-          <h3 class="card-title">
-            <i class="fas fa-list-check"></i> Recommended Warm-ups
-          </h3>
+      <details class="aw-prew-section">
+        <summary>
+          <span>
+            <i class="fas fa-lightbulb"></i> Pro tips
+          </span>
+        </summary>
+        <div class="aw-prew-section-body">
+          <ul class="aw-prew-tips-list">
+            <li>Start with light cardio to raise your heart rate</li>
+            <li>Focus on the muscles you'll be training today</li>
+            <li>Perform dynamic stretches (movement-based)</li>
+            <li>Take 5-10 minutes to properly warm up</li>
+          </ul>
         </div>
-        <div class="stack stack-sm">
-          ${warmups.slice(0, 6).map((w, idx) => html`
-            <div class="aw-warmup-item">
-              <div class="aw-warmup-num">${idx + 1}</div>
-              <div class="aw-warmup-info">
-                <strong>${w.name}</strong>
-                <span class="text-muted" style="font-size: var(--text-xs);">
-                  <i class="fas fa-bullseye"></i> ${w.muscle}
-                </span>
-              </div>
-              <span class="text-muted" style="font-size: var(--text-xs);">30–60 sec</span>
-            </div>
-          `)}
-        </div>
-      </div>
-
-      <div class="aw-warmup-tips">
-        <strong>
-          <i class="fas fa-lightbulb"></i> Pro Tips
-        </strong>
-        <ul>
-          <li>Start with light cardio to raise your heart rate</li>
-          <li>Focus on the muscles you'll be training today</li>
-          <li>Perform dynamic stretches (movement-based)</li>
-          <li>Take 5–10 minutes to properly warm up</li>
-        </ul>
-      </div>
-
-      <div class="cluster" style="justify-content: center;">
-        <button class="btn btn-outline" data-action="cancel-workout">
-          <i class="fas fa-times"></i> Cancel
-        </button>
-        <button class="btn btn-primary" data-action="start-exercises">
-          <i class="fas fa-check"></i> Ready — Start Workout
-        </button>
-      </div>
+      </details>
     </div>
   `;
 }
