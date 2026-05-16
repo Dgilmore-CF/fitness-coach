@@ -103,27 +103,35 @@ export async function startWorkoutDay(programId, programDayId) {
       return;
     }
 
-    // Phase 4: Pre-workout AI briefing
-    if (window.aiCoach?.showPreview) {
-      try {
-        await window.aiCoach.showPreview(programDayId);
-      } catch (err) {
-        console.warn('AI briefing failed:', err);
-      }
-    }
-
+    // Fetch the AI briefing and create the workout in parallel — the
+    // preview is just D1 queries (no LLM call) so it's cheap, and running
+    // it concurrently with workout creation means the user sees a single
+    // combined warm-up + briefing screen instead of two sequential modals.
     const fullWorkout = await withLoading('Starting your workout…', async () => {
-      const created = await api.post('/workouts', {
-        program_id: programId,
-        program_day_id: programDayId
-      });
-      return await api.get(`/workouts/${created.workout.id}`);
+      const [previewResult, createdResult] = await Promise.all([
+        api.get(`/ai/realtime/preview/${programDayId}`).catch((err) => {
+          // Briefing is best-effort; the warm-up screen renders without it
+          // when null. Logging only — no toast since the user still gets to
+          // start the workout normally.
+          console.warn('AI briefing failed:', err);
+          return null;
+        }),
+        api.post('/workouts', {
+          program_id: programId,
+          program_day_id: programDayId
+        })
+      ]);
+      const workoutFull = await api.get(`/workouts/${createdResult.workout.id}`);
+      return {
+        workout: workoutFull.workout,
+        preview: previewResult?.data || null
+      };
     });
 
     store.set('currentWorkout', fullWorkout.workout);
 
     if (window.activeWorkout?.showWarmup) {
-      window.activeWorkout.showWarmup(fullWorkout.workout);
+      window.activeWorkout.showWarmup(fullWorkout.workout, fullWorkout.preview);
     }
   } catch (err) {
     toast.error(`Error starting workout: ${err.message}`);

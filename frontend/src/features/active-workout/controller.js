@@ -221,14 +221,18 @@ function setModalContent(content) {
 // Public entry points
 // =========================================================================
 
-export function showWarmup(workout) {
+export function showWarmup(workout, preview = null) {
   if (!workout?.exercises?.length) {
     toast.error('Workout has no exercises');
     return;
   }
   setWorkout(workout);
   createModal();
-  setModalContent(renderWarmupScreen(workout));
+  // The optional `preview` object (AI briefing data) is rendered inline at
+  // the top of the warm-up screen. When null/undefined, only the warm-up
+  // routine + pro tips are shown — graceful degradation when the AI
+  // endpoint fails or is unavailable.
+  setModalContent(renderWarmupScreen(workout, preview));
 }
 
 export async function startExercises() {
@@ -373,9 +377,6 @@ async function handleClick(event) {
   const target = event.target.closest('[data-action]');
   if (!target) return;
   const action = target.getAttribute('data-action');
-  // Temporary diagnostic so we can see in the browser console whether the
-  // click is reaching the dispatcher. Safe to remove once stable.
-  console.log('[active-workout] action:', action);
   event.stopPropagation();
 
   if (action === 'dismiss-flag') {

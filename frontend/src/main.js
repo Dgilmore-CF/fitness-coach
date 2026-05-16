@@ -47,7 +47,9 @@ import { loadAnalytics } from './screens/analytics.js';
 import { loadNutrition } from './screens/nutrition.js';
 import { loadInsights } from './screens/insights.js';
 import { loadWorkout } from './screens/workout.js';
-import { showWorkoutPreview } from './features/ai-coach/WorkoutPreview.js';
+// WorkoutPreview removed: the pre-workout AI briefing is now rendered inline
+// at the top of the warm-up screen. See start-workout.js (parallel fetch) and
+// frontend/src/features/active-workout/views.js renderWarmupScreen().
 import {
   showNutritionAnalysis,
   showMealSuggestion,
@@ -126,16 +128,14 @@ window.__fitnessApp = {
   confirmDialog
 };
 
-// -----------------------------------------------------------------------------
-// AI coaching globals — only the pre-workout briefing surface remains exposed
-// here. The in-workout "live coach" overlay was retired in favor of the new
-// rule-based inline flag card (see features/active-workout/set-analyzer.js
-// and flag-card.js), and the chat surface lives in coach-sheet.js. Legacy
-// callers expect `window.aiCoach.showPreview(programDayId)` to still work.
-// -----------------------------------------------------------------------------
-window.aiCoach = {
-  showPreview: showWorkoutPreview
-};
+// No remaining cross-module globals are needed for AI coaching:
+//   - The in-workout "live coach" overlay was retired in favor of the inline
+//     rule-based flag card (features/active-workout/set-analyzer.js +
+//     flag-card.js).
+//   - The pre-workout briefing was merged into the warm-up screen — see
+//     start-workout.js (parallel fetch of /ai/realtime/preview) and
+//     views.js renderWarmupScreen() which renders both sections together.
+//   - The coach chat lives in coach-sheet.js, opened from the workout footer.
 
 // Active workout modal — replaces legacy show/resume/start functions
 window.activeWorkout = activeWorkout;

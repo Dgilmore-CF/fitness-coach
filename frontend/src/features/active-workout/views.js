@@ -17,15 +17,88 @@ import {
   isImperialSystem,
   toDisplayWeight
 } from '@utils/conversions';
+import { progressRing } from '@ui/ProgressRing';
 import { getBodyweightExerciseConfig, getWarmups } from './warmup-data.js';
 
 // ============================================================================
-// Warmup screen
+// Warmup + AI briefing screen (combined)
+//
+// Single pre-workout screen that merges the AI readiness briefing with the
+// warm-up routine. `preview` is optional — when the AI endpoint fails (or is
+// disabled for the user), the screen still renders the warm-up + tips and
+// the "Ready — Start Workout" CTA.
 // ============================================================================
 
-export function renderWarmupScreen(workout) {
+const READINESS_META = {
+  primed: { label: 'Primed to Go', emoji: '🔥', color: 'var(--color-secondary)' },
+  ready: { label: 'Ready', emoji: '✅', color: 'var(--color-primary)' },
+  fatigued: { label: 'Fatigued', emoji: '😮‍💨', color: 'var(--color-warning)' },
+  needs_rest: { label: 'Needs Rest', emoji: '😴', color: 'var(--color-danger)' }
+};
+
+function renderReadinessCard(readiness) {
+  if (!readiness) return '';
+  const meta = READINESS_META[readiness.status] || READINESS_META.ready;
+  return html`
+    <div class="preview-readiness">
+      <div class="preview-readiness-ring">
+        ${raw(progressRing({
+          value: readiness.score,
+          max: 100,
+          size: 140,
+          unit: '',
+          label: 'Readiness',
+          color: meta.color
+        }))}
+      </div>
+      <div class="preview-readiness-body">
+        <div class="preview-readiness-status">
+          <span class="preview-readiness-emoji">${meta.emoji}</span>
+          ${meta.label}
+        </div>
+        <ul class="preview-readiness-reasons">
+          ${(readiness.rationale || []).map((r) => html`<li>${r}</li>`)}
+        </ul>
+      </div>
+    </div>
+  `;
+}
+
+function renderPreviewExercise(ex) {
+  const unit = getWeightUnit();
+  const weight = ex.suggested_weight_kg != null
+    ? `${Math.round(toDisplayWeight(ex.suggested_weight_kg) * 10) / 10} ${unit}`
+    : 'No data yet';
+
+  const confidenceClass =
+    ex.confidence === 'high' ? 'confidence-high' :
+    ex.confidence === 'medium' ? 'confidence-medium' : 'confidence-low';
+
+  return html`
+    <div class="preview-exercise">
+      <div class="preview-exercise-main">
+        <strong>${ex.exercise_name}</strong>
+        <div class="text-muted" style="font-size: var(--text-xs);">
+          ${ex.muscle_group} · ${ex.target_sets} × ${ex.target_reps}
+        </div>
+      </div>
+      <div class="preview-exercise-suggestion">
+        <div class="preview-suggested-weight">${weight}</div>
+        <div class="preview-confidence ${confidenceClass}" title="${ex.rationale || ''}">
+          <i class="fas fa-magic"></i> ${ex.confidence}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+export function renderWarmupScreen(workout, preview = null) {
   const muscleGroups = [...new Set((workout.exercises || []).map((e) => e.muscle_group).filter(Boolean))];
   const warmups = getWarmups(muscleGroups);
+
+  const previewExercises = preview?.exercises || [];
+  const previewTargetMuscles = preview?.target_muscles || [];
+  const readiness = preview?.readiness || null;
 
   return html`
     <div class="aw-warmup-container">
@@ -33,11 +106,44 @@ export function renderWarmupScreen(workout) {
         <div class="aw-warmup-icon">
           <i class="fas fa-running"></i>
         </div>
-        <h1>Warm-Up &amp; Stretch</h1>
+        <h1>Ready for ${workout.day_name || 'Your Workout'}?</h1>
         <p class="text-muted" style="font-size: var(--text-lg);">
-          Prepare your body for ${workout.day_name || 'your workout'}
+          ${readiness
+            ? 'AI-prepped briefing + warm-up'
+            : 'Warm up, then start lifting'}
         </p>
       </div>
+
+      ${readiness ? renderReadinessCard(readiness) : ''}
+
+      ${previewTargetMuscles.length > 0
+        ? html`
+            <div>
+              <div class="section-label">Today's target muscles</div>
+              <div class="cluster">
+                ${previewTargetMuscles.map((m) => html`<span class="badge badge-primary">${m}</span>`)}
+              </div>
+            </div>
+          `
+        : ''}
+
+      ${previewExercises.length > 0
+        ? html`
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">
+                  <i class="fas fa-dumbbell"></i> Today's Exercises (${previewExercises.length})
+                </h3>
+                <span class="text-muted" style="font-size: var(--text-xs);">
+                  AI-suggested weights based on your last 14 days
+                </span>
+              </div>
+              <div class="stack stack-sm">
+                ${previewExercises.map(renderPreviewExercise)}
+              </div>
+            </div>
+          `
+        : ''}
 
       <div class="card">
         <div class="card-header">
@@ -209,13 +315,20 @@ export function renderExerciseContent(exercise, _index, history) {
   const hasHistoricalData = isFirstSet && historicalSet;
 
   let defaultWeight = '';
-  let defaultReps = exercise.target_reps || '';
+  // target_reps can be a range like "8-12" or "8–12" (en-dash). The reps
+  // input is type=number, so we need a single value, not the range string.
+  // Parse the low end as the conservative starting point.
+  let defaultReps = '';
+  if (exercise.target_reps != null && exercise.target_reps !== '') {
+    const lowReps = parseInt(String(exercise.target_reps).split(/[-–—]/)[0], 10);
+    if (Number.isFinite(lowReps)) defaultReps = String(lowReps);
+  }
   if (sourceSet) {
     if (sourceSet.weight_kg) {
       const weightValue = toDisplayWeight(sourceSet.weight_kg);
       defaultWeight = weightValue % 1 === 0 ? String(weightValue) : weightValue.toFixed(1);
     }
-    if (sourceSet.reps) defaultReps = sourceSet.reps;
+    if (sourceSet.reps) defaultReps = String(sourceSet.reps);
   }
 
   const inputClassName = hasHistoricalData
