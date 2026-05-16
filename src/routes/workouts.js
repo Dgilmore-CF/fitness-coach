@@ -56,6 +56,99 @@ workouts.get('/exercises/:exerciseId/last-set', async (c) => {
   return c.json({ lastSet });
 });
 
+// Exercise context for in-workout rule-based coaching.
+// Returns a snapshot of the user's history for a given exercise — used by the
+// frontend rule analyzer to detect PRs, stalls, form breakdowns, etc. without
+// per-set LLM calls. All weights remain in kg (storage convention); the
+// frontend converts to the user's preferred unit at display time.
+//
+// NOTE: must be declared before the catch-all GET /:id route.
+workouts.get('/exercises/:exerciseId/context', async (c) => {
+  const user = requireAuth(c);
+  const exerciseId = Number(c.req.param('exerciseId'));
+  const currentWorkoutId = c.req.query('workoutId') ? Number(c.req.query('workoutId')) : null;
+  const db = c.env.DB;
+
+  if (!Number.isInteger(exerciseId) || exerciseId <= 0) {
+    return c.json({ error: 'Invalid exerciseId' }, 400);
+  }
+
+  try {
+    // Run the three queries in parallel — they're independent.
+    const [historyRows, pr, load] = await Promise.all([
+      // Last 6 sessions (up to 30 sets) of this exercise, excluding current workout.
+      db.prepare(
+        `SELECT w.id AS workout_id, w.start_time, w.perceived_exertion,
+                s.set_number, s.weight_kg, s.reps, s.one_rep_max_kg
+         FROM sets s
+         JOIN workout_exercises we ON s.workout_exercise_id = we.id
+         JOIN workouts w ON we.workout_id = w.id
+         WHERE we.exercise_id = ? AND w.user_id = ? AND w.completed = 1
+           AND w.id != ?
+         ORDER BY w.start_time DESC, s.set_number ASC
+         LIMIT 30`
+      ).bind(exerciseId, user.id, currentWorkoutId || 0).all(),
+
+      db.prepare(
+        `SELECT MAX(s.weight_kg) AS max_weight_kg,
+                MAX(s.one_rep_max_kg) AS max_one_rep_max_kg,
+                MAX(s.reps) AS max_reps
+         FROM sets s
+         JOIN workout_exercises we ON s.workout_exercise_id = we.id
+         JOIN workouts w ON we.workout_id = w.id
+         WHERE we.exercise_id = ? AND w.user_id = ? AND w.completed = 1`
+      ).bind(exerciseId, user.id).first(),
+
+      db.prepare(
+        `SELECT COUNT(*) AS session_count,
+                AVG(perceived_exertion) AS avg_rpe,
+                SUM(total_weight_kg) AS total_volume_kg
+         FROM workouts
+         WHERE user_id = ? AND completed = 1
+           AND start_time >= datetime('now', '-7 days')`
+      ).bind(user.id).first()
+    ]);
+
+    // Group rows by workout for compact transport.
+    const byWorkout = new Map();
+    for (const row of historyRows.results || []) {
+      const key = row.workout_id;
+      if (!byWorkout.has(key)) {
+        byWorkout.set(key, {
+          workout_id: key,
+          date: row.start_time,
+          perceived_exertion: row.perceived_exertion,
+          sets: []
+        });
+      }
+      byWorkout.get(key).sets.push({
+        set_number: row.set_number,
+        weight_kg: row.weight_kg,
+        reps: row.reps,
+        one_rep_max_kg: row.one_rep_max_kg
+      });
+    }
+    const recent_history = Array.from(byWorkout.values()).slice(0, 6);
+
+    return c.json({
+      personal_records: {
+        max_weight_kg: pr?.max_weight_kg || 0,
+        max_one_rep_max_kg: pr?.max_one_rep_max_kg || 0,
+        max_reps: pr?.max_reps || 0
+      },
+      recent_history,
+      recent_load_7d: {
+        session_count: load?.session_count || 0,
+        avg_rpe: load?.avg_rpe || null,
+        total_volume_kg: load?.total_volume_kg || 0
+      }
+    });
+  } catch (error) {
+    console.error('Exercise context error:', error);
+    return c.json({ error: error.message }, 500);
+  }
+});
+
 // Get specific workout
 workouts.get('/:id', async (c) => {
   const user = requireAuth(c);

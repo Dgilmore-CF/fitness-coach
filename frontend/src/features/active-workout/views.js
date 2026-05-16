@@ -133,6 +133,9 @@ export function renderExerciseTabs(workout, activeIndex) {
             </button>
           </div>
           <div class="cluster" style="justify-content: center;">
+            <button class="btn btn-ghost btn-sm" data-action="ask-coach" title="Ask coach">
+              <i class="fas fa-comments"></i> <span class="hide-mobile">Coach</span>
+            </button>
             <button class="btn btn-ghost btn-sm" data-action="show-notes" title="Add workout notes">
               <i class="fas fa-note-sticky"></i> <span class="hide-mobile">Notes</span>
             </button>
@@ -279,6 +282,12 @@ export function renderExerciseContent(exercise, _index, history) {
         <button class="btn btn-ghost btn-sm aw-rest-btn" data-action="rest-adjust" data-delta="15">+15s</button>
       </div>
     </div>
+
+    <!-- Inline coaching card. Hidden by default; populated by flag-card.js -->
+    <!-- when the rule analyzer detects a notable event (PR, warning, stall). -->
+    <!-- Lives inside the scroll content so it can never overlap the Log Set -->
+    <!-- button — replaces the old floating LiveCoachOverlay. -->
+    <div id="aw-set-flag-card" hidden></div>
 
     ${exercise.tips
       ? html`

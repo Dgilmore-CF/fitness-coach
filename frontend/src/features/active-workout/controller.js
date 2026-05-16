@@ -18,7 +18,7 @@ import { api } from '@core/api';
 import { store } from '@core/state';
 import { toast } from '@ui/Toast';
 import { confirmDialog, openModal } from '@ui/Modal';
-import { formatDuration } from '@utils/formatters';
+import { formatDuration, formatWeight } from '@utils/formatters';
 import {
   isImperialSystem,
   lbsToKg,
@@ -32,6 +32,18 @@ import {
   renderAddExercisesModal,
   renderWorkoutSummary
 } from './views.js';
+import { analyzePostSet } from './set-analyzer.js';
+import {
+  showFlagCard,
+  hideFlagCard,
+  getActiveFlagAction,
+  getActiveFlagInsight
+} from './flag-card.js';
+import {
+  openCoachSheet,
+  buildPrefillFromFlag,
+  buildPrefillFromWorkout
+} from './coach-sheet.js';
 import {
   getWorkout,
   setWorkout,
@@ -69,6 +81,89 @@ import {
 let modalEl = null;
 let isAddingSet = false;
 let minimizedState = null;
+
+// In-workout exercise-context cache. Keyed by exercise_id (NOT
+// workout_exercise.id). Values are the JSON returned from
+// GET /api/workouts/exercises/:id/context. Populated lazily on first
+// view of each exercise tab and cleared on workout close.
+const exerciseContextCache = new Map();
+// Tracks in-flight requests so we don't double-fetch when the user
+// rapidly logs sets before the first fetch resolves.
+const exerciseContextPending = new Map();
+
+/**
+ * Resolve the canonical exercise_id from a workout-exercise row. Programs
+ * carry `exercise_id`; ad-hoc adds may only have `id`. Falls back to `id`.
+ */
+function resolveExerciseId(workoutExercise) {
+  if (!workoutExercise) return null;
+  return workoutExercise.exercise_id || workoutExercise.id || null;
+}
+
+/**
+ * Fetch (and cache) the exercise context snapshot used by the in-workout
+ * analyzer. Fire-and-forget — callers should not await this on a hot path.
+ * Returns the cached value immediately when available so callers like
+ * `logSet()` can run the analyzer synchronously.
+ */
+async function prefetchExerciseContext(exerciseId, workoutId) {
+  if (!exerciseId) return null;
+  if (exerciseContextCache.has(exerciseId)) {
+    return exerciseContextCache.get(exerciseId);
+  }
+  if (exerciseContextPending.has(exerciseId)) {
+    return exerciseContextPending.get(exerciseId);
+  }
+
+  const wq = workoutId ? `?workoutId=${workoutId}` : '';
+  const promise = api.get(`/workouts/exercises/${exerciseId}/context${wq}`)
+    .then((ctx) => {
+      exerciseContextCache.set(exerciseId, ctx);
+      return ctx;
+    })
+    .catch((err) => {
+      // Network/auth/etc. — the analyzer still runs with a blank context
+      // and simply returns null for most rules. We swallow the error so
+      // it doesn't surface as a toast during set logging.
+      console.warn('Exercise context fetch failed:', err);
+      return null;
+    })
+    .finally(() => {
+      exerciseContextPending.delete(exerciseId);
+    });
+
+  exerciseContextPending.set(exerciseId, promise);
+  return promise;
+}
+
+/**
+ * Run the rule analyzer against the most recently logged set and either
+ * surface a flag card or hide whatever was there before.
+ */
+function runSetAnalyzer({ exercise, refreshedSets, lastSet }) {
+  const exerciseId = resolveExerciseId(exercise);
+  if (!exerciseId) {
+    hideFlagCard();
+    return;
+  }
+  const ctx = exerciseContextCache.get(exerciseId);
+  // No context cached yet (e.g. very first set of the very first exercise
+  // before prefetch resolved). The analyzer only needs context for PR /
+  // stall rules; for routine sets it would have returned null anyway, so
+  // we just hide.
+  if (!ctx) {
+    hideFlagCard();
+    return;
+  }
+  const insight = analyzePostSet({
+    exercise,
+    currentSets: refreshedSets || [],
+    lastSet,
+    exerciseContext: ctx,
+    formatWeight
+  });
+  showFlagCard(insight);
+}
 
 function lockBodyScroll() {
   document.body.dataset.scrollY = String(window.scrollY);
@@ -111,7 +206,10 @@ function destroyModal() {
   unlockBodyScroll();
   stopWorkoutTimer();
   stopRestTimer();
-  if (window.aiCoach?.destroyLive) window.aiCoach.destroyLive();
+  // Discard per-workout cached exercise contexts so the next workout
+  // re-fetches fresh history (PRs may have changed, etc.).
+  exerciseContextCache.clear();
+  exerciseContextPending.clear();
 }
 
 function setModalContent(content) {
@@ -147,15 +245,11 @@ export async function startExercises() {
       if (el) el.textContent = formatDuration(elapsed);
     });
 
-    // Mount the AI coach overlay
-    if (window.aiCoach?.initLive) {
-      window.aiCoach.initLive({
-        onAction: (action) => {
-          if (typeof action.value === 'number' && action.value >= 30) {
-            adjustRestTimer(action.value);
-          }
-        }
-      });
+    // Prefetch context for the first exercise so the analyzer has data ready
+    // by the time the user logs their first set. Fire-and-forget.
+    const firstExercise = workout.exercises?.[getActiveIndex()];
+    if (firstExercise) {
+      prefetchExerciseContext(resolveExerciseId(firstExercise), workout.id);
     }
 
     renderTabs();
@@ -176,8 +270,10 @@ export async function resume(workout) {
     if (el) el.textContent = formatDuration(elapsed);
   });
 
-  if (window.aiCoach?.initLive) {
-    window.aiCoach.initLive();
+  // Prefetch context for the active exercise on resume.
+  const activeOnResume = workout.exercises?.[getActiveIndex()];
+  if (activeOnResume) {
+    prefetchExerciseContext(resolveExerciseId(activeOnResume), workout.id);
   }
 
   renderTabs();
@@ -207,6 +303,10 @@ function renderTabs() {
 
   setModalContent(renderExerciseTabs(workout, idx));
   renderActiveExerciseContent();
+
+  // Prefetch context for the now-active exercise. Cached fetches no-op.
+  // Done after the DOM is rendered so the flag card slot exists.
+  prefetchExerciseContext(resolveExerciseId(exercise), workout.id);
 
   // Resume visible rest timer if still active
   if (isRestActive()) {
@@ -256,10 +356,25 @@ function handleKeydown(event) {
 }
 
 async function handleClick(event) {
+  // Flag-card action buttons — checked before the generic data-action
+  // dispatcher because the flag card uses a distinct `data-flag-action`
+  // attribute to avoid colliding with the workout's data-action vocabulary.
+  const flagTarget = event.target.closest('[data-flag-action]');
+  if (flagTarget) {
+    event.stopPropagation();
+    handleFlagAction(flagTarget.getAttribute('data-flag-action'));
+    return;
+  }
+
   const target = event.target.closest('[data-action]');
   if (!target) return;
   const action = target.getAttribute('data-action');
   event.stopPropagation();
+
+  if (action === 'dismiss-flag') {
+    hideFlagCard();
+    return;
+  }
 
   switch (action) {
     case 'cancel-workout':
@@ -343,6 +458,9 @@ async function handleClick(event) {
     case 'end-workout':
       await endWorkoutEarly();
       break;
+    case 'ask-coach':
+      openCoachSheetFromFooter();
+      break;
     case 'show-extra-set-input':
       addExtraSet();
       break;
@@ -374,6 +492,62 @@ async function handleClick(event) {
 // =========================================================================
 // Actions
 // =========================================================================
+
+/**
+ * Handle a tap on a flag-card action button. The button itself carries only
+ * the action type; the numeric payload (rest seconds, drop-target weight) is
+ * stashed on the card element by flag-card.js so we can read it back here.
+ */
+function handleFlagAction(actionType) {
+  const action = getActiveFlagAction();
+  switch (actionType) {
+    case 'extend_rest': {
+      const seconds = typeof action?.value === 'number' ? action.value : 30;
+      adjustRestTimer(seconds);
+      toast.info(`Rest extended by ${seconds}s`);
+      // The card has done its job — collapse so it doesn't clutter the view.
+      hideFlagCard();
+      break;
+    }
+    case 'drop_weight': {
+      // Pre-fill the weight input with the dropped target in user units.
+      // Don't auto-submit — the user confirms by tapping Log Set themselves.
+      const targetKg = typeof action?.value === 'number' ? action.value : null;
+      if (targetKg == null) break;
+      const weightEl = document.getElementById('aw-new-set-weight');
+      if (weightEl) {
+        weightEl.value = String(toDisplayWeight(targetKg));
+        weightEl.focus();
+        weightEl.select?.();
+      }
+      hideFlagCard();
+      break;
+    }
+    case 'ask_coach': {
+      // Open the chat sheet with a question pre-seeded from the flag's
+      // context. Read insight BEFORE hiding the card (hide clears it).
+      const insightForPrefill = getActiveFlagInsight();
+      const exercise = getActiveExercise();
+      const prefill = buildPrefillFromFlag(insightForPrefill, exercise);
+      hideFlagCard();
+      openCoachSheet({ prefillMessage: prefill });
+      break;
+    }
+    default:
+      hideFlagCard();
+  }
+}
+
+/**
+ * Footer "Ask Coach" button entry. Builds a prefill from the active exercise
+ * + the user's most recent sets in this workout, then opens the chat sheet.
+ */
+function openCoachSheetFromFooter() {
+  const exercise = getActiveExercise();
+  const currentSets = exercise?.sets || [];
+  const prefill = buildPrefillFromWorkout({ exercise, currentSets });
+  openCoachSheet({ prefillMessage: prefill });
+}
 
 async function cancelWorkout() {
   const workout = getWorkout();
@@ -492,22 +666,29 @@ async function logSet(exerciseId) {
     });
     showRestTimer();
 
-    // AI coach analysis — pass exercise_id + workout_id so the backend
-    // can fetch the user's history for this exercise and tailor the tip.
-    if (window.aiCoach?.analyzeSet && refreshedExercise) {
-      const parsedTargetReps = parseInt(String(refreshedExercise.target_reps || '10').split(/[-–]/)[0], 10) || 10;
-      const currentWorkout = getWorkout();
-      window.aiCoach.analyzeSet({
-        exerciseId: refreshedExercise.exercise_id || refreshedExercise.id,
-        workoutId: currentWorkout?.id,
-        currentSets: refreshedExercise.sets || [],
-        targetReps: parsedTargetReps,
-        targetSets: refreshedExercise.target_sets || 3
-      });
-    }
-
     isAddingSet = false;
     renderTabs();
+
+    // In-workout coaching: run the rule-based analyzer against the just-
+    // logged set. Must run AFTER renderTabs() since that re-renders the
+    // modal innerHTML (including the #aw-set-flag-card slot). Surfaces an
+    // inline flag card only when something notable is detected (PR, form/
+    // load warning, plateau). Routine sets stay silent. No network call,
+    // no LLM, no per-set wait.
+    if (refreshedExercise) {
+      const refreshedSets = refreshedExercise.sets || [];
+      // The newest set is the one we just added — the last set_number wins,
+      // falling back to array tail if set_numbers aren't sequential.
+      const sortedSets = [...refreshedSets].sort(
+        (a, b) => (a.set_number || 0) - (b.set_number || 0)
+      );
+      const lastSet = sortedSets[sortedSets.length - 1];
+      runSetAnalyzer({
+        exercise: refreshedExercise,
+        refreshedSets,
+        lastSet
+      });
+    }
 
     // Auto-advance prompt
     const completed = (refreshedExercise.sets || []).length;

@@ -447,6 +447,184 @@
 }
 
 /* =========================================================================
+ * Inline coaching flag card
+ *
+ * Replaces the previous floating LiveCoachOverlay. Lives inside
+ * .aw-exercise-content, so it scrolls with the rest of the page and can
+ * never overlap the Log Set button.
+ * ========================================================================= */
+
+.aw-flag-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+  box-shadow: var(--shadow-sm);
+}
+
+.aw-flag-card.aw-flag-success {
+  border-left-color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 6%, var(--color-surface));
+}
+
+.aw-flag-card.aw-flag-warning {
+  border-left-color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 6%, var(--color-surface));
+}
+
+.aw-flag-card.aw-flag-info {
+  border-left-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface));
+}
+
+.aw-flag-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+.aw-flag-card-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.aw-flag-card-body {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+
+.aw-flag-card-actions {
+  margin-top: var(--space-3);
+}
+
+/* =========================================================================
+ * Coach chat sheet (opened from footer "Ask Coach" + flag-card actions)
+ * ========================================================================= */
+
+.aw-coach-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-height: 60vh;
+  min-height: 280px;
+}
+
+.aw-coach-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: var(--space-1);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.aw-coach-empty {
+  text-align: center;
+  padding: var(--space-5) var(--space-3);
+  color: var(--color-text-secondary);
+}
+
+.aw-coach-empty i {
+  font-size: 32px;
+  display: block;
+  margin-bottom: var(--space-2);
+  color: var(--color-primary);
+}
+
+.aw-coach-message {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.aw-coach-message-user {
+  flex-direction: row-reverse;
+}
+
+.aw-coach-message-avatar {
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface-alt, var(--color-surface));
+  color: var(--color-text-secondary);
+  font-size: 14px;
+}
+
+.aw-coach-message-user .aw-coach-message-avatar {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+
+.aw-coach-message-body {
+  background: var(--color-surface-alt, var(--color-surface));
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-2) var(--space-3);
+  max-width: 80%;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--color-text);
+  word-wrap: break-word;
+}
+
+.aw-coach-message-user .aw-coach-message-body {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  border-color: var(--color-primary);
+}
+
+.aw-coach-message-body ul {
+  margin: var(--space-1) 0 0 var(--space-3);
+  padding: 0;
+}
+
+.aw-coach-form {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-end;
+}
+
+.aw-coach-form .textarea {
+  flex: 1;
+  resize: none;
+  min-height: 44px;
+  max-height: 120px;
+}
+
+.aw-coach-typing-dots {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.aw-coach-typing-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-text-secondary);
+  animation: aw-coach-typing 1.2s infinite ease-in-out both;
+}
+
+.aw-coach-typing-dots span:nth-child(1) { animation-delay: -0.32s; }
+.aw-coach-typing-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes aw-coach-typing {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1); }
+}
+
+/* =========================================================================
  * Add exercises overlay
  * ========================================================================= */
 

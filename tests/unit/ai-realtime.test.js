@@ -1,8 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   calculateReadinessScore,
-  predictNextSet,
-  analyzePostSet
+  predictNextSet
 } from '../../src/services/ai-realtime.js';
 
 function hoursAgo(hours) {
@@ -85,50 +84,6 @@ describe('predictNextSet', () => {
   });
 });
 
-describe('analyzePostSet', () => {
-  it('returns null for empty input', () => {
-    expect(analyzePostSet({ currentSets: [] })).toBeNull();
-  });
-
-  it('suggests progression after smashing reps on first set', () => {
-    const insight = analyzePostSet({
-      currentSets: [{ weight_kg: 80, reps: 14 }],
-      targetReps: 10
-    });
-    expect(insight?.type).toBe('progression');
-  });
-
-  it('warns about form breakdown on big rep dropoff', () => {
-    const insight = analyzePostSet({
-      currentSets: [
-        { weight_kg: 80, reps: 10 },
-        { weight_kg: 80, reps: 9 },
-        { weight_kg: 80, reps: 4 }
-      ],
-      targetReps: 10
-    });
-    expect(insight?.type).toBe('form_warning');
-    expect(insight?.action).toBeDefined();
-  });
-
-  it('warns on load too heavy (very low reps)', () => {
-    const insight = analyzePostSet({
-      currentSets: [{ weight_kg: 150, reps: 3 }],
-      targetReps: 10
-    });
-    expect(insight?.type).toBe('load_warning');
-  });
-
-  it('celebrates completion of all target sets', () => {
-    const insight = analyzePostSet({
-      currentSets: [
-        { weight_kg: 80, reps: 10 },
-        { weight_kg: 80, reps: 10 },
-        { weight_kg: 80, reps: 10 }
-      ],
-      targetReps: 10,
-      targetSets: 3
-    });
-    expect(insight?.type).toBe('complete');
-  });
-});
+// The backend `analyzePostSet` was removed when in-workout coaching moved
+// to the frontend rule analyzer. See tests/unit/set-analyzer.test.js for
+// the new analyzer's tests (richer rules, unit-aware, deterministic).

@@ -48,7 +48,6 @@ import { loadNutrition } from './screens/nutrition.js';
 import { loadInsights } from './screens/insights.js';
 import { loadWorkout } from './screens/workout.js';
 import { showWorkoutPreview } from './features/ai-coach/WorkoutPreview.js';
-import { liveCoach } from './features/ai-coach/LiveCoachOverlay.js';
 import {
   showNutritionAnalysis,
   showMealSuggestion,
@@ -128,18 +127,14 @@ window.__fitnessApp = {
 };
 
 // -----------------------------------------------------------------------------
-// Phase 4: Real-time AI coaching — expose to legacy workout code via globals.
-// The legacy active-workout modal calls these at key moments:
-//   - BEFORE starting a workout: await window.aiCoach.showPreview(programDayId)
-//   - WHEN workout opens:        window.aiCoach.initLive()
-//   - AFTER a set is logged:     window.aiCoach.analyzeSet({currentSets, targetReps, targetSets})
-//   - WHEN workout ends:         window.aiCoach.destroyLive()
+// AI coaching globals — only the pre-workout briefing surface remains exposed
+// here. The in-workout "live coach" overlay was retired in favor of the new
+// rule-based inline flag card (see features/active-workout/set-analyzer.js
+// and flag-card.js), and the chat surface lives in coach-sheet.js. Legacy
+// callers expect `window.aiCoach.showPreview(programDayId)` to still work.
 // -----------------------------------------------------------------------------
 window.aiCoach = {
-  showPreview: showWorkoutPreview,
-  initLive: liveCoach.init,
-  destroyLive: liveCoach.destroy,
-  analyzeSet: liveCoach.analyzeSet
+  showPreview: showWorkoutPreview
 };
 
 // Active workout modal — replaces legacy show/resume/start functions

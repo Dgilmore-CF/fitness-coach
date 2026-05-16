@@ -8,9 +8,7 @@ import {
 } from '../services/ai-coach.js';
 import {
   buildPreWorkoutContext,
-  predictNextSet,
-  analyzePostSet,
-  analyzeSetWithContext
+  predictNextSet
 } from '../services/ai-realtime.js';
 import {
   analyzeNutrition,
@@ -533,49 +531,11 @@ ai.get('/realtime/predict/:exerciseId', async (c) => {
   }
 });
 
-/**
- * Post-set analysis: personalized mid-workout coaching that references the
- * user's actual exercise history, PRs, recent training load, and current
- * workout trend. AI-powered with a rule-based fallback.
- *
- * POST /api/ai/realtime/analyze
- * Body: {
- *   exercise_id?: number,       // required for tailored insights
- *   workout_id?: number,        // current workout id (excluded from history)
- *   current_sets: [{weight_kg, reps}, ...],
- *   target_reps: number,
- *   target_sets: number
- * }
- */
-ai.post('/realtime/analyze', async (c) => {
-  const user = requireAuth(c);
-  const db = c.env.DB;
-
-  try {
-    const body = await c.req.json();
-    const insight = await analyzeSetWithContext({
-      ai: c.env.AI,
-      env: c.env,
-      db,
-      user,
-      exerciseId: body.exercise_id ? Number(body.exercise_id) : null,
-      workoutId: body.workout_id ? Number(body.workout_id) : null,
-      currentSets: body.current_sets || [],
-      targetReps: body.target_reps || 10,
-      targetSets: body.target_sets || 3
-    });
-    return c.json({ success: true, insight });
-  } catch (error) {
-    console.error('Post-set analysis error:', error);
-    // Graceful fallback: never 500 — fall back to pure rule-based
-    const fallback = analyzePostSet({
-      currentSets: (await c.req.json().catch(() => ({})))?.current_sets || [],
-      targetReps: 10,
-      targetSets: 3
-    });
-    return c.json({ success: false, error: error.message, insight: fallback });
-  }
-});
+// Post-set analysis was previously here as POST /realtime/analyze. It has
+// been removed in favor of a frontend rule-based analyzer that reads from
+// GET /api/workouts/exercises/:id/context (lighter, deterministic, no LLM
+// call per set). For on-demand depth, the workout footer now offers an
+// "Ask Coach" button that uses POST /api/ai/coach/chat instead.
 
 // ============================================================================
 // AI nutrition coaching (Phase 5)
