@@ -464,19 +464,23 @@
   box-shadow: var(--shadow-sm);
 }
 
+/* The codebase uses --color-secondary for the green/success accent (not
+   --color-success). Use the lighter tinted backgrounds that already exist
+   on the design system instead of color-mix(), which isn't universally
+   supported on older WebKit. */
 .aw-flag-card.aw-flag-success {
-  border-left-color: var(--color-success);
-  background: color-mix(in srgb, var(--color-success) 6%, var(--color-surface));
+  border-left-color: var(--color-secondary);
+  background: var(--color-secondary-subtle, var(--color-secondary-light));
 }
 
 .aw-flag-card.aw-flag-warning {
   border-left-color: var(--color-warning);
-  background: color-mix(in srgb, var(--color-warning) 6%, var(--color-surface));
+  background: var(--color-warning-light);
 }
 
 .aw-flag-card.aw-flag-info {
   border-left-color: var(--color-primary);
-  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface));
+  background: var(--color-primary-subtle, var(--color-primary-light));
 }
 
 .aw-flag-card-header {
@@ -556,7 +560,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--color-surface-alt, var(--color-surface));
+  background: var(--color-surface-sunken);
   color: var(--color-text-secondary);
   font-size: 14px;
 }
@@ -567,7 +571,7 @@
 }
 
 .aw-coach-message-body {
-  background: var(--color-surface-alt, var(--color-surface));
+  background: var(--color-surface-sunken);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: var(--space-2) var(--space-3);

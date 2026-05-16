@@ -362,19 +362,31 @@ async function handleClick(event) {
   const flagTarget = event.target.closest('[data-flag-action]');
   if (flagTarget) {
     event.stopPropagation();
-    handleFlagAction(flagTarget.getAttribute('data-flag-action'));
+    try {
+      handleFlagAction(flagTarget.getAttribute('data-flag-action'));
+    } catch (err) {
+      console.error('Flag-action handler error:', err);
+    }
     return;
   }
 
   const target = event.target.closest('[data-action]');
   if (!target) return;
   const action = target.getAttribute('data-action');
+  // Temporary diagnostic so we can see in the browser console whether the
+  // click is reaching the dispatcher. Safe to remove once stable.
+  console.log('[active-workout] action:', action);
   event.stopPropagation();
 
   if (action === 'dismiss-flag') {
     hideFlagCard();
     return;
   }
+
+  // Wrap the entire dispatcher so a single failing handler can't break the
+  // event listener (an uncaught throw from any await would leave the click
+  // listener intact, but logging makes future debugging much easier).
+  try {
 
   switch (action) {
     case 'cancel-workout':
@@ -486,6 +498,11 @@ async function handleClick(event) {
     case 'skip-save-program':
       document.querySelector('.aw-summary-save-program')?.remove();
       break;
+  }
+
+  } catch (err) {
+    console.error(`Workout action handler "${action}" threw:`, err);
+    toast.error(`Action failed: ${err.message || 'unknown error'}`);
   }
 }
 
