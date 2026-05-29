@@ -33,6 +33,7 @@ import {
   renderWorkoutSummary
 } from './views.js';
 import { analyzePostSet } from './set-analyzer.js';
+import { connectLive, disconnectLive, ORIGIN_ID } from './live.js';
 import {
   showFlagCard,
   hideFlagCard,
@@ -206,6 +207,7 @@ function destroyModal() {
   unlockBodyScroll();
   stopWorkoutTimer();
   stopRestTimer();
+  disconnectLive();
   // Discard per-workout cached exercise contexts so the next workout
   // re-fetches fresh history (PRs may have changed, etc.).
   exerciseContextCache.clear();
@@ -215,6 +217,47 @@ function destroyModal() {
 function setModalContent(content) {
   if (!modalEl) createModal();
   modalEl.innerHTML = String(content);
+}
+
+// =========================================================================
+// Live multi-device sync (WebSocket → Durable Object)
+// =========================================================================
+
+/**
+ * Open the live socket for the active workout and react to events emitted by
+ * OTHER devices. Events originating from this tab are tagged with ORIGIN_ID
+ * and ignored (we already applied them locally).
+ */
+function startLive(workoutId) {
+  if (!workoutId) return;
+  connectLive(workoutId, {
+    onSet: (msg) => {
+      if (msg.originId === ORIGIN_ID) return; // our own change, already applied
+      if (isAddingSet) return; // mid-log locally; our refresh will catch up
+      refreshWorkout()
+        .then(() => renderTabs())
+        .catch(() => { /* transient; next event re-syncs */ });
+    },
+    onTimer: (msg) => {
+      if (msg.originId === ORIGIN_ID) return;
+      const remaining = Math.round((msg.endsAt - Date.now()) / 1000);
+      if (remaining > 0) {
+        startRestTimer(remaining, {
+          onTick: updateRestTimerDisplay,
+          onComplete: () => hideRestTimer()
+        });
+        showRestTimer();
+      }
+    },
+    onCompleted: (msg) => {
+      if (msg.originId === ORIGIN_ID) return; // we finished it ourselves
+      toast.info('Workout completed on another device');
+      disconnectLive();
+      destroyModal();
+      resetSession();
+      if (typeof window.switchTab === 'function') window.switchTab('dashboard');
+    }
+  });
 }
 
 // =========================================================================
@@ -256,6 +299,7 @@ export async function startExercises() {
       prefetchExerciseContext(resolveExerciseId(firstExercise), workout.id);
     }
 
+    startLive(workout.id);
     renderTabs();
   } catch (err) {
     toast.error(`Error loading workout: ${err.message}`);
@@ -280,6 +324,7 @@ export async function resume(workout) {
     prefetchExerciseContext(resolveExerciseId(activeOnResume), workout.id);
   }
 
+  startLive(workout.id);
   renderTabs();
 
   if (minimizedState?.restEndTime && Date.now() < minimizedState.restEndTime) {
@@ -665,7 +710,7 @@ async function logSet(exerciseId) {
       weight_kg: weight,
       reps,
       rest_seconds: 90
-    });
+    }, { headers: { 'X-Origin-Id': ORIGIN_ID } });
 
     await refreshWorkout();
     const refreshedExercise = getWorkout().exercises.find((e) => e.id === exerciseId);
@@ -762,7 +807,9 @@ async function deleteSet(exerciseId, setId) {
 
   const workout = getWorkout();
   try {
-    await api.delete(`/workouts/${workout.id}/exercises/${exerciseId}/sets/${setId}`);
+    await api.delete(`/workouts/${workout.id}/exercises/${exerciseId}/sets/${setId}`, {
+      headers: { 'X-Origin-Id': ORIGIN_ID }
+    });
     await refreshWorkout();
     renderTabs();
     toast.success('Set deleted');
@@ -803,7 +850,8 @@ async function openEditSet({ exerciseId, setId, weight, reps }) {
           try {
             await api.put(
               `/workouts/${getWorkout().id}/exercises/${exerciseId}/sets/${setId}`,
-              { weight_kg: w, reps: r }
+              { weight_kg: w, reps: r },
+              { headers: { 'X-Origin-Id': ORIGIN_ID } }
             );
             await refreshWorkout();
             renderTabs();
@@ -915,6 +963,8 @@ function minimize() {
   }
   unlockBodyScroll();
   stopWorkoutTimer();
+  // Drop the live socket while minimized; resume() reconnects.
+  disconnectLive();
   toast.info('Workout minimized — resume from the dashboard');
 }
 
@@ -1039,8 +1089,13 @@ async function showSummary() {
     // Mark complete (the complete endpoint returns only the updated workout
     // row — no exercises). Then immediately GET the full workout (which
     // joins in exercises + sets) so the summary shows what was actually done.
-    const result = await api.post(`/workouts/${workout.id}/complete`);
+    const result = await api.post(`/workouts/${workout.id}/complete`, null, {
+      headers: { 'X-Origin-Id': ORIGIN_ID }
+    });
     const completedRow = result.workout || workout;
+
+    // The DO has flushed to D1 and closed the live socket; stop reconnecting.
+    disconnectLive();
 
     let completed = completedRow;
     try {

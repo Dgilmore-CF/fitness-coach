@@ -25,6 +25,21 @@ bucket_name = "fitness-coach-storage"
 [ai]
 binding = "AI"
 
+# Durable Objects — one WorkoutSessionDO instance per active workout.
+# Holds the live set buffer + timer state in the DO's own embedded SQLite
+# (the hot, strongly-consistent store), fans out live updates to every
+# connected device over WebSockets, and materializes the finished workout
+# into D1 on completion (write-behind).
+[[durable_objects.bindings]]
+name = "WORKOUT_SESSION"
+class_name = "WorkoutSessionDO"
+
+# SQLite-backed DO storage (free-plan eligible). The class must be listed
+# here exactly once, the first time it is introduced.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["WorkoutSessionDO"]
+
 # Environment variables
 [vars]
 ENVIRONMENT = "production"

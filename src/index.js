@@ -59,3 +59,7 @@ app.all('*', async (c) => {
 });
 
 export default app;
+
+// Durable Object class export. Wrangler binds `WORKOUT_SESSION` (see
+// wrangler.toml) to this class; the named export must match `class_name`.
+export { WorkoutSessionDO } from './durable-objects/workout-session.js';

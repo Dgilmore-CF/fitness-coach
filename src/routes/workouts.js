@@ -5,6 +5,25 @@ import { checkAndAwardAchievements } from '../services/achievements';
 
 const workouts = new Hono();
 
+/**
+ * Resolve the WorkoutSessionDO stub for a given workout. One DO instance per
+ * workout id, addressed by name so any Worker invocation reaches the same
+ * object.
+ */
+function sessionStub(c, workoutId) {
+  const id = c.env.WORKOUT_SESSION.idFromName(`workout:${workoutId}`);
+  return c.env.WORKOUT_SESSION.get(id);
+}
+
+/** Translate an error thrown inside the DO into an appropriate HTTP response. */
+function mapDoError(c, err) {
+  const msg = err?.message || 'Internal error';
+  if (/forbidden/i.test(msg)) return c.json({ error: msg }, 403);
+  if (/not found/i.test(msg)) return c.json({ error: msg }, 404);
+  console.error('DO call failed:', err);
+  return c.json({ error: msg }, 500);
+}
+
 // Get user workouts
 workouts.get('/', async (c) => {
   const user = requireAuth(c);
@@ -181,18 +200,65 @@ workouts.get('/:id', async (c) => {
      ORDER BY we.order_index`
   ).bind(workoutId).all();
 
-  // Get sets for each exercise
-  for (const exercise of exercises.results) {
-    const sets = await db.prepare(
-      'SELECT * FROM sets WHERE workout_exercise_id = ? ORDER BY set_number'
-    ).bind(exercise.id).all();
-
-    exercise.sets = sets.results;
+  // Sets: for an ACTIVE workout the Durable Object is the source of truth
+  // (write-behind — sets aren't in D1 yet). For a completed workout, read
+  // straight from D1.
+  if (!workout.completed) {
+    let liveSets = {};
+    let sessionState = null;
+    try {
+      const res = await sessionStub(c, workoutId).getSets({
+        workoutId: Number(workoutId),
+        userId: user.id
+      });
+      liveSets = res?.sets || {};
+      sessionState = res?.state || null;
+    } catch (err) {
+      console.error('DO getSets failed, falling back to D1:', err);
+    }
+    for (const exercise of exercises.results) {
+      exercise.sets = liveSets[exercise.id] || [];
+    }
+    workout.exercises = exercises.results;
+    // Surface authoritative timer/session state so a reload or second device
+    // can resync the rest clock.
+    if (sessionState) workout.session_state = sessionState;
+  } else {
+    for (const exercise of exercises.results) {
+      const sets = await db.prepare(
+        'SELECT * FROM sets WHERE workout_exercise_id = ? ORDER BY set_number'
+      ).bind(exercise.id).all();
+      exercise.sets = sets.results;
+    }
+    workout.exercises = exercises.results;
   }
 
-  workout.exercises = exercises.results;
-
   return c.json({ workout });
+});
+
+// Live workout WebSocket — upgrades the connection and hands it to the
+// workout's Durable Object, which fans out set/timer/completion events to
+// every connected device (phone, tablet, …). Auth + ownership are enforced
+// here in the Worker before the socket reaches the DO.
+workouts.get('/:id/live', async (c) => {
+  const user = requireAuth(c);
+  const workoutId = c.req.param('id');
+
+  if (c.req.header('Upgrade') !== 'websocket') {
+    return c.json({ error: 'Expected WebSocket upgrade' }, 426);
+  }
+
+  const workout = await c.env.DB
+    .prepare('SELECT id FROM workouts WHERE id = ? AND user_id = ?')
+    .bind(workoutId, user.id)
+    .first();
+  if (!workout) {
+    return c.json({ error: 'Workout not found' }, 404);
+  }
+
+  // Forward the upgrade request to the DO; it returns the 101 response with
+  // the paired WebSocket attached.
+  return sessionStub(c, workoutId).fetch(c.req.raw);
 });
 
 // Start new workout
@@ -202,12 +268,13 @@ workouts.post('/', async (c) => {
   const { program_id, program_day_id } = body;
   const db = c.env.DB;
 
-  // Create workout
+  // Create workout. Coerce undefined → null so D1 accepts the bindings even
+  // for an ad-hoc workout started without a program day.
   const workout = await db.prepare(
     `INSERT INTO workouts (user_id, program_id, program_day_id, start_time)
      VALUES (?, ?, ?, CURRENT_TIMESTAMP)
      RETURNING *`
-  ).bind(user.id, program_id, program_day_id).first();
+  ).bind(user.id, program_id ?? null, program_day_id ?? null).first();
 
   // If program day specified, copy exercises from program
   if (program_day_id) {
@@ -246,6 +313,31 @@ workouts.post('/', async (c) => {
          VALUES (?, ?, ?, ?, ?)`
       ).bind(workout.id, pe.exercise_id, pe.id, i, targetSets).run();
     }
+  }
+
+  // Spin up the Durable Object for this workout and seed it with the exercise
+  // list (so the hot set-logging path never needs to touch D1 to learn which
+  // exercises are cardio). Best-effort: a failure here must not block starting
+  // the workout — the DO will lazily self-init from D1 on first use.
+  try {
+    const exRows = await db.prepare(
+      `SELECT we.id AS workout_exercise_id, e.muscle_group
+       FROM workout_exercises we
+       JOIN exercises e ON we.exercise_id = e.id
+       WHERE we.workout_id = ?`
+    ).bind(workout.id).all();
+    const exercises = (exRows.results || []).map((r) => ({
+      workout_exercise_id: r.workout_exercise_id,
+      is_cardio: r.muscle_group === 'Cardio'
+    }));
+    await sessionStub(c, workout.id).init({
+      workoutId: workout.id,
+      userId: user.id,
+      startTime: workout.start_time,
+      exercises
+    });
+  } catch (err) {
+    console.error('DO init on workout start failed (will lazy-init):', err);
   }
 
   return c.json({ workout, message: 'Workout started' });
@@ -474,6 +566,20 @@ workouts.post('/:id/complete', async (c) => {
     // No body or invalid JSON - that's fine, perceived_exertion is optional
   }
 
+  // Write-behind flush: materialize all buffered sets from the Durable Object
+  // into D1 BEFORE we compute totals (the totals query reads the `sets` table).
+  // Best-effort: if the DO is unreachable we still finalize on whatever D1 has.
+  try {
+    const originId = c.req.header('X-Origin-Id') || null;
+    await sessionStub(c, workoutId).complete({
+      workoutId: Number(workoutId),
+      userId: user.id,
+      originId
+    });
+  } catch (err) {
+    console.error('DO flush on complete failed:', err);
+  }
+
   // Calculate total weight and duration
   const stats = await db.prepare(
     `SELECT 
@@ -579,97 +685,58 @@ workouts.post('/:id/exercises', async (c) => {
   return c.json({ workout_exercise: workoutExercise });
 });
 
-// Record set (supports both strength and cardio)
+// Record set (supports both strength and cardio).
+// Write-behind: the set lands in the workout's Durable Object (its embedded
+// SQLite), NOT in D1. It is materialized into D1 when the workout completes.
 workouts.post('/:workoutId/exercises/:exerciseId/sets', async (c) => {
   const user = requireAuth(c);
   const workoutId = c.req.param('workoutId');
   const exerciseId = c.req.param('exerciseId');
   const body = await c.req.json();
-  const { weight_kg, reps, rest_seconds, duration_seconds, calories_burned, distance_meters, avg_heart_rate } = body;
-  const db = c.env.DB;
+  const originId = c.req.header('X-Origin-Id') || null;
 
-  // Verify workout belongs to user
-  const workout = await db.prepare(
-    'SELECT * FROM workouts WHERE id = ? AND user_id = ?'
-  ).bind(workoutId, user.id).first();
-
-  if (!workout) {
-    return c.json({ error: 'Workout not found' }, 404);
+  try {
+    const result = await sessionStub(c, workoutId).logSet({
+      workoutId: Number(workoutId),
+      userId: user.id,
+      workoutExerciseId: Number(exerciseId),
+      originId,
+      weight_kg: body.weight_kg,
+      reps: body.reps,
+      rest_seconds: body.rest_seconds,
+      duration_seconds: body.duration_seconds,
+      calories_burned: body.calories_burned,
+      distance_meters: body.distance_meters,
+      avg_heart_rate: body.avg_heart_rate
+    });
+    return c.json(result);
+  } catch (err) {
+    return mapDoError(c, err);
   }
-
-  // Get workout exercise with exercise details
-  const workoutExercise = await db.prepare(
-    `SELECT we.*, e.muscle_group FROM workout_exercises we
-     JOIN exercises e ON we.exercise_id = e.id
-     WHERE we.id = ? AND we.workout_id = ?`
-  ).bind(exerciseId, workoutId).first();
-
-  if (!workoutExercise) {
-    return c.json({ error: 'Exercise not found in workout' }, 404);
-  }
-
-  // Get current set count
-  const setCount = await db.prepare(
-    'SELECT COUNT(*) as count FROM sets WHERE workout_exercise_id = ?'
-  ).bind(exerciseId).first();
-
-  // Check if this is a cardio exercise
-  const isCardio = workoutExercise.muscle_group === 'Cardio';
-
-  let set;
-  if (isCardio) {
-    // For cardio, store duration and calories instead of weight/reps
-    set = await db.prepare(
-      `INSERT INTO sets (workout_exercise_id, set_number, weight_kg, reps, duration_seconds, calories_burned, distance_meters, avg_heart_rate, rest_seconds)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-       RETURNING *`
-    ).bind(exerciseId, setCount.count + 1, weight_kg || 0, reps || 1, duration_seconds, calories_burned, distance_meters, avg_heart_rate, rest_seconds || 0).first();
-  } else {
-    // For strength exercises, calculate 1RM
-    const oneRepMax = calculateOneRepMax(weight_kg, reps);
-    set = await db.prepare(
-      `INSERT INTO sets (workout_exercise_id, set_number, weight_kg, reps, one_rep_max_kg, rest_seconds)
-       VALUES (?, ?, ?, ?, ?, ?)
-       RETURNING *`
-    ).bind(exerciseId, setCount.count + 1, weight_kg, reps, oneRepMax, rest_seconds).first();
-  }
-
-  return c.json({ set });
 });
 
-// Update set
+// Update set — routed to the DO (the live source of truth while active).
 workouts.put('/:workoutId/exercises/:exerciseId/sets/:setId', async (c) => {
   const user = requireAuth(c);
   const workoutId = c.req.param('workoutId');
   const setId = c.req.param('setId');
   const body = await c.req.json();
-  const { weight_kg, reps, rest_seconds } = body;
-  const db = c.env.DB;
+  const originId = c.req.header('X-Origin-Id') || null;
 
-  // Verify workout belongs to user
-  const workout = await db.prepare(
-    'SELECT * FROM workouts WHERE id = ? AND user_id = ?'
-  ).bind(workoutId, user.id).first();
-
-  if (!workout) {
-    return c.json({ error: 'Workout not found' }, 404);
+  try {
+    const result = await sessionStub(c, workoutId).updateSet({
+      workoutId: Number(workoutId),
+      userId: user.id,
+      setId: Number(setId),
+      originId,
+      weight_kg: body.weight_kg,
+      reps: body.reps,
+      rest_seconds: body.rest_seconds
+    });
+    return c.json(result);
+  } catch (err) {
+    return mapDoError(c, err);
   }
-
-  // Calculate 1RM
-  const oneRepMax = calculateOneRepMax(weight_kg, reps);
-
-  const set = await db.prepare(
-    `UPDATE sets 
-     SET weight_kg = ?, reps = ?, one_rep_max_kg = ?, rest_seconds = ?
-     WHERE id = ?
-     RETURNING *`
-  ).bind(weight_kg, reps, oneRepMax, rest_seconds, setId).first();
-
-  if (!set) {
-    return c.json({ error: 'Set not found' }, 404);
-  }
-
-  return c.json({ set });
 });
 
 // Update target sets for an exercise in workout
@@ -745,26 +812,19 @@ workouts.delete('/:workoutId/exercises/:exerciseId/sets/:setId', async (c) => {
   const user = requireAuth(c);
   const workoutId = c.req.param('workoutId');
   const setId = c.req.param('setId');
-  const db = c.env.DB;
+  const originId = c.req.header('X-Origin-Id') || null;
 
-  // Verify workout belongs to user
-  const workout = await db.prepare(
-    'SELECT * FROM workouts WHERE id = ? AND user_id = ?'
-  ).bind(workoutId, user.id).first();
-
-  if (!workout) {
-    return c.json({ error: 'Workout not found' }, 404);
+  try {
+    await sessionStub(c, workoutId).deleteSet({
+      workoutId: Number(workoutId),
+      userId: user.id,
+      setId: Number(setId),
+      originId
+    });
+    return c.json({ message: 'Set deleted' });
+  } catch (err) {
+    return mapDoError(c, err);
   }
-
-  const result = await db.prepare(
-    'DELETE FROM sets WHERE id = ?'
-  ).bind(setId).run();
-
-  if (result.meta.changes === 0) {
-    return c.json({ error: 'Set not found' }, 404);
-  }
-
-  return c.json({ message: 'Set deleted' });
 });
 
 // Update exercise notes
