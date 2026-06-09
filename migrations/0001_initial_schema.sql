@@ -105,6 +105,11 @@ CREATE TABLE IF NOT EXISTS workout_exercises (
     program_exercise_id INTEGER,
     order_index INTEGER NOT NULL,
     notes TEXT,
+    -- Per-workout target set count (user-customizable). Present in production
+    -- but historically missing from the migration source — added here so fresh
+    -- databases reproduce the live schema. Existing DBs already have 0001
+    -- recorded as applied, so this edit never re-runs against them.
+    target_sets INTEGER,
     FOREIGN KEY (workout_id) REFERENCES workouts(id) ON DELETE CASCADE,
     FOREIGN KEY (exercise_id) REFERENCES exercises(id) ON DELETE CASCADE,
     FOREIGN KEY (program_exercise_id) REFERENCES program_exercises(id) ON DELETE SET NULL
