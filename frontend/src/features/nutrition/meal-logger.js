@@ -10,6 +10,7 @@ import { toast } from '@ui/Toast';
 import { playBarcodeDetected } from '@utils/audio';
 import { todayLocal } from '@utils/date';
 import { createDecoder, hasCameraSupport, mapPointsToDisplay } from './barcode-decoder.js';
+import { openMealConfirm } from './meal-confirm.js';
 
 let state = {
   mealType: 'snack',
@@ -51,19 +52,10 @@ export async function showLogMealModal(mealType = 'snack', preserveFoods = false
   state.mealType = mealType;
 
   const modal = openModal({
-    title: `Log ${mealType.charAt(0).toUpperCase() + mealType.slice(1)}`,
+    title: 'Add Foods',
     size: 'wide',
     content: String(html`
       <div class="stack stack-md">
-        <div class="meal-type-selector">
-          ${['breakfast', 'lunch', 'dinner', 'snack'].map((t) => html`
-            <label class="meal-type-label ${t === mealType ? 'is-selected' : ''}">
-              <input type="radio" name="meal-type-radio" value="${t}" ${t === mealType ? 'checked' : ''} />
-              ${t.charAt(0).toUpperCase() + t.slice(1)}
-            </label>
-          `)}
-        </div>
-
         <div class="form-group">
           <label class="form-label">Search foods</label>
           <input type="text" id="meal-food-search" class="input" placeholder="e.g., chicken breast, greek yogurt…" />
@@ -95,13 +87,20 @@ export async function showLogMealModal(mealType = 'snack', preserveFoods = false
     actions: [
       { label: 'Cancel', variant: 'btn-outline' },
       {
-        label: 'Save Meal',
+        label: 'Review & Log',
         primary: true,
         onClick: async (modalApi) => {
-          await saveMeal();
+          if (state.selectedFoods.length === 0) {
+            toast.warning('Add at least one food');
+            return;
+          }
+          // Capture the selection, then hand off to the unified Review & Log
+          // panel (meal type / name / save-as-reusable live there now).
+          const foods = state.selectedFoods.map(selectedFoodToDraft);
+          const name = buildSelectedMealName(state.selectedFoods);
           modalApi.close();
           resetState();
-          if (typeof window.loadNutrition === 'function') window.loadNutrition();
+          openMealConfirm({ title: 'Review & Log Meal', name, foods });
         }
       }
     ],
@@ -115,6 +114,32 @@ export async function showLogMealModal(mealType = 'snack', preserveFoods = false
   });
 }
 
+// Map a meal-logger selected food (per-serving macros on item.food, with a
+// real food_id) to the unified confirm-panel draft food shape.
+function selectedFoodToDraft(item) {
+  const f = item.food || {};
+  return {
+    name: f.name,
+    food_id: item.food_id || undefined,
+    quantity: item.quantity,
+    unit: item.unit,
+    calories: f.calories,
+    protein_g: f.protein_g,
+    carbs_g: f.carbs_g,
+    fat_g: f.fat_g,
+    fiber_g: f.fiber_g,
+    source: f.source,
+    source_id: f.source_id
+  };
+}
+
+function buildSelectedMealName(items, maxLength = 80) {
+  const names = (items || []).map((i) => i.food?.name).filter(Boolean);
+  if (!names.length) return 'Meal';
+  const joined = names.join(', ');
+  return joined.length <= maxLength ? joined : joined.slice(0, maxLength - 1) + '…';
+}
+
 function attachHandlers(modalEl) {
   // Search with debounce
   const searchInput = modalEl.querySelector('#meal-food-search');
@@ -122,15 +147,6 @@ function attachHandlers(modalEl) {
     if (state.searchDebounce) clearTimeout(state.searchDebounce);
     const query = e.target.value;
     state.searchDebounce = setTimeout(() => searchFoods(query), 300);
-  });
-
-  modalEl.addEventListener('change', (event) => {
-    if (event.target.name === 'meal-type-radio') {
-      state.mealType = event.target.value;
-      modalEl.querySelectorAll('.meal-type-label').forEach((l) => {
-        l.classList.toggle('is-selected', l.querySelector('input').checked);
-      });
-    }
   });
 
   modalEl.addEventListener('click', async (event) => {
@@ -372,38 +388,6 @@ function updateSelectedFoodsDisplay() {
   `);
 
   totalsCard.removeAttribute('hidden');
-}
-
-async function saveMeal() {
-  if (state.selectedFoods.length === 0) {
-    toast.warning('Add at least one food');
-    return;
-  }
-
-  try {
-    await api.post('/nutrition/meals', {
-      date: todayLocal(),
-      meal_type: state.mealType,
-      foods: state.selectedFoods.map((item) => {
-        const payload = {
-          quantity: item.quantity,
-          unit: item.unit
-        };
-        // For local-DB foods (already saved), send the id.
-        // For USDA / Open Food Facts results (id: null), send the full food
-        // object so the backend can persist it before linking to the meal.
-        if (item.food_id) {
-          payload.food_id = item.food_id;
-        } else if (item.food) {
-          payload.food = item.food;
-        }
-        return payload;
-      })
-    });
-    toast.success('Meal logged!');
-  } catch (err) {
-    toast.error(`Error: ${err.message}`);
-  }
 }
 
 // ============================================================================
@@ -888,17 +872,10 @@ async function lookupBarcode() {
                 <input type="number" id="scan-qty" class="input"
                        min="0.25" step="0.25" value="1"
                        style="max-width: 6rem;" />
-                <label class="form-label" style="margin: 0;">Meal</label>
-                <select id="scan-meal-type" class="input" style="flex: 1; min-width: 8rem;">
-                  <option value="breakfast" ${defaultMealType === 'breakfast' ? 'selected' : ''}>Breakfast</option>
-                  <option value="lunch" ${defaultMealType === 'lunch' ? 'selected' : ''}>Lunch</option>
-                  <option value="dinner" ${defaultMealType === 'dinner' ? 'selected' : ''}>Dinner</option>
-                  <option value="snack" ${defaultMealType === 'snack' ? 'selected' : ''}>Snack</option>
-                </select>
               </div>
               <div class="cluster" style="margin-top: var(--space-3);">
                 <button class="btn btn-outline" id="scan-log-now" style="flex: 1;"
-                        title="Log just this single item now (skip building a meal)">
+                        title="Review & log just this single item (skip building a meal)">
                   <i class="fas fa-check"></i> Log Just This
                 </button>
                 <button class="btn btn-outline" id="scan-save-meal"
@@ -961,22 +938,28 @@ async function lookupBarcode() {
       }
     });
 
-    // 1) Log It — quick-add a single-food meal to today in the chosen meal slot.
+    // 1) Log Just This — hand the single scanned item to the unified Review &
+    //    Log panel (meal type / name / save-as-reusable live there now).
     document.getElementById('scan-log-now')?.addEventListener('click', async () => {
       const qty = parseFloat(document.getElementById('scan-qty')?.value) || 1;
-      const mealType = document.getElementById('scan-meal-type')?.value || defaultMealType;
       try {
         const toAdd = await ensureFoodPersisted(food);
-        await api.post('/nutrition/quick-add', {
-          food_id: toAdd.id,
-          quantity: qty,
-          unit: 'serving',
-          meal_type: mealType,
-          date: todayLocal()
+        closeTopModal(); // close the scanner (stops camera, clears pendingScans)
+        openMealConfirm({
+          title: 'Review & Log Meal',
+          name: toAdd.name,
+          foods: [{
+            name: toAdd.name,
+            food_id: toAdd.id,
+            quantity: qty,
+            unit: 'serving',
+            calories: toAdd.calories,
+            protein_g: toAdd.protein_g,
+            carbs_g: toAdd.carbs_g,
+            fat_g: toAdd.fat_g,
+            fiber_g: toAdd.fiber_g
+          }]
         });
-        closeTopModal();
-        toast.success(`Logged ${toAdd.name}`);
-        if (typeof window.loadNutrition === 'function') window.loadNutrition();
       } catch (err) {
         toast.error(`Error logging food: ${err.message}`);
       }
@@ -995,10 +978,9 @@ async function lookupBarcode() {
       }
       try {
         const toAdd = await ensureFoodPersisted(food);
-        const mealType = document.getElementById('scan-meal-type')?.value || defaultMealType;
         const res = await api.post('/nutrition/saved-meals', {
           name: toAdd.name,
-          meal_type: mealType,
+          meal_type: defaultMealType,
           // One-food template: copy per-serving macros from the food row.
           foods: [{
             food_id: toAdd.id,
@@ -1031,10 +1013,9 @@ async function lookupBarcode() {
     document.getElementById('scan-build-meal')?.addEventListener('click', async () => {
       try {
         const toAdd = await ensureFoodPersisted(food);
-        const mealType = document.getElementById('scan-meal-type')?.value || defaultMealType;
         state.selectedFoods.push({ food_id: toAdd.id, food: toAdd, quantity: 1, unit: 'serving' });
         closeTopModal();
-        await showLogMealModal(mealType, /* preserveFoods */ true);
+        await showLogMealModal(defaultMealType, /* preserveFoods */ true);
       } catch (err) {
         toast.error(`Error: ${err.message}`);
       }
@@ -1143,13 +1124,6 @@ function renderPendingScansPanel() {
   }
 
   const totals = computePendingTotals(items);
-  const defaultMealType = autoMealTypeByTime();
-
-  // Preserve user choices across re-renders (when adding/removing/qty change).
-  const prevMealType = document.getElementById('pending-meal-type')?.value;
-  const selectedMealType = ['breakfast', 'lunch', 'dinner', 'snack'].includes(prevMealType)
-    ? prevMealType
-    : defaultMealType;
 
   panel.hidden = false;
   panel.innerHTML = String(html`
@@ -1212,66 +1186,38 @@ function renderPendingScansPanel() {
         <span class="text-warning">${totals.fat_g.toFixed(1)}g F</span>
       </div>
 
-      <div class="form-group" style="margin-top: var(--space-3); margin-bottom: var(--space-2);">
-        <label class="form-label" for="pending-meal-type">Meal</label>
-        <select id="pending-meal-type" class="select">
-          <option value="breakfast" ${selectedMealType === 'breakfast' ? 'selected' : ''}>Breakfast</option>
-          <option value="lunch" ${selectedMealType === 'lunch' ? 'selected' : ''}>Lunch</option>
-          <option value="dinner" ${selectedMealType === 'dinner' ? 'selected' : ''}>Dinner</option>
-          <option value="snack" ${selectedMealType === 'snack' ? 'selected' : ''}>Snack</option>
-        </select>
-      </div>
-
       <button class="btn btn-primary btn-block"
               data-action="log-pending-meal">
         <i class="fas fa-check"></i>
-        Log Meal · ${Math.round(totals.calories)} cal
+        Review &amp; Log · ${Math.round(totals.calories)} cal
       </button>
     </div>
   `);
 }
 
-async function logPendingMeal() {
+function logPendingMeal() {
   if (state.pendingScans.length === 0) {
     toast.warning('Scan at least one item first.');
     return;
   }
 
-  const mealType = document.getElementById('pending-meal-type')?.value || autoMealTypeByTime();
   const mealName = buildPendingMealName(state.pendingScans);
-  const itemCount = state.pendingScans.length;
+  // Capture the scanned items as draft foods BEFORE closing the scanner —
+  // onClose clears state.pendingScans.
+  const foods = state.pendingScans.map((it) => ({
+    name: it.food?.name,
+    food_id: it.food_id,
+    quantity: it.quantity,
+    unit: it.unit,
+    calories: it.food?.calories,
+    protein_g: it.food?.protein_g,
+    carbs_g: it.food?.carbs_g,
+    fat_g: it.food?.fat_g,
+    fiber_g: it.food?.fiber_g
+  }));
 
-  const logBtn = document.querySelector('[data-action="log-pending-meal"]');
-  const originalHTML = logBtn?.innerHTML || '';
-  if (logBtn) {
-    logBtn.disabled = true;
-    logBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Logging…';
-  }
-
-  try {
-    await api.post('/nutrition/meals', {
-      date: todayLocal(),
-      meal_type: mealType,
-      name: mealName,
-      foods: state.pendingScans.map((it) => ({
-        food_id: it.food_id,
-        quantity: it.quantity,
-        unit: it.unit
-      }))
-    });
-
-    state.pendingScans = [];
-    renderPendingScansPanel();
-    closeTopModal();
-    toast.success(`Logged ${mealType}: ${itemCount} ${itemCount === 1 ? 'item' : 'items'}`);
-    if (typeof window.loadNutrition === 'function') window.loadNutrition();
-  } catch (err) {
-    toast.error(`Error logging meal: ${err.message}`);
-    if (logBtn) {
-      logBtn.disabled = false;
-      logBtn.innerHTML = originalHTML;
-    }
-  }
+  closeTopModal(); // stops camera + clears pendingScans via onClose
+  openMealConfirm({ title: 'Review & Log Meal', name: mealName, foods });
 }
 
 // Legacy compat exports

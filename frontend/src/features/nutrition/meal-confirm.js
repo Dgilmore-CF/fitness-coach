@@ -65,6 +65,12 @@ function computeTotals(draft) {
 /** Map a draft food (per-unit macros) to the POST /nutrition/meals food shape. */
 function toMealFood(f) {
   const unit = f.unit || 'serving';
+  // Already-persisted local foods (manual search, barcode) carry a food_id —
+  // link to the existing row (backend computes macros) instead of inlining a
+  // duplicate food.
+  if (f.food_id) {
+    return { food_id: f.food_id, quantity: Number(f.quantity) || 1, unit };
+  }
   return {
     quantity: Number(f.quantity) || 1,
     unit,
