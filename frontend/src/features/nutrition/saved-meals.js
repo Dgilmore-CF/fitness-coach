@@ -9,6 +9,10 @@ import { delegate } from '@core/delegate';
 import { openModal, confirmDialog, closeTopModal } from '@ui/Modal';
 import { toast } from '@ui/Toast';
 import { todayLocal, daysAgoLocal, dateLocal, nowLocalISO } from '@utils/date';
+import { openMealConfirm } from '@features/nutrition/meal-confirm';
+
+// Meal types incl. 'any' for saved-meal templates that aren't slot-specific.
+const SAVED_MEAL_TYPES = ['any', 'breakfast', 'lunch', 'dinner', 'snack'];
 
 // ============================================================================
 // Saved meals list (preview in Nutrition tab)
@@ -159,6 +163,16 @@ function renderSavedMealForm({ mode, mealId, meal = {} }) {
           <input type="text" id="sm-description" class="input" value="${meal.description || ''}" />
         </div>
         <div class="form-group">
+          <label class="form-label">Default meal</label>
+          <select id="sm-meal-type" class="select">
+            ${SAVED_MEAL_TYPES.map((mt) => html`
+              <option value="${mt}" ${mt === (meal.meal_type || 'any') ? 'selected' : ''}>
+                ${mt === 'any' ? 'Any time' : mt.charAt(0).toUpperCase() + mt.slice(1)}
+              </option>
+            `)}
+          </select>
+        </div>
+        <div class="form-group">
           <label class="form-label">Recipe URL (optional — we'll try to parse macros)</label>
           <div class="cluster">
             <input type="url" id="sm-recipe-url" class="input" value="${meal.recipe_url || ''}" placeholder="https://…" style="flex: 1;" />
@@ -197,6 +211,7 @@ function renderSavedMealForm({ mode, mealId, meal = {} }) {
           const payload = {
             name: modalApi.element.querySelector('#sm-name').value.trim(),
             description: modalApi.element.querySelector('#sm-description').value.trim(),
+            meal_type: modalApi.element.querySelector('#sm-meal-type').value,
             recipe_url: modalApi.element.querySelector('#sm-recipe-url').value.trim(),
             calories: parseFloat(modalApi.element.querySelector('#sm-calories').value) || 0,
             protein_g: parseFloat(modalApi.element.querySelector('#sm-protein').value) || 0,
@@ -345,16 +360,16 @@ export function showQuickMacroEntry() {
           </div>
         </div>
 
-        <label class="cluster" style="gap: var(--space-2); cursor: pointer;">
-          <input type="checkbox" id="qm-save-too" />
-          <span>Also save as a reusable meal</span>
-        </label>
+        <div class="form-group">
+          <label class="form-label">Meal name (optional)</label>
+          <input type="text" id="qm-name" class="input" placeholder="e.g., Protein shake" />
+        </div>
       </div>
     `),
     actions: [
       { label: 'Cancel', variant: 'btn-outline' },
       {
-        label: 'Log Meal',
+        label: 'Continue',
         primary: true,
         onClick: async (modalApi) => {
           await logQuickMacros(modalApi);
@@ -381,40 +396,22 @@ async function logQuickMacros(modalApi) {
   const protein = parseFloat(el.querySelector('#qm-protein').value) || 0;
   const carbs = parseFloat(el.querySelector('#qm-carbs').value) || 0;
   const fat = parseFloat(el.querySelector('#qm-fat').value) || 0;
-  const saveToo = el.querySelector('#qm-save-too').checked;
+  const name = el.querySelector('#qm-name')?.value.trim() || '';
 
   if (!calories && !protein && !carbs && !fat) {
     toast.warning('Enter at least one value');
     return;
   }
 
-  try {
-    // Log as a custom meal (no foods, just macros)
-    await api.post('/nutrition/meals', {
-      date: todayLocal(),
-      meal_type: 'snack',
-      custom_macros: { calories, protein_g: protein, carbs_g: carbs, fat_g: fat }
-    });
-
-    if (saveToo) {
-      const name = prompt('Name this meal for future use:');
-      if (name) {
-        await api.post('/nutrition/saved-meals', {
-          name,
-          calories,
-          protein_g: protein,
-          carbs_g: carbs,
-          fat_g: fat
-        });
-      }
-    }
-
-    toast.success('Meal logged!');
-    modalApi.close();
-    if (typeof window.loadNutrition === 'function') window.loadNutrition();
-  } catch (err) {
-    toast.error(`Error: ${err.message}`);
-  }
+  // Hand off to the unified confirm panel so quick macros get the same
+  // meal-type / name / save-as-reusable controls as every other entry method.
+  modalApi.close();
+  openMealConfirm({
+    title: 'Review & Log Meal',
+    sourceLabel: 'Quick macros',
+    name,
+    customMacros: { calories, protein_g: protein, carbs_g: carbs, fat_g: fat }
+  });
 }
 
 export function applyMacroPreset(calories, protein, carbs, fat) {

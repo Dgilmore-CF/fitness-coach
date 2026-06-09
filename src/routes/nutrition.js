@@ -2026,6 +2026,31 @@ nutrition.get('/saved-meals', async (c) => {
   return c.json({ saved_meals: meals.results || [] });
 });
 
+// Get a single saved meal (with its child foods) — used to prefill the edit form.
+nutrition.get('/saved-meals/:id', async (c) => {
+  const user = requireAuth(c);
+  const db = c.env.DB;
+  const mealId = c.req.param('id');
+
+  const meal = await db.prepare(
+    'SELECT * FROM saved_meals WHERE id = ? AND user_id = ?'
+  ).bind(mealId, user.id).first();
+
+  if (!meal) {
+    return c.json({ error: 'Saved meal not found' }, 404);
+  }
+
+  const foods = await db.prepare(
+    `SELECT smf.*, f.name AS food_name
+     FROM saved_meal_foods smf
+     LEFT JOIN foods f ON smf.food_id = f.id
+     WHERE smf.saved_meal_id = ?`
+  ).bind(mealId).all();
+
+  meal.foods = foods.results || [];
+  return c.json({ meal });
+});
+
 // Create or UPDATE a saved meal by name.
 //
 // De-dupes on (user_id, name) so the barcode-save flow (which calls this
@@ -2135,8 +2160,8 @@ nutrition.post('/saved-meals', async (c) => {
   });
 });
 
-// Update a saved meal
-nutrition.put('/saved-meals/:id', async (c) => {
+// Update a saved meal. Accept both PUT and PATCH (the frontend uses PATCH).
+nutrition.on(['PUT', 'PATCH'], '/saved-meals/:id', async (c) => {
   const user = requireAuth(c);
   const mealId = c.req.param('id');
   const body = await c.req.json();
@@ -2159,7 +2184,12 @@ nutrition.put('/saved-meals/:id', async (c) => {
          updated_at = CURRENT_TIMESTAMP
      WHERE id = ? AND user_id = ?
      RETURNING *`
-  ).bind(name, description, meal_type, calories, protein_g, carbs_g, fat_g, fiber_g, recipe_url, is_favorite, mealId, user.id).first();
+  ).bind(
+    name ?? null, description ?? null, meal_type ?? null,
+    calories ?? null, protein_g ?? null, carbs_g ?? null, fat_g ?? null,
+    fiber_g ?? null, recipe_url ?? null, is_favorite ?? null,
+    mealId, user.id
+  ).first();
   
   if (!meal) {
     return c.json({ error: 'Meal not found' }, 404);

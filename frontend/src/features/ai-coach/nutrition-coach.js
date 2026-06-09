@@ -13,10 +13,7 @@ import { api } from '@core/api';
 import { openModal, closeTopModal } from '@ui/Modal';
 import { toast } from '@ui/Toast';
 import { withLoading } from '@ui/LoadingOverlay';
-import { todayLocal } from '@utils/date';
-import { autoMealTypeByTime } from '@features/nutrition/meal-logger';
-
-const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'];
+import { openMealConfirm } from '@features/nutrition/meal-confirm';
 
 // Build a human-friendly meal name from parsed foods.
 // e.g. ['Eggs', 'Whole-wheat toast', 'Banana'] → 'Eggs, Whole-wheat toast, Banana'
@@ -275,37 +272,22 @@ export async function showMealSuggestion(mealType = 'next') {
   });
 }
 
-async function logSuggestionAsMeal(suggestion) {
+function logSuggestionAsMeal(suggestion) {
   const macros = suggestion.macros || {};
-  try {
-    await api.post('/nutrition/meals', {
-      date: todayLocal(),
-      meal_type: 'snack',
-      name: suggestion.name,
-      // Inline-save the AI suggestion as a food so the backend records the
-      // macros into meal_foods + nutrition_log properly.
-      foods: [{
-        food: {
-          name: suggestion.name || 'AI suggested meal',
-          source: 'ai',
-          source_id: `ai_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-          serving_size: 1,
-          serving_unit: 'serving',
-          serving_description: '1 serving',
-          calories: Math.round(macros.calories || 0),
-          protein_g: Math.round(macros.protein_g || 0),
-          carbs_g: Math.round(macros.carbs_g || 0),
-          fat_g: Math.round(macros.fat_g || 0)
-        },
-        quantity: 1,
-        unit: 'serving'
-      }]
-    });
-    toast.success(`Logged: ${suggestion.name}`);
-    if (typeof window.loadNutrition === 'function') window.loadNutrition();
-  } catch (err) {
-    toast.error(`Error logging meal: ${err.message}`);
-  }
+  // Route through the unified confirm panel so an AI suggestion gets the same
+  // meal-type / name / save-as-reusable controls as every other entry method.
+  openMealConfirm({
+    title: 'Review & Log Meal',
+    sourceLabel: 'AI suggestion',
+    name: suggestion.name || 'AI suggested meal',
+    customMacros: {
+      calories: Math.round(macros.calories || 0),
+      protein_g: Math.round(macros.protein_g || 0),
+      carbs_g: Math.round(macros.carbs_g || 0),
+      fat_g: Math.round(macros.fat_g || 0),
+      fiber_g: Math.round(macros.fiber_g || 0)
+    }
+  });
 }
 
 // ============================================================================
@@ -314,7 +296,6 @@ async function logSuggestionAsMeal(suggestion) {
 
 export function showParseMeal() {
   let parseResult = null;
-  const defaultMealType = autoMealTypeByTime();
 
   const modal = openModal({
     title: 'Describe Your Meal',
@@ -323,17 +304,6 @@ export function showParseMeal() {
       <div class="stack stack-md">
         <div class="text-muted" style="font-size: var(--text-sm);">
           Type what you ate in plain language. The AI coach will estimate macros.
-        </div>
-
-        <div class="form-group">
-          <label class="form-label" for="parse-meal-type">Meal</label>
-          <select id="parse-meal-type" class="select">
-            ${MEAL_TYPES.map((mt) => html`
-              <option value="${mt}" ${mt === defaultMealType ? 'selected' : ''}>
-                ${mt.charAt(0).toUpperCase() + mt.slice(1)}
-              </option>
-            `)}
-          </select>
         </div>
 
         <div class="form-group">
@@ -351,7 +321,7 @@ export function showParseMeal() {
             <i class="fas fa-magic"></i> Parse with AI
           </button>
           <div class="text-muted" style="font-size: var(--text-xs);">
-            <i class="fas fa-info-circle"></i> Review before logging — AI estimates vary
+            <i class="fas fa-info-circle"></i> You'll review meal type & macros next
           </div>
         </div>
 
@@ -361,19 +331,32 @@ export function showParseMeal() {
     actions: [
       { label: 'Cancel', variant: 'btn-outline' },
       {
-        label: 'Log Meal',
+        label: 'Review & Log',
         primary: true,
         onClick: async (m) => {
           if (!parseResult || parseResult.foods.length === 0) {
             toast.warning('Parse a meal first.');
             return;
           }
-          const mealTypeEl = m.element.querySelector('#parse-meal-type');
-          const mealType = MEAL_TYPES.includes(mealTypeEl?.value)
-            ? mealTypeEl.value
-            : defaultMealType;
-          await logParsedMeal(parseResult, { mealType });
           m.close();
+          // Hand off to the unified confirm panel — same controls (meal type,
+          // name, save-as-reusable) as every other entry method.
+          openMealConfirm({
+            title: 'Review & Log Meal',
+            sourceLabel: 'AI estimate',
+            name: buildMealNameFromFoods(parseResult.foods),
+            foods: (parseResult.foods || []).map((f) => ({
+              name: f.name,
+              quantity: f.quantity,
+              unit: f.unit,
+              calories: f.calories,
+              protein_g: f.protein_g,
+              carbs_g: f.carbs_g,
+              fat_g: f.fat_g,
+              fiber_g: f.fiber_g,
+              source: 'ai'
+            }))
+          });
         }
       }
     ],
@@ -475,35 +458,4 @@ function renderParseResults({ foods, totals }) {
   `;
 }
 
-async function logParsedMeal(parseResult, { mealType } = {}) {
-  const safeMealType = MEAL_TYPES.includes(mealType) ? mealType : autoMealTypeByTime();
-  const mealName = buildMealNameFromFoods(parseResult.foods);
-  try {
-    await api.post('/nutrition/meals', {
-      date: todayLocal(),
-      meal_type: safeMealType,
-      name: mealName,
-      foods: parseResult.foods.map((f) => ({
-        quantity: f.quantity,
-        unit: f.unit,
-        food: {
-          name: f.name,
-          source: 'ai',
-          source_id: `ai_parsed_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-          serving_size: 1,
-          serving_unit: f.unit,
-          serving_description: `1 ${f.unit}`,
-          calories: f.calories,
-          protein_g: f.protein_g,
-          carbs_g: f.carbs_g,
-          fat_g: f.fat_g,
-          fiber_g: f.fiber_g
-        }
-      }))
-    });
-    toast.success(`Logged ${safeMealType}: ${mealName}`);
-    if (typeof window.loadNutrition === 'function') window.loadNutrition();
-  } catch (err) {
-    toast.error(`Error logging meal: ${err.message}`);
-  }
-}
+
