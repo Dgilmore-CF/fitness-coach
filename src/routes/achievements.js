@@ -72,7 +72,7 @@ achievements.get('/leaderboard', async (c) => {
       COUNT(*) as total_workouts
     FROM workouts w
     JOIN users u ON w.user_id = u.id
-    WHERE w.status = 'completed'
+    WHERE w.completed = 1
     GROUP BY u.id
     ORDER BY total_workouts DESC
     LIMIT 10

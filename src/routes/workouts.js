@@ -503,7 +503,7 @@ workouts.post('/retroactive', async (c) => {
     for (let j = 0; j < (ex.sets || []).length; j++) {
       const set = ex.sets[j];
       await db.prepare(
-        `INSERT INTO sets (workout_exercise_id, set_number, weight_kg, reps, completed, logged_at)
+        `INSERT INTO sets (workout_exercise_id, set_number, weight_kg, reps, completed, created_at)
          VALUES (?, ?, ?, ?, 1, ?)`
       ).bind(
         workoutExercise.id,

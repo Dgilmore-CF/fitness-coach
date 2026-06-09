@@ -590,11 +590,12 @@ analytics.get('/recommendations', async (c) => {
   const db = c.env.DB;
   const limit = c.req.query('limit') || 10;
 
+  // ai_recommendations was rebuilt in migration 0009: no more exercise_id /
+  // accepted columns. Active recs are status='active'.
   const recommendations = await db.prepare(
-    `SELECT r.*, e.name as exercise_name
+    `SELECT r.*
      FROM ai_recommendations r
-     JOIN exercises e ON r.exercise_id = e.id
-     WHERE r.user_id = ? AND r.accepted IS NULL
+     WHERE r.user_id = ? AND r.status = 'active'
      ORDER BY r.created_at DESC
      LIMIT ?`
   ).bind(user.id, limit).all();
@@ -610,9 +611,13 @@ analytics.post('/recommendations/:id/respond', async (c) => {
   const { accepted } = body;
   const db = c.env.DB;
 
+  // Map the legacy boolean to the post-0009 status workflow.
+  const status = accepted ? 'applied' : 'dismissed';
   const recommendation = await db.prepare(
-    'UPDATE ai_recommendations SET accepted = ? WHERE id = ? AND user_id = ? RETURNING *'
-  ).bind(accepted, recommendationId, user.id).first();
+    `UPDATE ai_recommendations
+     SET status = ?, applied_at = CASE WHEN ? = 'applied' THEN CURRENT_TIMESTAMP ELSE applied_at END
+     WHERE id = ? AND user_id = ? RETURNING *`
+  ).bind(status, status, recommendationId, user.id).first();
 
   if (!recommendation) {
     return c.json({ error: 'Recommendation not found' }, 404);

@@ -1273,18 +1273,36 @@ export async function getAIRecommendations(db, ai, userId, workoutId) {
     }
 
     if (recommendation) {
-      // Save recommendation
+      // Save recommendation using the current ai_recommendations schema
+      // (title/description/category/priority/action_items/reasoning…). The
+      // legacy exercise_id/current_weight_kg columns were removed in 0009, so
+      // we fold that detail into the human-readable fields + action_items.
+      const titleByType = {
+        increase_weight: `${exercise.name}: Increase weight`,
+        decrease_weight: `${exercise.name}: Reduce weight`,
+        increase_volume: `${exercise.name}: Add volume`
+      };
+      const priorityByType = {
+        increase_weight: 'medium',
+        decrease_weight: 'high',
+        increase_volume: 'low'
+      };
+      const actionItems = [];
+      if (recommendation.suggested_weight != null) {
+        actionItems.push(
+          `Target ~${recommendation.suggested_weight}kg next session (last top set ${recommendation.current_weight}kg)`
+        );
+      }
       await db.prepare(
-        `INSERT INTO ai_recommendations 
-         (user_id, exercise_id, recommendation_type, recommendation, current_weight_kg, suggested_weight_kg, reasoning)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO ai_recommendations
+         (user_id, title, description, category, priority, action_items, reasoning, status)
+         VALUES (?, ?, ?, 'progression', ?, ?, ?, 'active')`
       ).bind(
         userId,
-        exercise.exercise_id,
-        recommendation.type,
+        titleByType[recommendation.type] || `${exercise.name}: Adjustment`,
         recommendation.message,
-        recommendation.current_weight,
-        recommendation.suggested_weight,
+        priorityByType[recommendation.type] || 'medium',
+        JSON.stringify(actionItems),
         recommendation.reasoning
       ).run();
     }
