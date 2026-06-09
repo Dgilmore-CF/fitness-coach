@@ -190,6 +190,17 @@ export class WorkoutSessionDO extends DurableObject {
     await this._touch();
   }
 
+  /** Register an exercise added mid-workout so set logging knows its type. */
+  async addExercise({ workoutExerciseId, isCardio }) {
+    this._sql().exec(
+      `INSERT INTO exercise_meta (workout_exercise_id, is_cardio) VALUES (?, ?)
+       ON CONFLICT(workout_exercise_id) DO UPDATE SET is_cardio = excluded.is_cardio`,
+      Number(workoutExerciseId),
+      isCardio ? 1 : 0
+    );
+    return { ok: true };
+  }
+
   async _assertOwner(workoutId, userId) {
     await this._ensureInit(workoutId, userId);
     const owner = await this._get('userId');

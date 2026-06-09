@@ -676,11 +676,27 @@ workouts.post('/:id/exercises', async (c) => {
     'SELECT COALESCE(MAX(order_index), -1) as max_order FROM workout_exercises WHERE workout_id = ?'
   ).bind(workoutId).first();
 
+  // Coerce undefined → null: D1 rejects undefined bindings, and ad-hoc adds
+  // (mid-workout) carry no program_exercise_id.
   const workoutExercise = await db.prepare(
     `INSERT INTO workout_exercises (workout_id, exercise_id, program_exercise_id, order_index)
      VALUES (?, ?, ?, ?)
      RETURNING *`
-  ).bind(workoutId, exercise_id, program_exercise_id, maxOrder.max_order + 1).first();
+  ).bind(workoutId, exercise_id, program_exercise_id ?? null, maxOrder.max_order + 1).first();
+
+  // Teach the live DO about the new exercise so set logging knows whether it's
+  // cardio without a D1 round-trip. Best-effort (the DO self-heals otherwise).
+  try {
+    const meta = await db.prepare(
+      'SELECT muscle_group FROM exercises WHERE id = ?'
+    ).bind(exercise_id).first();
+    await sessionStub(c, workoutId).addExercise({
+      workoutExerciseId: workoutExercise.id,
+      isCardio: meta?.muscle_group === 'Cardio'
+    });
+  } catch (err) {
+    console.error('DO addExercise failed (will self-heal):', err);
+  }
 
   return c.json({ workout_exercise: workoutExercise });
 });

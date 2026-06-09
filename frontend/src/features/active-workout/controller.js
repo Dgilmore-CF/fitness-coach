@@ -786,7 +786,7 @@ async function adjustTargetSets(exerciseId, adjustment) {
 
   const newTarget = Math.max(1, Math.min(10, (exercise.target_sets || 3) + adjustment));
   try {
-    await api.patch(`/workouts/${workout.id}/exercises/${exerciseId}`, {
+    await api.patch(`/workouts/${workout.id}/exercises/${exerciseId}/target-sets`, {
       target_sets: newTarget
     });
     exercise.target_sets = newTarget;
