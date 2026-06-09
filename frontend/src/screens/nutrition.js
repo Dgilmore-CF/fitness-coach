@@ -14,7 +14,8 @@ import { delegate } from '@core/delegate';
 import { toast } from '@ui/Toast';
 import { progressRing } from '@ui/ProgressRing';
 import { formatDate, formatNumber } from '@utils/formatters';
-import { todayLocal, nowLocalISO } from '@utils/date';
+import { todayLocal } from '@utils/date';
+import { autoMealTypeByTime } from '@features/nutrition/meal-logger';
 
 // =============================================================================
 // Rendering helpers
@@ -100,102 +101,39 @@ function renderMacroRings(daily) {
   `;
 }
 
-function renderQuickLog() {
-  return html`
-    <div class="stack stack-sm">
-      <div class="meal-type-grid">
-        ${[
-          { type: 'breakfast', label: 'Breakfast', icon: 'fa-sun' },
-          { type: 'lunch', label: 'Lunch', icon: 'fa-cloud-sun' },
-          { type: 'dinner', label: 'Dinner', icon: 'fa-moon' },
-          { type: 'snack', label: 'Snack', icon: 'fa-cookie' }
-        ].map((m) => html`
-          <button class="meal-type-btn" data-action="log-meal" data-meal-type="${m.type}">
-            <i class="fas ${m.icon}"></i>
-            <span>${m.label}</span>
-          </button>
-        `)}
-      </div>
-      <div class="quick-action-grid">
-        <button class="btn btn-outline" data-action="scan-barcode">
-          <i class="fas fa-barcode"></i> Scan
-        </button>
-        <button class="btn btn-outline" data-action="quick-macros">
-          <i class="fas fa-calculator"></i> Quick Macros
-        </button>
-        <button class="btn btn-outline" data-action="parse-meal">
-          <i class="fas fa-magic"></i> Parse Text
-        </button>
-        <button class="btn btn-outline" data-action="saved-meals">
-          <i class="fas fa-bookmark"></i> Saved
-        </button>
-      </div>
-    </div>
-  `;
-}
+// Unified "Add to Today" card. Every way of getting food/macros in is a single
+// method chip; all of them funnel into the shared Review & Log panel (or their
+// native picker), so the experience is consistent regardless of method. The AI
+// coach actions (suggest / analyze) are folded in here too.
+const ADD_METHODS = [
+  { action: 'log-meal', icon: 'fa-magnifying-glass', label: 'Search foods', sub: 'Database & USDA' },
+  { action: 'scan-barcode', icon: 'fa-barcode', label: 'Scan barcode', sub: 'Packaged foods' },
+  { action: 'parse-meal', icon: 'fa-wand-magic-sparkles', label: 'Describe it', sub: 'AI estimate' },
+  { action: 'quick-macros', icon: 'fa-calculator', label: 'Quick macros', sub: 'Enter numbers' },
+  { action: 'ai-suggest-meal', icon: 'fa-utensils', label: 'Suggest a meal', sub: 'AI for your goals' },
+  { action: 'saved-meals', icon: 'fa-bookmark', label: 'Saved meals', sub: 'Reuse & manage' },
+  { action: 'quick-supplements', icon: 'fa-bolt', label: 'Protein · Water · Creatine', sub: 'Quick add', wide: true }
+];
 
-function renderAICoachCard() {
-  return html`
-    <div class="card ai-nutrition-coach-card">
-      <div class="ai-nutrition-coach-header">
-        <div class="ai-nutrition-coach-icon">
-          <i class="fas fa-robot"></i>
-        </div>
-        <div>
-          <h3 style="margin: 0; color: inherit;">AI Nutrition Coach</h3>
-          <p style="margin: 4px 0 0; opacity: 0.9; font-size: var(--text-sm);">
-            Personalized insights based on your intake and goals
-          </p>
-        </div>
-      </div>
-      <div class="cluster" style="gap: var(--space-2);">
-        <button class="btn ai-nutrition-btn" data-action="ai-analyze">
-          <i class="fas fa-chart-line"></i> Analyze My Day
-        </button>
-        <button class="btn ai-nutrition-btn" data-action="ai-suggest-meal">
-          <i class="fas fa-utensils"></i> What Should I Eat?
-        </button>
-        <button class="btn ai-nutrition-btn" data-action="parse-meal">
-          <i class="fas fa-magic"></i> Parse Meal
-        </button>
-      </div>
-    </div>
-  `;
-}
-
-function renderQuickAddForm() {
+function renderAddCard() {
   return html`
     <div class="card">
       <div class="card-header">
-        <h3 class="card-title" style="font-size: var(--text-base);">
-          <i class="fas fa-bolt"></i> Quick Add
-        </h3>
-      </div>
-      <div class="stack stack-sm">
-        <div class="quick-add-row">
-          <label>Protein</label>
-          <div class="quick-add-input-group">
-            <input type="number" class="input" id="nq-protein" placeholder="0" min="0" step="1" />
-            <span class="quick-add-unit">g</span>
-          </div>
-        </div>
-        <div class="quick-add-row">
-          <label>Water</label>
-          <div class="quick-add-input-group">
-            <input type="number" class="input" id="nq-water" placeholder="0" min="0" step="100" />
-            <span class="quick-add-unit">ml</span>
-          </div>
-        </div>
-        <div class="quick-add-row">
-          <label>Creatine</label>
-          <div class="quick-add-input-group">
-            <input type="number" class="input" id="nq-creatine" placeholder="0" min="0" step="0.5" />
-            <span class="quick-add-unit">g</span>
-          </div>
-        </div>
-        <button class="btn btn-primary btn-block" data-action="log-all-quick">
-          <i class="fas fa-plus-circle"></i> Log All
+        <h2 class="card-title"><i class="fas fa-plus-circle"></i> Add to Today</h2>
+        <button class="btn btn-ghost btn-sm" data-action="ai-analyze" title="AI insights on today's intake">
+          <i class="fas fa-robot"></i> Analyze my day
         </button>
+      </div>
+      <div class="nut-add-grid">
+        ${ADD_METHODS.map((m) => html`
+          <button class="nut-method ${m.wide ? 'is-wide' : ''}" data-action="${m.action}">
+            <span class="nut-method-icon"><i class="fas ${m.icon}"></i></span>
+            <span class="nut-method-text">
+              <strong>${m.label}</strong>
+              <span class="text-muted">${m.sub}</span>
+            </span>
+          </button>
+        `)}
       </div>
     </div>
   `;
@@ -307,45 +245,6 @@ function delegateToLegacy(fnName, ...args) {
   }
 }
 
-async function logAllQuick() {
-  const protein = parseFloat(document.getElementById('nq-protein').value) || 0;
-  const water = parseFloat(document.getElementById('nq-water').value) || 0;
-  const creatine = parseFloat(document.getElementById('nq-creatine').value) || 0;
-
-  if (!protein && !water && !creatine) {
-    toast.warning('Enter an amount in at least one field.');
-    return;
-  }
-
-  try {
-    // Stamp each entry with a local-time ISO so it's filed under the user's
-    // current calendar day, not UTC's (which may be tomorrow in the evening
-    // for Western-Hemisphere users).
-    const loggedAt = nowLocalISO();
-    const ops = [];
-    if (protein > 0) {
-      ops.push(api.post('/nutrition/entries', { entry_type: 'protein', amount: protein, unit: 'g', logged_at: loggedAt }));
-    }
-    if (water > 0) {
-      ops.push(api.post('/nutrition/entries', { entry_type: 'water', amount: water, unit: 'ml', logged_at: loggedAt }));
-    }
-    if (creatine > 0) {
-      ops.push(api.post('/nutrition/entries', { entry_type: 'creatine', amount: creatine, unit: 'g', logged_at: loggedAt }));
-    }
-
-    await Promise.all(ops);
-
-    document.getElementById('nq-protein').value = '';
-    document.getElementById('nq-water').value = '';
-    document.getElementById('nq-creatine').value = '';
-
-    toast.success('Nutrition logged!');
-    loadNutrition();
-  } catch (err) {
-    toast.error(`Error logging nutrition: ${err.message}`);
-  }
-}
-
 /**
  * Rebuild the daily nutrition_log totals from the ground-truth rows
  * (meals + nutrition_entries) for the last 30 days, then refresh the
@@ -381,7 +280,9 @@ function attachNutritionHandlers(container) {
 
     switch (action) {
       case 'log-meal':
-        delegateToLegacy('showLogMealModal', target.getAttribute('data-meal-type'));
+        // Default to the time-appropriate meal; the logger still has its own
+        // meal-type radio for overrides.
+        delegateToLegacy('showLogMealModal', target.getAttribute('data-meal-type') || autoMealTypeByTime());
         break;
       case 'scan-barcode':
         delegateToLegacy('showBarcodeScanner');
@@ -389,11 +290,11 @@ function attachNutritionHandlers(container) {
       case 'quick-macros':
         delegateToLegacy('showQuickMacroEntry');
         break;
+      case 'quick-supplements':
+        delegateToLegacy('showQuickAddSupplements');
+        break;
       case 'saved-meals':
         delegateToLegacy('showSavedMeals');
-        break;
-      case 'log-all-quick':
-        logAllQuick();
         break;
       case 'view-entries':
         delegateToLegacy('loadNutritionEntries');
@@ -468,17 +369,7 @@ export async function loadNutrition() {
           ${renderMacroRings(daily)}
         </div>
 
-        ${renderAICoachCard()}
-
-        <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
-          <div class="card">
-            <div class="card-header">
-              <h2 class="card-title"><i class="fas fa-utensils"></i> Log Meal</h2>
-            </div>
-            ${renderQuickLog()}
-          </div>
-          ${renderQuickAddForm()}
-        </div>
+        ${renderAddCard()}
 
         <div class="card">
           <div class="card-header">

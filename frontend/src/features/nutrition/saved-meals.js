@@ -414,6 +414,74 @@ async function logQuickMacros(modalApi) {
   });
 }
 
+// Quick-add protein / water / creatine. Folded into the unified "Add to Today"
+// flow as a single method (replaces the old always-on inline form).
+export function showQuickAddSupplements() {
+  openModal({
+    title: 'Quick Add',
+    size: 'default',
+    content: String(html`
+      <div class="stack stack-sm">
+        <div class="text-muted" style="font-size: var(--text-sm);">
+          Log protein, water, or creatine for today. Fill in any that apply.
+        </div>
+        <div class="quick-add-row">
+          <label>Protein</label>
+          <div class="quick-add-input-group">
+            <input type="number" class="input" id="qas-protein" placeholder="0" min="0" step="1" autofocus />
+            <span class="quick-add-unit">g</span>
+          </div>
+        </div>
+        <div class="quick-add-row">
+          <label>Water</label>
+          <div class="quick-add-input-group">
+            <input type="number" class="input" id="qas-water" placeholder="0" min="0" step="100" />
+            <span class="quick-add-unit">ml</span>
+          </div>
+        </div>
+        <div class="quick-add-row">
+          <label>Creatine</label>
+          <div class="quick-add-input-group">
+            <input type="number" class="input" id="qas-creatine" placeholder="0" min="0" step="0.5" />
+            <span class="quick-add-unit">g</span>
+          </div>
+        </div>
+      </div>
+    `),
+    actions: [
+      { label: 'Cancel', variant: 'btn-outline', onClick: (m) => m.close(false) },
+      {
+        label: 'Log',
+        variant: 'btn-primary',
+        primary: true,
+        onClick: async (m) => {
+          const val = (id) => parseFloat(m.element.querySelector(id).value) || 0;
+          const protein = val('#qas-protein');
+          const water = val('#qas-water');
+          const creatine = val('#qas-creatine');
+          if (!protein && !water && !creatine) {
+            toast.warning('Enter an amount in at least one field.');
+            return;
+          }
+          const loggedAt = nowLocalISO();
+          const ops = [];
+          if (protein > 0) ops.push(api.post('/nutrition/entries', { entry_type: 'protein', amount: protein, unit: 'g', logged_at: loggedAt }));
+          if (water > 0) ops.push(api.post('/nutrition/entries', { entry_type: 'water', amount: water, unit: 'ml', logged_at: loggedAt }));
+          if (creatine > 0) ops.push(api.post('/nutrition/entries', { entry_type: 'creatine', amount: creatine, unit: 'g', logged_at: loggedAt }));
+          try {
+            await Promise.all(ops);
+            toast.success('Logged!');
+            m.close(true);
+            if (typeof window.loadNutrition === 'function') window.loadNutrition();
+          } catch (err) {
+            toast.error(`Error: ${err.message}`);
+          }
+        }
+      }
+    ]
+  });
+}
+
 export function applyMacroPreset(calories, protein, carbs, fat) {
   document.getElementById('qm-calories')?.setAttribute('value', String(calories));
   document.getElementById('qm-protein')?.setAttribute('value', String(protein));

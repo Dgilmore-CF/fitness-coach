@@ -100,6 +100,7 @@ import {
   parseRecipeUrl,
   createSavedMeal,
   showQuickMacroEntry,
+  showQuickAddSupplements,
   applyMacroPreset,
   logProtein,
   logWater,
@@ -240,6 +241,7 @@ registerScreen('saved-meals-update', 'updateSavedMeal', updateSavedMeal);
 registerScreen('parse-recipe', 'parseRecipeUrl', parseRecipeUrl);
 registerScreen('create-saved-meal', 'createSavedMeal', createSavedMeal);
 registerScreen('quick-macro-entry', 'showQuickMacroEntry', showQuickMacroEntry);
+registerScreen('quick-add-supplements', 'showQuickAddSupplements', showQuickAddSupplements);
 registerScreen('macro-preset', 'applyMacroPreset', applyMacroPreset);
 registerScreen('log-protein', 'logProtein', logProtein);
 registerScreen('log-water', 'logWater', logWater);
