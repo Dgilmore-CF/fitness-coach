@@ -752,6 +752,24 @@ export function renderWorkoutSummary(workout, stats, hasModifications) {
           `
         : ''}
 
+      ${!workout.program_day_id
+        ? html`
+            <div class="card aw-summary-save-program">
+              <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-bookmark"></i> Save as a reusable day?</h3>
+              </div>
+              <p class="text-muted" style="margin-bottom: var(--space-3);">
+                Liked this workout? Save it to <strong>My Custom Workouts</strong> so you can repeat it anytime.
+              </p>
+              <div class="cluster">
+                <button class="btn btn-primary" data-action="save-as-day">
+                  <i class="fas fa-save"></i> Save as Day
+                </button>
+              </div>
+            </div>
+          `
+        : ''}
+
       <div class="cluster" style="justify-content: center;">
         <button class="btn btn-outline text-danger" data-action="delete-workout">
           <i class="fas fa-trash"></i> Delete Workout

@@ -65,6 +65,7 @@ import {
   startWorkoutFromProgram,
   startWorkoutDay
 } from './features/start-workout.js';
+import { startQuickWorkout } from './features/quick-workout.js';
 import { openUnifiedExporter } from './features/analytics/export-center.js';
 import {
   loadAdvancedAnalytics,
@@ -195,6 +196,7 @@ registerScreen('view-workout', 'viewWorkout', viewWorkout);
 registerScreen('start-workout', 'startWorkout', startWorkout);
 registerScreen('start-workout-program', 'startWorkoutFromProgram', startWorkoutFromProgram);
 registerScreen('start-workout-day', 'startWorkoutDay', startWorkoutDay);
+registerScreen('start-quick-workout', 'startQuickWorkout', startQuickWorkout);
 
 // Export Center (called from Analytics screen)
 registerScreen('export-center', 'openUnifiedExporter', openUnifiedExporter);

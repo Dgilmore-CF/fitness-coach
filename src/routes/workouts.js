@@ -1097,4 +1097,82 @@ workouts.put('/:id/cardio', async (c) => {
   return c.json({ workout: updated });
 });
 
+// Save an (ad-hoc) workout's exercises as a reusable program day. Creates or
+// reuses a "My Custom Workouts" program for the user, then snapshots the
+// workout's exercises (with the number of sets actually performed as the new
+// target) into a fresh program day.
+workouts.post('/:workoutId/save-as-day', async (c) => {
+  const user = requireAuth(c);
+  const workoutId = c.req.param('workoutId');
+  const db = c.env.DB;
+
+  let dayName = 'Custom Workout';
+  try {
+    const body = await c.req.json();
+    if (body?.name && String(body.name).trim()) dayName = String(body.name).trim().slice(0, 80);
+  } catch (e) { /* name optional */ }
+
+  // Verify workout belongs to user
+  const workout = await db.prepare(
+    'SELECT * FROM workouts WHERE id = ? AND user_id = ?'
+  ).bind(workoutId, user.id).first();
+  if (!workout) {
+    return c.json({ error: 'Workout not found' }, 404);
+  }
+
+  // Gather the workout's exercises + the count of sets performed per exercise
+  // (used as the saved target_sets). Cardio-only sets still count as sets.
+  const exercises = await db.prepare(
+    `SELECT we.id AS workout_exercise_id, we.exercise_id, we.order_index,
+            we.target_sets,
+            (SELECT COUNT(*) FROM sets s WHERE s.workout_exercise_id = we.id) AS performed_sets
+     FROM workout_exercises we
+     WHERE we.workout_id = ?
+     ORDER BY we.order_index`
+  ).bind(workoutId).all();
+
+  if (!exercises.results?.length) {
+    return c.json({ error: 'This workout has no exercises to save' }, 400);
+  }
+
+  // Find or create the user's "My Custom Workouts" container program.
+  let program = await db.prepare(
+    `SELECT * FROM programs WHERE user_id = ? AND name = 'My Custom Workouts' LIMIT 1`
+  ).bind(user.id).first();
+  if (!program) {
+    program = await db.prepare(
+      `INSERT INTO programs (user_id, name, days_per_week, goal, equipment, ai_generated, active)
+       VALUES (?, 'My Custom Workouts', 0, 'Custom', 'Mixed', 0, 0)
+       RETURNING *`
+    ).bind(user.id).first();
+  }
+
+  // Append a new day.
+  const maxDay = await db.prepare(
+    'SELECT COALESCE(MAX(day_number), 0) AS n FROM program_days WHERE program_id = ?'
+  ).bind(program.id).first();
+  const day = await db.prepare(
+    `INSERT INTO program_days (program_id, day_number, name, focus)
+     VALUES (?, ?, ?, ?)
+     RETURNING *`
+  ).bind(program.id, (maxDay?.n || 0) + 1, dayName, 'Custom').first();
+
+  // Snapshot exercises into program_exercises.
+  const stmts = exercises.results.map((ex, i) =>
+    db.prepare(
+      `INSERT INTO program_exercises (program_day_id, exercise_id, order_index, target_sets, rest_seconds)
+       VALUES (?, ?, ?, ?, 90)`
+    ).bind(day.id, ex.exercise_id, i, ex.performed_sets || ex.target_sets || 3)
+  );
+  await db.batch(stmts);
+
+  return c.json({
+    message: 'Saved as reusable day',
+    program_id: program.id,
+    program_day_id: day.id,
+    day_name: dayName,
+    exercise_count: exercises.results.length
+  });
+});
+
 export default workouts;

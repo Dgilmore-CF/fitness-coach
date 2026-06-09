@@ -541,6 +541,9 @@ async function handleClick(event) {
     case 'save-to-program':
       await saveWorkoutToProgram();
       break;
+    case 'save-as-day':
+      await saveAsReusableDay(target);
+      break;
     case 'skip-save-program':
       document.querySelector('.aw-summary-save-program')?.remove();
       break;
@@ -1166,6 +1169,26 @@ async function deleteCompletedWorkout() {
     if (typeof window.switchTab === 'function') window.switchTab('dashboard');
   } catch (err) {
     toast.error(`Error: ${err.message}`);
+  }
+}
+
+async function saveAsReusableDay(triggerEl) {
+  const workout = getWorkout();
+  if (!workout) return;
+
+  const defaultName = workout.day_name || 'Custom Workout';
+  const name = window.prompt('Name this workout day:', defaultName);
+  if (name === null) return; // cancelled
+
+  try {
+    const res = await api.post(`/workouts/${workout.id}/save-as-day`, {
+      name: name.trim() || defaultName
+    });
+    toast.success(`Saved "${res.day_name}" to My Custom Workouts`);
+    // Collapse the prompt card so it can't be double-saved.
+    triggerEl?.closest('.aw-summary-save-program')?.remove();
+  } catch (err) {
+    toast.error(`Could not save: ${err.message}`);
   }
 }
 

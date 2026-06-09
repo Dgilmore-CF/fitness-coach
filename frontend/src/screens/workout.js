@@ -53,9 +53,14 @@ function renderHero(program) {
               </span>
             </div>
           </div>
-          <button class="btn btn-lg workout-hero-start" data-action="start-workout">
-            <i class="fas fa-play"></i> Start Workout
-          </button>
+          <div class="stack stack-sm" style="align-items: stretch;">
+            <button class="btn btn-lg workout-hero-start" data-action="start-workout">
+              <i class="fas fa-play"></i> Start Workout
+            </button>
+            <button class="btn btn-ghost btn-sm workout-hero-quick" data-action="start-quick-workout">
+              <i class="fas fa-bolt"></i> Build a Workout
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -300,6 +305,10 @@ function renderNoProgram() {
           <i class="fas fa-list"></i> View Programs
         </button>
       </div>
+      <div class="qw-noprogram-divider"><span>or</span></div>
+      <button class="btn btn-outline btn-block" data-action="start-quick-workout">
+        <i class="fas fa-bolt"></i> Build a Workout — pick your own exercises
+      </button>
     </div>
   `;
 }
@@ -314,6 +323,9 @@ function attachHandlers(container, program) {
     switch (action) {
       case 'start-workout':
         if (typeof window.startWorkout === 'function') await window.startWorkout();
+        break;
+      case 'start-quick-workout':
+        if (typeof window.startQuickWorkout === 'function') await window.startQuickWorkout();
         break;
       case 'start-day': {
         const programId = parseInt(target.dataset.programId, 10);

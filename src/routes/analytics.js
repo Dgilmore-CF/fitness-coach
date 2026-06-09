@@ -79,6 +79,134 @@ analytics.get('/progress', async (c) => {
   });
 });
 
+// Consolidated dashboard payload — everything the redesigned Stats screen
+// needs in a single round trip. Period is `days` (default 84 = 12 weeks);
+// deltas compare against the immediately preceding window of the same length.
+analytics.get('/dashboard', async (c) => {
+  const user = requireAuth(c);
+  const db = c.env.DB;
+  const days = Math.max(7, Math.min(366, parseInt(c.req.query('days') || '84', 10)));
+  const prevDays = days * 2;
+
+  const [overview, prev, setsAgg, volumeTrend, byMuscle, topExercises, dow, activeDays] =
+    await Promise.all([
+      db.prepare(
+        `SELECT COUNT(*) AS workouts, COALESCE(SUM(total_weight_kg),0) AS volume_kg,
+                COALESCE(SUM(total_duration_seconds),0) AS time_seconds,
+                AVG(perceived_exertion) AS avg_rpe
+         FROM workouts WHERE user_id=? AND completed=1
+           AND start_time >= datetime('now','-'||?||' days')`
+      ).bind(user.id, days).first(),
+
+      db.prepare(
+        `SELECT COUNT(*) AS workouts, COALESCE(SUM(total_weight_kg),0) AS volume_kg,
+                COALESCE(SUM(total_duration_seconds),0) AS time_seconds
+         FROM workouts WHERE user_id=? AND completed=1
+           AND start_time >= datetime('now','-'||?||' days')
+           AND start_time <  datetime('now','-'||?||' days')`
+      ).bind(user.id, prevDays, days).first(),
+
+      db.prepare(
+        `SELECT COUNT(s.id) AS total_sets
+         FROM sets s JOIN workout_exercises we ON s.workout_exercise_id=we.id
+         JOIN workouts w ON we.workout_id=w.id
+         WHERE w.user_id=? AND w.completed=1 AND w.start_time >= datetime('now','-'||?||' days')`
+      ).bind(user.id, days).first(),
+
+      db.prepare(
+        `SELECT strftime('%Y-%W', w.start_time) AS period,
+                MIN(date(w.start_time)) AS week_start,
+                COALESCE(SUM(w.total_weight_kg),0) AS volume,
+                COUNT(*) AS workouts, AVG(w.perceived_exertion) AS avg_rpe
+         FROM workouts w WHERE w.user_id=? AND w.completed=1
+           AND w.start_time >= datetime('now','-'||?||' days')
+         GROUP BY period ORDER BY period`
+      ).bind(user.id, days).all(),
+
+      db.prepare(
+        `SELECT e.muscle_group,
+                SUM(CASE WHEN e.is_unilateral THEN s.weight_kg*s.reps*2 ELSE s.weight_kg*s.reps END) AS volume,
+                COUNT(s.id) AS sets
+         FROM sets s JOIN workout_exercises we ON s.workout_exercise_id=we.id
+         JOIN exercises e ON we.exercise_id=e.id JOIN workouts w ON we.workout_id=w.id
+         WHERE w.user_id=? AND w.completed=1 AND w.start_time >= datetime('now','-'||?||' days')
+         GROUP BY e.muscle_group ORDER BY volume DESC`
+      ).bind(user.id, days).all(),
+
+      db.prepare(
+        `SELECT e.id AS exercise_id, e.name, e.muscle_group,
+                SUM(CASE WHEN e.is_unilateral THEN s.weight_kg*s.reps*2 ELSE s.weight_kg*s.reps END) AS volume,
+                MAX(s.one_rep_max_kg) AS max_1rm,
+                COUNT(DISTINCT we.workout_id) AS workout_count
+         FROM sets s JOIN workout_exercises we ON s.workout_exercise_id=we.id
+         JOIN exercises e ON we.exercise_id=e.id JOIN workouts w ON we.workout_id=w.id
+         WHERE w.user_id=? AND w.completed=1 AND w.start_time >= datetime('now','-'||?||' days')
+         GROUP BY e.id ORDER BY volume DESC LIMIT 8`
+      ).bind(user.id, days).all(),
+
+      db.prepare(
+        `SELECT strftime('%w', start_time) AS dow, COUNT(*) AS count
+         FROM workouts WHERE user_id=? AND completed=1
+           AND start_time >= datetime('now','-'||?||' days')
+         GROUP BY dow`
+      ).bind(user.id, days).all(),
+
+      db.prepare(
+        `SELECT COUNT(DISTINCT date(start_time)) AS active_days
+         FROM workouts WHERE user_id=? AND completed=1
+           AND start_time >= datetime('now','-'||?||' days')`
+      ).bind(user.id, days).first()
+    ]);
+
+  // 1RM progression for the single highest-volume exercise of the period.
+  let topExercise1rm = null;
+  const top = topExercises.results?.[0];
+  if (top) {
+    const series = await db.prepare(
+      `SELECT date(w.start_time) AS date, MAX(s.one_rep_max_kg) AS max_1rm
+       FROM sets s JOIN workout_exercises we ON s.workout_exercise_id=we.id
+       JOIN workouts w ON we.workout_id=w.id
+       WHERE w.user_id=? AND w.completed=1 AND we.exercise_id=?
+         AND w.start_time >= datetime('now','-'||?||' days')
+       GROUP BY date(w.start_time) ORDER BY date(w.start_time)`
+    ).bind(user.id, top.exercise_id, days).all();
+    topExercise1rm = {
+      exercise_id: top.exercise_id,
+      exercise_name: top.name,
+      series: series.results
+    };
+  }
+
+  const pct = (cur, prv) => (prv > 0 ? ((cur - prv) / prv) * 100 : (cur > 0 ? 100 : 0));
+
+  return c.json({
+    range_days: days,
+    overview: {
+      workouts: overview.workouts || 0,
+      volume_kg: overview.volume_kg || 0,
+      time_seconds: overview.time_seconds || 0,
+      avg_workout_seconds: overview.workouts ? (overview.time_seconds / overview.workouts) : 0,
+      total_sets: setsAgg.total_sets || 0,
+      avg_rpe: overview.avg_rpe
+    },
+    deltas: {
+      workouts: pct(overview.workouts || 0, prev.workouts || 0),
+      volume_kg: pct(overview.volume_kg || 0, prev.volume_kg || 0),
+      time_seconds: pct(overview.time_seconds || 0, prev.time_seconds || 0)
+    },
+    volume_trend: volumeTrend.results || [],
+    volume_by_muscle: byMuscle.results || [],
+    top_exercises: topExercises.results || [],
+    top_exercise_1rm: topExercise1rm,
+    dow_distribution: dow.results || [],
+    consistency: {
+      active_days: activeDays.active_days || 0,
+      period_days: days,
+      workouts_per_week: overview.workouts ? (overview.workouts / (days / 7)) : 0
+    }
+  });
+});
+
 // Get 1RM history for all exercises
 analytics.get('/1rm', async (c) => {
   const user = requireAuth(c);
