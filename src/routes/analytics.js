@@ -698,7 +698,7 @@ analytics.get('/advanced', async (c) => {
       consistency: consistency.consistency,
       recoveryStatus: recovery.status,
       currentStreak: consistency.currentStreak
-    });
+    }, c.env);
 
     return c.json({
       consistency,

@@ -37,7 +37,8 @@ programs.post('/generate', async (c) => {
         goal,
         custom_instructions,
         exercises: exercises.results,
-        available_equipment
+        available_equipment,
+        env: c.env
       });
     } catch (aiError) {
       console.error('AI generation error:', aiError);

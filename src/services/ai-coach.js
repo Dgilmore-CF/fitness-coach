@@ -3,23 +3,27 @@
  * Provides intelligent, personalized recommendations based on complete workout history
  */
 
-import { buildGatewayOptions } from '../utils/ai-parser.js';
+import { runChat, AI_MODELS } from '../utils/ai-gateway.js';
 
 /**
- * Helper to call env.AI.run() with gateway options when available.
- * All AI calls in this service should go through this wrapper so they
- * benefit from gateway logging + caching when AI_GATEWAY_ID is set.
+ * Helper to run an AI chat with full resilience (AI Gateway dynamic routing
+ * when configured, otherwise a multi-model fallback chain). Preserves the
+ * legacy `{ response }` return shape so existing callers are unchanged.
+ * The per-call `model` becomes the preferred head of the fallback chain.
  */
-function withGateway(ai, model, inputs, env, featureName, userId, overrides = {}) {
-  const options = {};
-  const gateway = env ? buildGatewayOptions(env, {
+async function withGateway(ai, model, inputs, env, featureName, userId, overrides = {}) {
+  const chain = model ? [model, ...AI_MODELS.filter((m) => m !== model)] : AI_MODELS;
+  const { text } = await runChat(ai, {
+    env,
+    messages: inputs?.messages,
+    prompt: inputs?.prompt,
+    maxTokens: inputs?.max_tokens ?? 1500,
+    temperature: inputs?.temperature,
+    models: chain,
     metadata: { feature: featureName, userId: String(userId || 'unknown') },
-    ...overrides
-  }) : null;
-  if (gateway) options.gateway = gateway;
-  return Object.keys(options).length > 0
-    ? ai.run(model, inputs, options)
-    : ai.run(model, inputs);
+    gateway: overrides
+  });
+  return { response: text };
 }
 
 /**

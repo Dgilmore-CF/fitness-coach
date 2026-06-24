@@ -2,6 +2,8 @@
  * AI service for program generation and recommendations using Cloudflare Workers AI
  */
 
+import { runChat } from '../utils/ai-gateway.js';
+
 /**
  * Calculate one rep max using Epley formula
  */
@@ -300,7 +302,7 @@ function removeDuplicateExercises(dayExercises) {
  * 2. Prompt chaining (structure first, then exercises)
  * 3. Validation at each step
  */
-export async function generateProgram(ai, { user, days_per_week, goal, custom_instructions = '', exercises, available_equipment = [] }) {
+export async function generateProgram(ai, { user, days_per_week, goal, custom_instructions = '', exercises, available_equipment = [], env = null }) {
   console.log(`\n🔧 Starting hybrid AI program generation (${days_per_week} days, ${goal})...`);
   if (custom_instructions) {
     console.log(`📝 Custom instructions: ${custom_instructions}`);
@@ -364,7 +366,7 @@ export async function generateProgram(ai, { user, days_per_week, goal, custom_in
     // STEP 1: Generate program structure with few-shot learning
     console.log('📋 Step 1: Generating program structure with few-shot learning...');
     const programData = await generateProgramStructureWithFewShot(
-      ai, days_per_week, goal, user, custom_instructions
+      ai, days_per_week, goal, user, custom_instructions, env
     );
     
     if (!programData || !programData.days) {
@@ -416,7 +418,7 @@ export async function generateProgram(ai, { user, days_per_week, goal, custom_in
       let dayExercises = [];
       try {
         dayExercises = await generateExercisesForDay(
-          ai, day, validExercises, formatExerciseList, custom_instructions, usedExerciseIds
+          ai, day, validExercises, formatExerciseList, custom_instructions, usedExerciseIds, env
         );
         console.log(`   AI returned ${dayExercises ? dayExercises.length : 0} exercises`);
       } catch (aiError) {
@@ -485,7 +487,7 @@ export async function generateProgram(ai, { user, days_per_week, goal, custom_in
  * Step 1: Generate program structure using AI with few-shot examples
  * The AI interprets user instructions directly - no regex parsing
  */
-async function generateProgramStructureWithFewShot(ai, days_per_week, goal, user, custom_instructions = '') {
+async function generateProgramStructureWithFewShot(ai, days_per_week, goal, user, custom_instructions = '', env = null) {
   console.log('🤖 AI generating program structure...');
   console.log(`   Days: ${days_per_week}, Goal: ${goal}`);
   console.log(`   User instructions: ${custom_instructions || '(none)'}`);
@@ -539,15 +541,17 @@ CRITICAL RULES:
 
 Now create the program. Return ONLY valid JSON, no other text:`;
   
-  const response = await ai.run('@cf/meta/llama-3-8b-instruct', {
+  const response = await runChat(ai, {
+    env,
     prompt: structurePrompt,
-    max_tokens: 2048,
-    temperature: 0.3
+    maxTokens: 2048,
+    temperature: 0.3,
+    metadata: { feature: 'program_structure' }
   });
   
   console.log('📥 AI response received');
   
-  const jsonMatch = response.response.match(/\{[\s\S]*\}/);
+  const jsonMatch = response.text.match(/\{[\s\S]*\}/);
   if (jsonMatch) {
     try {
       const parsed = JSON.parse(jsonMatch[0]);
@@ -571,7 +575,7 @@ Now create the program. Return ONLY valid JSON, no other text:`;
  * - Mix of compound and isolation exercises
  * - Multiple angles for complete muscle development
  */
-async function generateExercisesForDay(ai, day, validExercises, formatExerciseList, custom_instructions = '', usedExerciseIds = new Set()) {
+async function generateExercisesForDay(ai, day, validExercises, formatExerciseList, custom_instructions = '', usedExerciseIds = new Set(), env = null) {
   // Build day-specific exercise structure requirements
   const dayName = day.name.toLowerCase();
   let exerciseStructure = '';
@@ -643,14 +647,16 @@ SET/REP SCHEME:
 - Secondary compound: 3-4 sets, 8-10 reps, 120s rest
 - Isolation: 3 sets, 10-15 reps, 60-90s rest`;
   
-  const response = await ai.run('@cf/meta/llama-3-8b-instruct', {
+  const response = await runChat(ai, {
+    env,
     prompt: exercisePrompt,
-    max_tokens: 1024,
-    temperature: 0.4  // Lower for more consistent adherence to rules
+    maxTokens: 1024,
+    temperature: 0.4,  // Lower for more consistent adherence to rules
+    metadata: { feature: 'program_exercises' }
   });
   
   // Parse JSON array from response
-  const jsonMatch = response.response.match(/\[[\s\S]*\]/);
+  const jsonMatch = response.text.match(/\[[\s\S]*\]/);
   if (jsonMatch) {
     try {
       const exercises = JSON.parse(jsonMatch[0]);

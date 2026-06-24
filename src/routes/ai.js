@@ -10,6 +10,7 @@ import {
   buildPreWorkoutContext,
   predictNextSet
 } from '../services/ai-realtime.js';
+import { runChat } from '../utils/ai-gateway.js';
 import {
   analyzeNutrition,
   suggestNextMeal,
@@ -157,18 +158,18 @@ Provide recommendations in this JSON format:
 
 Focus on: volume optimization, muscle balance, recovery needs, injury prevention.`;
 
-    // Call AI model
-    const aiResponse = await aiModel.run('@cf/meta/llama-3.1-8b-instruct', {
-      messages: [
-        { role: 'system', content: 'You are an expert strength coach analyzing training data.' },
-        { role: 'user', content: analysisPrompt }
-      ]
+    // Call AI model (resilient: dynamic routing or model-chain fallback)
+    const aiResponse = await runChat(aiModel, {
+      env: c.env,
+      systemPrompt: 'You are an expert strength coach analyzing training data.',
+      prompt: analysisPrompt,
+      metadata: { feature: 'recommendations', userId: String(user.id) }
     });
 
     // Parse AI response
     let aiRecommendations = [];
     try {
-      const responseText = aiResponse.response || '';
+      const responseText = aiResponse.text || '';
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);

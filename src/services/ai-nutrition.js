@@ -406,33 +406,27 @@ Output: {"foods":[{"name":"Banana","quantity":1,"unit":"medium","calories":105,"
 Input: "6oz grilled chicken breast and 1 cup white rice"
 Output: {"foods":[{"name":"Chicken breast, grilled","quantity":6,"unit":"oz","calories":47,"protein_g":8.8,"carbs_g":0,"fat_g":1,"fiber_g":0,"confidence":"high"},{"name":"White rice, cooked","quantity":1,"unit":"cup","calories":205,"protein_g":4.3,"carbs_g":45,"fat_g":0.4,"fiber_g":0.6,"confidence":"high"}]}`;
 
-  // Prefer the larger 70B model for accuracy; fall back to 8B if unavailable
-  const models = [
-    '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
-    '@cf/meta/llama-3.1-8b-instruct'
-  ];
-
-  let result = { success: false, parsed: { foods: [] } };
-  for (const model of models) {
-    result = await callAI(ai, {
-      systemPrompt,
-      userPrompt: `Input: "${text.trim()}"\nOutput:`,
-      model,
-      maxTokens: 1200,
-      parseJson: true,
-      fallbackJson: { foods: [] },
-      env,
-      gateway: {
-        // Cache identical meal descriptions for 24h — common strings like
-        // "2 eggs and toast" benefit a lot from caching.
-        cacheTtl: 86400,
-        metadata: { feature: 'meal_parse', userId: String(userId || 'unknown') }
-      }
-    });
-    if (result.success && Array.isArray(result.parsed?.foods) && result.parsed.foods.length > 0) {
-      break;
+  // Resilient single call: callAI tries AI Gateway dynamic routing first (when
+  // configured) and otherwise falls back across the model chain (70B → 8B) on
+  // its own, so a single deprecated model no longer breaks parsing.
+  const result = await callAI(ai, {
+    systemPrompt,
+    userPrompt: `Input: "${text.trim()}"\nOutput:`,
+    models: [
+      '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+      '@cf/meta/llama-3.1-8b-instruct'
+    ],
+    maxTokens: 1200,
+    parseJson: true,
+    fallbackJson: { foods: [] },
+    env,
+    gateway: {
+      // Cache identical meal descriptions for 24h — common strings like
+      // "2 eggs and toast" benefit a lot from caching.
+      cacheTtl: 86400,
+      metadata: { feature: 'meal_parse', userId: String(userId || 'unknown') }
     }
-  }
+  });
 
   const parsed = result.parsed || {};
   const rawFoods = Array.isArray(parsed.foods) ? parsed.foods : [];

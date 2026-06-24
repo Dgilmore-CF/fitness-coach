@@ -1,5 +1,7 @@
 // Advanced Analytics Service with ML Predictions
 
+import { runChat } from '../utils/ai-gateway.js';
+
 // Calculate linear regression for trend prediction
 function linearRegression(data) {
   const n = data.length;
@@ -359,7 +361,7 @@ export async function generateVolumePredictions(db, userId) {
 }
 
 // Get AI-powered workout insights using Cloudflare AI
-export async function getAIWorkoutInsights(ai, userData) {
+export async function getAIWorkoutInsights(ai, userData, env = null) {
   const prompt = `As a fitness coach, analyze this training data and provide 3 specific, actionable insights:
 
 Training Summary (Last 30 Days):
@@ -387,14 +389,14 @@ Provide insights in this JSON format:
 }`;
 
   try {
-    const response = await ai.run('@cf/meta/llama-3.1-8b-instruct', {
-      messages: [
-        { role: 'system', content: 'You are an expert strength coach providing data-driven insights. Always respond with valid JSON.' },
-        { role: 'user', content: prompt }
-      ]
+    const response = await runChat(ai, {
+      env,
+      systemPrompt: 'You are an expert strength coach providing data-driven insights. Always respond with valid JSON.',
+      prompt,
+      metadata: { feature: 'advanced_insights' }
     });
     
-    const responseText = response.response || '';
+    const responseText = response.text || '';
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     
     if (jsonMatch) {

@@ -43,12 +43,23 @@ new_sqlite_classes = ["WorkoutSessionDO"]
 # Environment variables
 [vars]
 ENVIRONMENT = "production"
-# AI Gateway — when set, every Workers AI call is routed through the
+# AI Gateway — when set, every Workers AI binding call is routed through the
 # named gateway for analytics, caching, rate limiting, and cost controls.
-# See the Cloudflare dashboard: AI → AI Gateway → Create Gateway.
-# Replace the value below with your gateway slug (lowercase, no spaces).
-# To disable routing, comment this line out.
 AI_GATEWAY_ID = "fitness-coach"
+# Cloudflare account id — needed to build the AI Gateway dynamic-routing URL
+# (https://gateway.ai.cloudflare.com/v1/<account>/<gateway>/compat/...).
+CF_ACCOUNT_ID = "430470778f0d9dbd89d3d69637b2ae9d"
+# AI Gateway Dynamic Routing: set this to the route name you create in the
+# dashboard (AI Gateway → your gateway → Dynamic Routes). When this AND the
+# CF_AIG_TOKEN secret are present, AI calls use `dynamic/<route>` so model
+# selection + fallbacks are managed in the dashboard with no code deploy.
+# Leave empty to use the in-code Workers AI model fallback chain instead.
+AI_GATEWAY_ROUTE = ""
+
+# Secrets (set via CLI, never commit):
+#   wrangler secret put JWT_SECRET
+#   wrangler secret put USDA_API_KEY
+#   wrangler secret put CF_AIG_TOKEN   # gateway auth token for dynamic routing
 
 # Secrets (set via CLI, never commit):
 #   wrangler secret put JWT_SECRET
