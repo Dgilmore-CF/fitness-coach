@@ -412,10 +412,8 @@ Output: {"foods":[{"name":"Chicken breast, grilled","quantity":6,"unit":"oz","ca
   const result = await callAI(ai, {
     systemPrompt,
     userPrompt: `Input: "${text.trim()}"\nOutput:`,
-    models: [
-      '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
-      '@cf/meta/llama-3.1-8b-instruct'
-    ],
+    // No explicit models → inherit the central AI_MODELS fallback chain
+    // (single source of truth in src/utils/ai-gateway.js).
     maxTokens: 1200,
     parseJson: true,
     fallbackJson: { foods: [] },

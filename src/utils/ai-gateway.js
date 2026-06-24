@@ -19,12 +19,16 @@
  * All model IDs live here so a future deprecation is a one-line change.
  */
 
-// Ordered fallback chain for the Workers AI binding path. Keep the strongest /
-// most current model first. (The legacy `@cf/meta/llama-3-8b-instruct` and
-// bare `llama-3.1` were retired here after the 2026-05-30 deprecations.)
+// Ordered fallback chain for the Workers AI binding path. Cross-family on
+// purpose so a single model (or whole family) being retired never takes the
+// app down. Every id below was verified present in the live catalog
+// (`wrangler ai models`). The previously-used `@cf/meta/llama-3-8b-instruct`
+// and the non-fp8 `@cf/meta/llama-3.1-8b-instruct` were REMOVED from the
+// catalog (the 2026-05-30 deprecation) — that's what was 410-ing.
 export const AI_MODELS = [
-  '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
-  '@cf/meta/llama-3.1-8b-instruct'
+  '@cf/meta/llama-3.3-70b-instruct-fp8-fast', // strong, great at strict JSON
+  '@cf/zai-org/glm-4.7-flash',                // different family, fast, 131k ctx
+  '@cf/meta/llama-3.1-8b-instruct-fp8'        // cheap last-resort (fp8 replaces the retired 8b)
 ];
 
 /** The single default model for callers that want just one id. */

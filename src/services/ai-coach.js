@@ -3,7 +3,7 @@
  * Provides intelligent, personalized recommendations based on complete workout history
  */
 
-import { runChat, AI_MODELS } from '../utils/ai-gateway.js';
+import { runChat, AI_MODELS, DEFAULT_AI_MODEL } from '../utils/ai-gateway.js';
 
 /**
  * Helper to run an AI chat with full resilience (AI Gateway dynamic routing
@@ -447,7 +447,7 @@ Based on their recent training, provide pre-workout guidance in JSON format:
     // Call AI model
     const response = await withGateway(
       ai,
-      '@cf/meta/llama-3.1-8b-instruct',
+      DEFAULT_AI_MODEL,
       {
         messages: [
           { role: 'system', content: systemPrompt },
@@ -582,7 +582,7 @@ Provide coaching in JSON format:
   try {
     const response = await withGateway(
       ai,
-      '@cf/meta/llama-3.1-8b-instruct',
+      DEFAULT_AI_MODEL,
       {
         messages: [
           { role: 'system', content: 'You are an expert strength coach specializing in exercise programming and technique.' },
@@ -716,7 +716,7 @@ YOUR COACHING GUIDELINES:
   try {
     const response = await withGateway(
       ai,
-      '@cf/meta/llama-3.1-8b-instruct',
+      DEFAULT_AI_MODEL,
       {
         messages,
         max_tokens: 1500
