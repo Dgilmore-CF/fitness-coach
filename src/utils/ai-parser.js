@@ -15,8 +15,19 @@
  * @param {*} [fallback=null] - returned when parsing fails
  * @returns {object | *}
  */
-export function parseAIJsonResponse(text, fallback = null) {
-  if (!text || typeof text !== 'string') return fallback;
+/**
+ * Remove reasoning-model chain-of-thought blocks (e.g. <think>…</think>) so the
+ * greedy JSON extractor doesn't trip over braces inside the reasoning. Several
+ * Workers AI models (GLM-5.2, Kimi) are reasoning models that wrap their answer
+ * this way. Safe no-op for normal instruct models.
+ */
+function stripReasoning(text) {
+  return text.replace(/<(think|thinking|reasoning|thought)>[\s\S]*?<\/\1>/gi, '').trim();
+}
+
+export function parseAIJsonResponse(rawText, fallback = null) {
+  if (!rawText || typeof rawText !== 'string') return fallback;
+  const text = stripReasoning(rawText);
 
   // Strip code fences
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
@@ -45,8 +56,9 @@ export function parseAIJsonResponse(text, fallback = null) {
  * @param {Array} [fallback=[]]
  * @returns {Array}
  */
-export function parseAIJsonArray(text, fallback = []) {
-  if (!text || typeof text !== 'string') return fallback;
+export function parseAIJsonArray(rawText, fallback = []) {
+  if (!rawText || typeof rawText !== 'string') return fallback;
+  const text = stripReasoning(rawText);
 
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (fenced) {

@@ -121,6 +121,16 @@ describe('ai-parser', () => {
     expect(parseAIJsonArray('```json\n["a","b"]\n```')).toEqual(['a', 'b']);
     expect(parseAIJsonArray('not an array')).toEqual([]);
   });
+
+  it('strips reasoning-model <think> blocks before extracting JSON', () => {
+    // Reasoning models (GLM-5.2, Kimi) wrap chain-of-thought that often
+    // contains braces which would break a naive greedy {…} match.
+    const obj = '<think>Let me see... {maybe} or [1,2]?</think>\n{"foods": [{"name": "Egg"}]}';
+    expect(parseAIJsonResponse(obj)).toEqual({ foods: [{ name: 'Egg' }] });
+
+    const arr = '<reasoning>list has 3 items {x}</reasoning> [1, 2, 3]';
+    expect(parseAIJsonArray(arr)).toEqual([1, 2, 3]);
+  });
 });
 
 describe('volume (backend)', () => {
