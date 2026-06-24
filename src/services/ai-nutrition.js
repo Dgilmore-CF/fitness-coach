@@ -482,7 +482,7 @@ Output: {"foods":[{"name":"Chicken breast, grilled","quantity":6,"unit":"oz","ca
     { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0 }
   );
 
-  return {
+  const out = {
     foods: clean,
     totals: {
       calories: Math.round(totals.calories),
@@ -493,4 +493,21 @@ Output: {"foods":[{"name":"Chicken breast, grilled","quantity":6,"unit":"oz","ca
     },
     source: result.success ? 'ai' : 'error'
   };
+
+  // Diagnostics: when nothing parsed, surface what the model actually returned
+  // (which model/route answered + a snippet of raw text) so failures aren't
+  // opaque. Logged server-side and echoed in the response for inspection.
+  if (clean.length === 0) {
+    const debug = {
+      via: result.via || null,
+      model: result.model || null,
+      success: result.success,
+      error: result.error || null,
+      raw: (result.text || '').slice(0, 800)
+    };
+    console.warn('parse-meal produced no foods:', JSON.stringify(debug));
+    out._debug = debug;
+  }
+
+  return out;
 }

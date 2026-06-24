@@ -127,7 +127,7 @@ export async function callAI(ai, {
       : AI_MODELS;
 
   try {
-    const { text } = await runChat(ai, {
+    const { text, model: answeredBy, via } = await runChat(ai, {
       env,
       systemPrompt,
       prompt: userPrompt,
@@ -135,10 +135,13 @@ export async function callAI(ai, {
       temperature,
       models: chain,
       metadata: gateway?.metadata,
-      gateway
+      gateway,
+      // JSON callers can safely recover a reasoning model's answer from
+      // reasoning_content (the JSON parser strips the <think> wrapper).
+      allowReasoning: parseJson
     });
 
-    const result = { success: true, text };
+    const result = { success: true, text, model: answeredBy, via };
     if (parseJson) {
       result.parsed = parseAIJsonResponse(text, fallbackJson);
     }

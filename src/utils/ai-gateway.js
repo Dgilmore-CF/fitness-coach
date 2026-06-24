@@ -87,7 +87,7 @@ function toMessages({ messages, prompt, systemPrompt }) {
 }
 
 /** Call the gateway compat endpoint targeting a dynamic route. */
-async function runViaDynamicRoute(cfg, { messages, maxTokens, temperature, metadata }) {
+async function runViaDynamicRoute(cfg, { messages, maxTokens, temperature, metadata, allowReasoning }) {
   const url = `https://gateway.ai.cloudflare.com/v1/${cfg.accountId}/${cfg.gatewayId}/compat/chat/completions`;
   const headers = {
     'Content-Type': 'application/json',
@@ -111,24 +111,33 @@ async function runViaDynamicRoute(cfg, { messages, maxTokens, temperature, metad
     throw new Error(`dynamic route HTTP ${res.status}: ${detail.slice(0, 200)}`);
   }
   const data = await res.json();
-  const text = extractMessageText(data?.choices?.[0]?.message);
+  const text = extractMessageText(data?.choices?.[0]?.message, allowReasoning);
   // The compat response echoes the model the route actually resolved to.
   return { text, model: data?.model || `dynamic/${cfg.route}`, via: 'dynamic-route' };
 }
 
 /**
  * Pull the assistant text out of an OpenAI-compatible message. Handles plain
- * string content and the array-of-parts shape some providers return. Reasoning
- * models put their chain-of-thought in a separate field, so empty `content`
- * here (rather than substituting reasoning) is treated as "no answer" upstream,
- * which triggers the binding fallback.
+ * string content and the array-of-parts shape some providers return.
+ *
+ * Reasoning models (GLM-5.2, Kimi) often leave `content` empty and put their
+ * output — including the JSON we asked for — in `reasoning_content`. For
+ * JSON-extraction callers we set `allowReasoning` so that text is recovered
+ * (the JSON parser strips the <think> wrapper). For free-text callers (chat)
+ * we do NOT, since they'd otherwise be shown raw chain-of-thought; an empty
+ * content there correctly triggers the binding fallback to a cleaner model.
  */
-function extractMessageText(message) {
+function extractMessageText(message, allowReasoning = false) {
   if (!message) return '';
   const c = message.content;
-  if (typeof c === 'string') return c;
-  if (Array.isArray(c)) {
-    return c.map((p) => (typeof p === 'string' ? p : p?.text || '')).join('');
+  let text = '';
+  if (typeof c === 'string') text = c;
+  else if (Array.isArray(c)) text = c.map((p) => (typeof p === 'string' ? p : p?.text || '')).join('');
+  if (text && text.trim()) return text;
+
+  if (allowReasoning) {
+    const r = message.reasoning_content ?? message.reasoning;
+    if (typeof r === 'string' && r.trim()) return r;
   }
   return '';
 }
@@ -178,7 +187,8 @@ export async function runChat(ai, {
   temperature,
   models,
   metadata,
-  gateway
+  gateway,
+  allowReasoning = false
 } = {}) {
   const msgs = toMessages({ messages, prompt, systemPrompt });
   const chain = models && models.length ? models : AI_MODELS;
@@ -187,7 +197,7 @@ export async function runChat(ai, {
   const cfg = dynamicRouteConfig(env);
   if (cfg) {
     try {
-      const result = await runViaDynamicRoute(cfg, { messages: msgs, maxTokens, temperature, metadata });
+      const result = await runViaDynamicRoute(cfg, { messages: msgs, maxTokens, temperature, metadata, allowReasoning });
       // A route model that returns empty text (e.g. a reasoning model that
       // exhausted its token budget on thinking) shouldn't strand the caller —
       // fall through to the binding chain instead of returning "".
