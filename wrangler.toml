@@ -54,7 +54,7 @@ CF_ACCOUNT_ID = "430470778f0d9dbd89d3d69637b2ae9d"
 # CF_AIG_TOKEN secret are present, AI calls use `dynamic/<route>` so model
 # selection + fallbacks are managed in the dashboard with no code deploy.
 # Leave empty to use the in-code Workers AI model fallback chain instead.
-AI_GATEWAY_ROUTE = ""
+AI_GATEWAY_ROUTE = "fitness-llm"
 
 # Secrets (set via CLI, never commit):
 #   wrangler secret put JWT_SECRET

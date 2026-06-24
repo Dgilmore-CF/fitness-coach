@@ -49,6 +49,22 @@ export function buildGatewayOptions(env, overrides = {}) {
   };
 }
 
+/**
+ * Report AI configuration status (no secrets leaked) — used by the health
+ * probe so you can see at a glance whether dynamic routing is wired up.
+ */
+export function getAiConfig(env) {
+  const ready = !!dynamicRouteConfig(env);
+  return {
+    gateway_id: env?.AI_GATEWAY_ID || null,
+    account_id_set: !!env?.CF_ACCOUNT_ID,
+    route: env?.AI_GATEWAY_ROUTE || null,
+    aig_token_set: !!env?.CF_AIG_TOKEN,
+    dynamic_routing_ready: ready,
+    fallback_models: AI_MODELS
+  };
+}
+
 /** Resolve dynamic-routing config from env, or null when not fully set. */
 function dynamicRouteConfig(env) {
   const accountId = env?.CF_ACCOUNT_ID;
@@ -96,7 +112,8 @@ async function runViaDynamicRoute(cfg, { messages, maxTokens, temperature, metad
   }
   const data = await res.json();
   const text = data?.choices?.[0]?.message?.content || '';
-  return { text, model: `dynamic/${cfg.route}` };
+  // The compat response echoes the model the route actually resolved to.
+  return { text, model: data?.model || `dynamic/${cfg.route}`, via: 'dynamic-route' };
 }
 
 /** Call the Workers AI binding, falling back across the model chain. */
@@ -110,7 +127,7 @@ async function runViaBinding(ai, env, { models, messages, maxTokens, temperature
       const inputs = { messages, max_tokens: maxTokens };
       if (typeof temperature === 'number') inputs.temperature = temperature;
       const response = await ai.run(model, inputs, runOptions);
-      return { text: response?.response || '', model };
+      return { text: response?.response || '', model, via: 'binding' };
     } catch (err) {
       lastErr = err;
       console.warn(`AI model ${model} failed: ${err?.message || err}`);

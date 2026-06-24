@@ -10,7 +10,7 @@ import {
   buildPreWorkoutContext,
   predictNextSet
 } from '../services/ai-realtime.js';
-import { runChat } from '../utils/ai-gateway.js';
+import { runChat, getAiConfig } from '../utils/ai-gateway.js';
 import {
   analyzeNutrition,
   suggestNextMeal,
@@ -19,6 +19,54 @@ import {
 import { todayForRequest } from '../utils/local-date.js';
 
 const ai = new Hono();
+
+// AI health probe — runs a tiny real completion through the resilient runner
+// and reports whether it went through the AI Gateway dynamic route or fell
+// back to the binding model chain, plus which model actually answered.
+// Handy for verifying the dynamic route + diagnosing future deprecations.
+ai.get('/health', async (c) => {
+  const env = c.env;
+  const config = getAiConfig(env);
+  const started = Date.now();
+
+  let probe;
+  try {
+    const r = await runChat(env.AI, {
+      env,
+      systemPrompt: 'You are a health check. Reply with exactly one word.',
+      prompt: 'Reply with the single word: ok',
+      maxTokens: 5,
+      temperature: 0,
+      metadata: { feature: 'health_probe' }
+    });
+    probe = {
+      ok: Boolean((r.text || '').trim()),
+      via: r.via || null,          // 'dynamic-route' | 'binding'
+      model: r.model || null,      // the model that actually answered
+      sample: (r.text || '').trim().slice(0, 40)
+    };
+  } catch (err) {
+    probe = { ok: false, error: err?.message || String(err) };
+  }
+
+  const latency_ms = Date.now() - started;
+  const usingDynamicRoute = probe.via === 'dynamic-route';
+
+  // 200 when a model answered; 503 when AI is completely unavailable.
+  return c.json(
+    {
+      ok: probe.ok,
+      latency_ms,
+      using_dynamic_route: usingDynamicRoute,
+      // Configured for dynamic routing but fell back → route isn't working.
+      dynamic_route_degraded: config.dynamic_routing_ready && !usingDynamicRoute,
+      answered_by: probe.model,
+      config,
+      probe
+    },
+    probe.ok ? 200 : 503
+  );
+});
 
 // Get all recommendations for user
 ai.get('/recommendations', async (c) => {
