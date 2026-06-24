@@ -35,7 +35,9 @@ ai.get('/health', async (c) => {
       env,
       systemPrompt: 'You are a health check. Reply with exactly one word.',
       prompt: 'Reply with the single word: ok',
-      maxTokens: 5,
+      // Generous budget: reasoning models (e.g. GLM-5.2) spend tokens thinking
+      // before emitting any content, so a tiny cap returns empty text.
+      maxTokens: 256,
       temperature: 0,
       metadata: { feature: 'health_probe' }
     });

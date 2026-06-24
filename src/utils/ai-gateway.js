@@ -111,9 +111,26 @@ async function runViaDynamicRoute(cfg, { messages, maxTokens, temperature, metad
     throw new Error(`dynamic route HTTP ${res.status}: ${detail.slice(0, 200)}`);
   }
   const data = await res.json();
-  const text = data?.choices?.[0]?.message?.content || '';
+  const text = extractMessageText(data?.choices?.[0]?.message);
   // The compat response echoes the model the route actually resolved to.
   return { text, model: data?.model || `dynamic/${cfg.route}`, via: 'dynamic-route' };
+}
+
+/**
+ * Pull the assistant text out of an OpenAI-compatible message. Handles plain
+ * string content and the array-of-parts shape some providers return. Reasoning
+ * models put their chain-of-thought in a separate field, so empty `content`
+ * here (rather than substituting reasoning) is treated as "no answer" upstream,
+ * which triggers the binding fallback.
+ */
+function extractMessageText(message) {
+  if (!message) return '';
+  const c = message.content;
+  if (typeof c === 'string') return c;
+  if (Array.isArray(c)) {
+    return c.map((p) => (typeof p === 'string' ? p : p?.text || '')).join('');
+  }
+  return '';
 }
 
 /** Call the Workers AI binding, falling back across the model chain. */
@@ -170,7 +187,12 @@ export async function runChat(ai, {
   const cfg = dynamicRouteConfig(env);
   if (cfg) {
     try {
-      return await runViaDynamicRoute(cfg, { messages: msgs, maxTokens, temperature, metadata });
+      const result = await runViaDynamicRoute(cfg, { messages: msgs, maxTokens, temperature, metadata });
+      // A route model that returns empty text (e.g. a reasoning model that
+      // exhausted its token budget on thinking) shouldn't strand the caller —
+      // fall through to the binding chain instead of returning "".
+      if (result.text && result.text.trim()) return result;
+      console.warn('Dynamic route returned empty text, falling back to binding');
     } catch (err) {
       console.warn(`Dynamic route failed, falling back to binding: ${err?.message || err}`);
     }
